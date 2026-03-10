@@ -11,10 +11,10 @@
 
 mod common;
 
+use serde::{Deserialize, Serialize};
 use skaffen::extensions::{ExtensionManager, JsExtensionLoadSpec, JsExtensionRuntimeHandle};
 use skaffen::extensions_js::{ExtensionRepairEvent, PiJsRuntimeConfig, RepairMode};
 use skaffen::tools::ToolRegistry;
-use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::fmt::Write as _;
 use std::path::{Path, PathBuf};

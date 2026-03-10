@@ -1,13 +1,13 @@
 #![forbid(unsafe_code)]
 
+use proptest::prelude::*;
+use serde_json::{Value, json};
 use skaffen::PiResult;
 use skaffen::session::{CustomEntry, EntryBase, MigrationState, SessionEntry};
 use skaffen::session_store_v2::{
     MigrationEvent, MigrationVerification, SessionStoreV2, frame_to_session_entry,
     session_entry_to_frame_args,
 };
-use proptest::prelude::*;
-use serde_json::{Value, json};
 use std::fs;
 use std::io::{Seek, SeekFrom, Write};
 use std::path::Path;
@@ -1436,7 +1436,11 @@ fn build_test_jsonl(dir: &Path, entries: &[skaffen::session::SessionEntry]) -> s
     path
 }
 
-fn make_message_entry(id: &str, parent_id: Option<&str>, text: &str) -> skaffen::session::SessionEntry {
+fn make_message_entry(
+    id: &str,
+    parent_id: Option<&str>,
+    text: &str,
+) -> skaffen::session::SessionEntry {
     skaffen::session::SessionEntry::Message(skaffen::session::MessageEntry {
         base: skaffen::session::EntryBase::new(parent_id.map(String::from), id.to_string()),
         message: skaffen::session::SessionMessage::User {

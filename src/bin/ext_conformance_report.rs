@@ -13,11 +13,11 @@ use std::path::{Path, PathBuf};
 use anyhow::{Context, Result};
 use chrono::{DateTime, SecondsFormat, Utc};
 use clap::{Parser, ValueEnum};
+use serde::Serialize;
 use skaffen::conformance::report::{
     ConformanceRegression, ConformanceReport, ExtensionConformanceResult, compute_regression,
     generate_report,
 };
-use serde::Serialize;
 use uuid::Uuid;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]

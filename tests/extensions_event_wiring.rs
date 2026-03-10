@@ -12,6 +12,7 @@
 
 mod common;
 
+use serde_json::{Value, json};
 use skaffen::extensions::{
     ExtensionEventName, ExtensionManager, JsExtensionLoadSpec, JsExtensionRuntimeHandle,
     PROTOCOL_VERSION, RegisterPayload,
@@ -19,7 +20,6 @@ use skaffen::extensions::{
 use skaffen::extensions_js::PiJsRuntimeConfig;
 use skaffen::model::ToolCall;
 use skaffen::tools::{ToolOutput, ToolRegistry};
-use serde_json::{Value, json};
 use std::sync::Arc;
 
 // ---------------------------------------------------------------------------
@@ -74,10 +74,12 @@ fn make_tool_call(name: &str, args: Value) -> ToolCall {
 
 fn make_tool_output(text: &str) -> ToolOutput {
     ToolOutput {
-        content: vec![skaffen::model::ContentBlock::Text(skaffen::model::TextContent {
-            text: text.to_string(),
-            text_signature: None,
-        })],
+        content: vec![skaffen::model::ContentBlock::Text(
+            skaffen::model::TextContent {
+                text: text.to_string(),
+                text_signature: None,
+            },
+        )],
         details: None,
         is_error: false,
     }
@@ -632,10 +634,12 @@ fn event_ordering_startup_then_tool_call_then_agent_end() {
                 .expect("dispatch tool_call");
 
             let output = ToolOutput {
-                content: vec![skaffen::model::ContentBlock::Text(skaffen::model::TextContent {
-                    text: "ok".to_string(),
-                    text_signature: None,
-                })],
+                content: vec![skaffen::model::ContentBlock::Text(
+                    skaffen::model::TextContent {
+                        text: "ok".to_string(),
+                        text_signature: None,
+                    },
+                )],
                 details: None,
                 is_error: false,
             };

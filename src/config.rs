@@ -1472,7 +1472,10 @@ mod tests {
     fn directory_helpers_honor_environment_overrides() {
         let env = HashMap::from([
             ("PI_CODING_AGENT_DIR".to_string(), "env-root".to_string()),
-            ("SKAFFEN_SESSIONS_DIR".to_string(), "env-sessions".to_string()),
+            (
+                "SKAFFEN_SESSIONS_DIR".to_string(),
+                "env-sessions".to_string(),
+            ),
             ("PI_PACKAGE_DIR".to_string(), "env-packages".to_string()),
             (
                 "PI_EXTENSION_INDEX_PATH".to_string(),
@@ -2031,7 +2034,10 @@ mod tests {
                 }
             }"#,
         );
-        write_file(&cwd.join(".skaffen/settings.json"), r#"{ "extensionRisk": {} }"#);
+        write_file(
+            &cwd.join(".skaffen/settings.json"),
+            r#"{ "extensionRisk": {} }"#,
+        );
 
         let config = Config::load_with_roots(None, &global_dir, &cwd).expect("load");
         let risk = config.extension_risk.expect("merged extension risk");

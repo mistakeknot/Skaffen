@@ -343,9 +343,9 @@ fn stack_limit_allows_reasonable_recursion() {
 
 #[test]
 fn hostcall_timeout_is_tracked_in_stats() {
+    use serde_json::Value;
     use skaffen::extensions_js::HostcallKind;
     use skaffen::scheduler::HostcallOutcome;
-    use serde_json::Value;
 
     futures::executor::block_on(async {
         let config = config_with_limits(PiJsRuntimeLimits {

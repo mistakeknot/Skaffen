@@ -9,6 +9,7 @@ mod common;
 #[cfg(unix)]
 use asupersync::runtime::RuntimeBuilder;
 use common::TestHarness;
+use serde_json::json;
 use skaffen::config::Config;
 #[cfg(unix)]
 use skaffen::extensions::{ExtensionManager, JsExtensionLoadSpec, JsExtensionRuntimeHandle};
@@ -18,7 +19,6 @@ use skaffen::extensions_js::PiJsRuntimeConfig;
 use skaffen::package_manager::{PackageManager, PackageScope, ResolveRoots};
 use skaffen::session::encode_cwd;
 use skaffen::tools::ToolRegistry;
-use serde_json::json;
 use std::cell::Cell;
 use std::collections::BTreeMap;
 use std::ffi::OsStr;
@@ -119,7 +119,10 @@ impl CliTestHarness {
 
     #[cfg(unix)]
     fn project_settings_path(&self) -> PathBuf {
-        self.harness.temp_dir().join(".skaffen").join("settings.json")
+        self.harness
+            .temp_dir()
+            .join(".skaffen")
+            .join("settings.json")
     }
 
     #[cfg(unix)]
@@ -1087,7 +1090,11 @@ fn e2e_cli_config_show_lists_discovered_package_resources() {
         .harness
         .record_artifact("config-ui-pkg.dir", &package_root);
 
-    let project_settings = harness.harness.temp_dir().join(".skaffen").join("settings.json");
+    let project_settings = harness
+        .harness
+        .temp_dir()
+        .join(".skaffen")
+        .join("settings.json");
     fs::create_dir_all(
         project_settings
             .parent()
@@ -2376,9 +2383,10 @@ fn setup_vcr_anthropic_with_chunks(
         "VCR_CASSETTE_DIR".to_string(),
         cassette_dir.display().to_string(),
     );
-    harness
-        .env
-        .insert("SKAFFEN_VCR_TEST_NAME".to_string(), cassette_name.to_string());
+    harness.env.insert(
+        "SKAFFEN_VCR_TEST_NAME".to_string(),
+        cassette_name.to_string(),
+    );
     harness
         .env
         .insert("ANTHROPIC_API_KEY".to_string(), "test-vcr-key".to_string());
@@ -2527,7 +2535,12 @@ fn e2e_cli_print_mode_vcr_roundtrip() {
     assert_contains(&harness.harness, &result.stdout, "pong");
 
     // Verify no session files created in print mode (even on success).
-    let sessions_dir = PathBuf::from(harness.env.get("SKAFFEN_SESSIONS_DIR").expect("SKAFFEN_SESSIONS_DIR"));
+    let sessions_dir = PathBuf::from(
+        harness
+            .env
+            .get("SKAFFEN_SESSIONS_DIR")
+            .expect("SKAFFEN_SESSIONS_DIR"),
+    );
     let jsonl_count = count_jsonl_files(&sessions_dir);
     harness
         .harness
@@ -2578,7 +2591,12 @@ fn e2e_cli_print_mode_stdin_sends_to_provider() {
     assert_contains(&harness.harness, &result.stdout, "Received your stdin.");
 
     // Verify no session files created.
-    let sessions_dir = PathBuf::from(harness.env.get("SKAFFEN_SESSIONS_DIR").expect("SKAFFEN_SESSIONS_DIR"));
+    let sessions_dir = PathBuf::from(
+        harness
+            .env
+            .get("SKAFFEN_SESSIONS_DIR")
+            .expect("SKAFFEN_SESSIONS_DIR"),
+    );
     let jsonl_count = count_jsonl_files(&sessions_dir);
     harness
         .harness

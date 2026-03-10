@@ -412,8 +412,9 @@ impl SkaffenApp {
                 {
                     Ok(summary) => summary,
                     Err(err) => {
-                        let _ = event_tx
-                            .try_send(SkaffenMsg::AgentError(format!("Branch summary failed: {err}")));
+                        let _ = event_tx.try_send(SkaffenMsg::AgentError(format!(
+                            "Branch summary failed: {err}"
+                        )));
                         return;
                     }
                 }
@@ -425,8 +426,9 @@ impl SkaffenApp {
                 let mut guard = match session.lock(&cx).await {
                     Ok(guard) => guard,
                     Err(err) => {
-                        let _ = event_tx
-                            .try_send(SkaffenMsg::AgentError(format!("Failed to lock session: {err}")));
+                        let _ = event_tx.try_send(SkaffenMsg::AgentError(format!(
+                            "Failed to lock session: {err}"
+                        )));
                         return;
                     }
                 };
@@ -459,8 +461,9 @@ impl SkaffenApp {
                 let mut agent_guard = match agent.lock(&cx).await {
                     Ok(guard) => guard,
                     Err(err) => {
-                        let _ = event_tx
-                            .try_send(SkaffenMsg::AgentError(format!("Failed to lock agent: {err}")));
+                        let _ = event_tx.try_send(SkaffenMsg::AgentError(format!(
+                            "Failed to lock agent: {err}"
+                        )));
                         return;
                     }
                 };
@@ -471,8 +474,9 @@ impl SkaffenApp {
                 let guard = match session.lock(&cx).await {
                     Ok(guard) => guard,
                     Err(err) => {
-                        let _ = event_tx
-                            .try_send(SkaffenMsg::AgentError(format!("Failed to lock session: {err}")));
+                        let _ = event_tx.try_send(SkaffenMsg::AgentError(format!(
+                            "Failed to lock session: {err}"
+                        )));
                         return;
                     }
                 };

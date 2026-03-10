@@ -11,7 +11,9 @@ use skaffen::config::Config;
 use skaffen::model::UserContent;
 use skaffen::session::{Session, SessionHeader, SessionMessage, encode_cwd};
 use skaffen::session_index::SessionMeta;
-use skaffen::session_picker::{SessionPicker, format_time, list_sessions_for_project, pick_session};
+use skaffen::session_picker::{
+    SessionPicker, format_time, list_sessions_for_project, pick_session,
+};
 use std::env;
 use std::future::Future;
 use std::path::{Path, PathBuf};

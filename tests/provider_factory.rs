@@ -4,6 +4,7 @@ mod common;
 
 use common::{MockHttpResponse, TestHarness};
 use futures::StreamExt;
+use proptest::prelude::*;
 use skaffen::Error;
 use skaffen::auth::{AuthCredential, AuthStorage};
 use skaffen::model::{Message, UserContent, UserMessage};
@@ -18,7 +19,6 @@ use skaffen::provider_metadata::{
 use skaffen::providers::{
     create_provider, normalize_cohere_base, normalize_openai_base, normalize_openai_responses_base,
 };
-use proptest::prelude::*;
 use std::collections::HashMap;
 use std::str::FromStr;
 use std::sync::Arc;

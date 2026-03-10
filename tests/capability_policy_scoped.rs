@@ -14,6 +14,7 @@
 use std::future::Future;
 
 use asupersync::runtime::RuntimeBuilder;
+use serde_json::json;
 use skaffen::config::{Config, ExtensionPolicyConfig};
 use skaffen::connectors::http::HttpConnector;
 use skaffen::extensions::{
@@ -22,7 +23,6 @@ use skaffen::extensions::{
     dispatch_host_call_shared, required_capability_for_host_call,
 };
 use skaffen::tools::ToolRegistry;
-use serde_json::json;
 use tempfile::tempdir;
 
 // ─── Async helper ─────────────────────────────────────────────────────────

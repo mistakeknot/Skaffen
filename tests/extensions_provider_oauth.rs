@@ -12,10 +12,10 @@
 mod common;
 
 use common::{MockHttpResponse, TestHarness, run_async};
+use serde_json::json;
 use skaffen::auth::{AuthCredential, AuthStorage, complete_extension_oauth, start_extension_oauth};
 use skaffen::http::client::Client;
 use skaffen::models::OAuthConfig;
-use serde_json::json;
 use std::collections::HashMap;
 
 fn sample_config(token_url: &str) -> OAuthConfig {
@@ -794,7 +794,9 @@ fn resolve_api_key_override_takes_precedence_over_oauth() {
 // ---------------------------------------------------------------------------
 
 /// Mirrors the config-extraction logic in main.rs.
-fn oauth_configs_from_entries(entries: &[skaffen::models::ModelEntry]) -> HashMap<String, OAuthConfig> {
+fn oauth_configs_from_entries(
+    entries: &[skaffen::models::ModelEntry],
+) -> HashMap<String, OAuthConfig> {
     entries
         .iter()
         .filter_map(|entry| {

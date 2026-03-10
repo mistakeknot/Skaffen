@@ -17,7 +17,9 @@ use skaffen::config::Config;
 use skaffen::model::{ContentBlock, ThinkingLevel};
 use skaffen::models::{ModelEntry, ModelRegistry};
 use skaffen::provider::{InputType, Model, ModelCost};
-use skaffen::session::{EntryBase, ModelChangeEntry, Session, SessionEntry, ThinkingLevelChangeEntry};
+use skaffen::session::{
+    EntryBase, ModelChangeEntry, Session, SessionEntry, ThinkingLevelChangeEntry,
+};
 use skaffen::tools::process_file_arguments;
 use std::collections::HashMap;
 
@@ -229,7 +231,11 @@ fn select_model_and_thinking_resolves_model_flag_with_provider_prefixed_openrout
         "select_model_and_thinking_resolves_model_flag_with_provider_prefixed_openrouter_id",
     );
     let registry = make_registry(&harness, &[("openrouter", "test-openrouter-key")]);
-    let cli = cli::Cli::parse_from(["skaffen", "--model", "openrouter/anthropic/claude-3.5-sonnet"]);
+    let cli = cli::Cli::parse_from([
+        "skaffen",
+        "--model",
+        "openrouter/anthropic/claude-3.5-sonnet",
+    ]);
 
     let selection = select_model_and_thinking(
         &cli,
@@ -254,7 +260,13 @@ fn select_model_and_thinking_resolves_openrouter_provider_alias_and_model_alias(
         "select_model_and_thinking_resolves_openrouter_provider_alias_and_model_alias",
     );
     let registry = make_registry(&harness, &[("openrouter", "test-openrouter-key")]);
-    let cli = cli::Cli::parse_from(["skaffen", "--provider", "open-router", "--model", "gpt-4o-mini"]);
+    let cli = cli::Cli::parse_from([
+        "skaffen",
+        "--provider",
+        "open-router",
+        "--model",
+        "gpt-4o-mini",
+    ]);
 
     let selection = select_model_and_thinking(
         &cli,

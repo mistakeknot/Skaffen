@@ -8,12 +8,14 @@ mod common;
 
 use common::{TestHarness, validate_jsonl};
 use futures::StreamExt;
+use serde_json::json;
 use skaffen::error::Error;
 use skaffen::http::client::Client;
 use skaffen::model::{Message, UserContent, UserMessage};
 use skaffen::provider::{Context, Provider, StreamOptions};
-use skaffen::vcr::{Cassette, Interaction, RecordedRequest, RecordedResponse, VcrMode, VcrRecorder};
-use serde_json::json;
+use skaffen::vcr::{
+    Cassette, Interaction, RecordedRequest, RecordedResponse, VcrMode, VcrRecorder,
+};
 
 // ============================================================================
 // Helpers
@@ -234,8 +236,8 @@ mod provider_http_errors {
         );
         common::run_async(async move {
             let harness = TestHarness::new("anthropic_http_401");
-            let provider =
-                skaffen::providers::anthropic::AnthropicProvider::new("claude-test").with_client(client);
+            let provider = skaffen::providers::anthropic::AnthropicProvider::new("claude-test")
+                .with_client(client);
             let err = provider
                 .stream(&context_for("test"), &options_with_key("bad-key"))
                 .await
@@ -263,8 +265,8 @@ mod provider_http_errors {
         );
         common::run_async(async move {
             let harness = TestHarness::new("anthropic_http_403");
-            let provider =
-                skaffen::providers::anthropic::AnthropicProvider::new("claude-test").with_client(client);
+            let provider = skaffen::providers::anthropic::AnthropicProvider::new("claude-test")
+                .with_client(client);
             let err = provider
                 .stream(&context_for("test"), &options_with_key("test-key"))
                 .await
@@ -292,8 +294,8 @@ mod provider_http_errors {
         );
         common::run_async(async move {
             let harness = TestHarness::new("anthropic_http_429");
-            let provider =
-                skaffen::providers::anthropic::AnthropicProvider::new("claude-test").with_client(client);
+            let provider = skaffen::providers::anthropic::AnthropicProvider::new("claude-test")
+                .with_client(client);
             let err = provider
                 .stream(&context_for("test"), &options_with_key("test-key"))
                 .await
@@ -321,8 +323,8 @@ mod provider_http_errors {
         );
         common::run_async(async move {
             let harness = TestHarness::new("anthropic_http_529");
-            let provider =
-                skaffen::providers::anthropic::AnthropicProvider::new("claude-test").with_client(client);
+            let provider = skaffen::providers::anthropic::AnthropicProvider::new("claude-test")
+                .with_client(client);
             let err = provider
                 .stream(&context_for("test"), &options_with_key("test-key"))
                 .await
@@ -461,9 +463,10 @@ mod provider_http_errors {
         );
         common::run_async(async move {
             let harness = TestHarness::new("azure_http_401");
-            let provider = skaffen::providers::azure::AzureOpenAIProvider::new("unused", "gpt-test")
-                .with_client(client)
-                .with_endpoint_url(endpoint);
+            let provider =
+                skaffen::providers::azure::AzureOpenAIProvider::new("unused", "gpt-test")
+                    .with_client(client)
+                    .with_endpoint_url(endpoint);
             let err = provider
                 .stream(&context_for("test"), &options_with_key("bad-key"))
                 .await
@@ -488,9 +491,10 @@ mod provider_http_errors {
         );
         common::run_async(async move {
             let harness = TestHarness::new("azure_http_429");
-            let provider = skaffen::providers::azure::AzureOpenAIProvider::new("unused", "gpt-test")
-                .with_client(client)
-                .with_endpoint_url(endpoint);
+            let provider =
+                skaffen::providers::azure::AzureOpenAIProvider::new("unused", "gpt-test")
+                    .with_client(client)
+                    .with_endpoint_url(endpoint);
             let err = provider
                 .stream(&context_for("test"), &options_with_key("test-key"))
                 .await
@@ -520,8 +524,8 @@ mod provider_http_errors {
         );
         common::run_async(async move {
             let harness = TestHarness::new("anthropic_http_400");
-            let provider =
-                skaffen::providers::anthropic::AnthropicProvider::new("claude-test").with_client(client);
+            let provider = skaffen::providers::anthropic::AnthropicProvider::new("claude-test")
+                .with_client(client);
             let err = provider
                 .stream(&context_for("test"), &options_with_key("test-key"))
                 .await
@@ -606,9 +610,10 @@ mod provider_http_errors {
         );
         common::run_async(async move {
             let harness = TestHarness::new("azure_http_400");
-            let provider = skaffen::providers::azure::AzureOpenAIProvider::new("unused", "gpt-test")
-                .with_client(client)
-                .with_endpoint_url(endpoint);
+            let provider =
+                skaffen::providers::azure::AzureOpenAIProvider::new("unused", "gpt-test")
+                    .with_client(client)
+                    .with_endpoint_url(endpoint);
             let err = provider
                 .stream(&context_for("test"), &options_with_key("test-key"))
                 .await
@@ -692,9 +697,10 @@ mod provider_http_errors {
         );
         common::run_async(async move {
             let harness = TestHarness::new("azure_http_403");
-            let provider = skaffen::providers::azure::AzureOpenAIProvider::new("unused", "gpt-test")
-                .with_client(client)
-                .with_endpoint_url(endpoint);
+            let provider =
+                skaffen::providers::azure::AzureOpenAIProvider::new("unused", "gpt-test")
+                    .with_client(client)
+                    .with_endpoint_url(endpoint);
             let err = provider
                 .stream(&context_for("test"), &options_with_key("test-key"))
                 .await
@@ -748,9 +754,10 @@ mod provider_http_errors {
         );
         common::run_async(async move {
             let harness = TestHarness::new("azure_http_500");
-            let provider = skaffen::providers::azure::AzureOpenAIProvider::new("unused", "gpt-test")
-                .with_client(client)
-                .with_endpoint_url(endpoint);
+            let provider =
+                skaffen::providers::azure::AzureOpenAIProvider::new("unused", "gpt-test")
+                    .with_client(client)
+                    .with_endpoint_url(endpoint);
             let err = provider
                 .stream(&context_for("test"), &options_with_key("test-key"))
                 .await
@@ -782,8 +789,8 @@ mod malformed_responses {
         );
         common::run_async(async move {
             let harness = TestHarness::new("anthropic_invalid_json_sse");
-            let provider =
-                skaffen::providers::anthropic::AnthropicProvider::new("claude-test").with_client(client);
+            let provider = skaffen::providers::anthropic::AnthropicProvider::new("claude-test")
+                .with_client(client);
             let mut stream = provider
                 .stream(&context_for("test"), &options_with_key("test-key"))
                 .await
@@ -813,8 +820,8 @@ mod malformed_responses {
         );
         common::run_async(async move {
             let harness = TestHarness::new("anthropic_empty_body_200");
-            let provider =
-                skaffen::providers::anthropic::AnthropicProvider::new("claude-test").with_client(client);
+            let provider = skaffen::providers::anthropic::AnthropicProvider::new("claude-test")
+                .with_client(client);
             let result = provider
                 .stream(&context_for("test"), &options_with_key("test-key"))
                 .await;
@@ -947,8 +954,8 @@ mod malformed_responses {
         );
         common::run_async(async move {
             let harness = TestHarness::new("anthropic_sse_error_event");
-            let provider =
-                skaffen::providers::anthropic::AnthropicProvider::new("claude-test").with_client(client);
+            let provider = skaffen::providers::anthropic::AnthropicProvider::new("claude-test")
+                .with_client(client);
             let mut stream = provider
                 .stream(&context_for("test"), &options_with_key("test-key"))
                 .await
@@ -1040,9 +1047,10 @@ mod malformed_responses {
         );
         common::run_async(async move {
             let harness = TestHarness::new("azure_empty_body_200");
-            let provider = skaffen::providers::azure::AzureOpenAIProvider::new("unused", "gpt-test")
-                .with_client(client)
-                .with_endpoint_url(endpoint);
+            let provider =
+                skaffen::providers::azure::AzureOpenAIProvider::new("unused", "gpt-test")
+                    .with_client(client)
+                    .with_endpoint_url(endpoint);
             let result = provider
                 .stream(&context_for("test"), &options_with_key("test-key"))
                 .await;

@@ -8,8 +8,8 @@
 
 use asupersync::lab::{LabConfig, LabRuntime};
 use asupersync::types::Budget;
-use skaffen::extensions::{ExtensionManager, PROTOCOL_VERSION, RegisterPayload};
 use serde_json::{Value, json};
+use skaffen::extensions::{ExtensionManager, PROTOCOL_VERSION, RegisterPayload};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 

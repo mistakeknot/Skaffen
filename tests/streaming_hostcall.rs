@@ -4,9 +4,9 @@
 //! We validate streaming semantics by having JS report observed chunks back
 //! to the host via `pi.tool("__report", ...)` hostcalls.
 
+use serde_json::{Value, json};
 use skaffen::extensions_js::{HostcallKind, HostcallRequest, PiJsRuntime};
 use skaffen::scheduler::{DeterministicClock, HostcallOutcome};
-use serde_json::{Value, json};
 use std::collections::VecDeque;
 
 fn drain_one(runtime: &PiJsRuntime<DeterministicClock>) -> HostcallRequest {

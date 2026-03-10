@@ -1,6 +1,7 @@
 mod common;
 
 use common::{TestHarness, run_async};
+use serde_json::json;
 use skaffen::agent::{Agent, AgentConfig, AgentEvent, AgentSession};
 use skaffen::config::Config;
 use skaffen::http::client::Client;
@@ -11,7 +12,6 @@ use skaffen::providers::openai::OpenAIProvider;
 use skaffen::session::Session;
 use skaffen::tools::ToolRegistry;
 use skaffen::vcr::{VcrMode, VcrRecorder};
-use serde_json::json;
 use std::fs::File;
 use std::io::Write as _;
 use std::path::PathBuf;

@@ -6,9 +6,9 @@
 //! `pi.*`, drains the resulting `HostcallRequest`, and verifies the
 //! `HostcallKind`, payload, and JS-side result when completed.
 
+use serde_json::{Value, json};
 use skaffen::extensions_js::{HostcallKind, HostcallRequest, PiJsRuntime};
 use skaffen::scheduler::{DeterministicClock, HostcallOutcome};
-use serde_json::{Value, json};
 use std::collections::VecDeque;
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────

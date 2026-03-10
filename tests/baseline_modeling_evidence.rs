@@ -11,6 +11,7 @@
 mod common;
 
 use common::TestHarness;
+use serde_json::json;
 use skaffen::connectors::http::HttpConnector;
 use skaffen::extensions::{
     BaselineDriftReport, ExtensionManager, ExtensionPolicy, ExtensionPolicyMode, HostCallContext,
@@ -20,7 +21,6 @@ use skaffen::extensions::{
     verify_runtime_risk_ledger_artifact,
 };
 use skaffen::tools::ToolRegistry;
-use serde_json::json;
 use std::fs;
 
 fn permissive_policy() -> ExtensionPolicy {

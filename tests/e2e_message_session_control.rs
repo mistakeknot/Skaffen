@@ -17,6 +17,7 @@ mod common;
 
 use async_trait::async_trait;
 use futures::Stream;
+use serde_json::Value;
 use skaffen::agent::{Agent, AgentConfig, AgentSession};
 use skaffen::compaction::ResolvedCompactionSettings;
 use skaffen::error::Result;
@@ -31,7 +32,6 @@ use skaffen::model::{
 use skaffen::provider::{Context, Provider, StreamOptions};
 use skaffen::session::{Session, SessionHandle, SessionMessage};
 use skaffen::tools::ToolRegistry;
-use serde_json::Value;
 use std::pin::Pin;
 use std::sync::{Arc, Mutex};
 

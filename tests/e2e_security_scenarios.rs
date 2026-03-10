@@ -17,6 +17,7 @@
 mod common;
 
 use common::TestHarness;
+use serde_json::json;
 use skaffen::connectors::http::HttpConnector;
 use skaffen::extension_preflight::{PREFLIGHT_SCHEMA, PreflightAnalyzer, PreflightVerdict};
 use skaffen::extensions::{
@@ -28,7 +29,6 @@ use skaffen::extensions::{
     dispatch_host_call_shared, verify_runtime_risk_ledger_artifact,
 };
 use skaffen::tools::ToolRegistry;
-use serde_json::json;
 use std::fs;
 use std::path::Path;
 use std::time::Instant;

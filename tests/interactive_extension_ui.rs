@@ -4,9 +4,9 @@
 //! - `format_extension_ui_prompt`: provenance display, all methods, edge cases
 //! - `parse_extension_ui_response`: confirm, select, input, editor, cancel, errors
 
+use serde_json::{Value, json};
 use skaffen::extensions::ExtensionUiRequest;
 use skaffen::interactive::{format_extension_ui_prompt, parse_extension_ui_response};
-use serde_json::{Value, json};
 
 // ---------------------------------------------------------------------------
 // Helper: build a request with common fields

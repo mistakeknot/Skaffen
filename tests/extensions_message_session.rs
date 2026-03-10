@@ -6,9 +6,9 @@
 //! integration. Session-dependent tests use real `SessionHandle` backed by an
 //! in-memory `Session`, exercising the full session persistence plumbing.
 
+use serde_json::{Value, json};
 use skaffen::extensions::{ExtensionManager, ExtensionSession, PROTOCOL_VERSION, RegisterPayload};
 use skaffen::session::{Session, SessionHandle};
-use serde_json::{Value, json};
 use std::sync::Arc;
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────

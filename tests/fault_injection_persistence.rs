@@ -17,10 +17,10 @@
 //! - Trace log correlation for debugging persistence failures
 
 use asupersync::runtime::RuntimeBuilder;
+use serde_json::json;
 use skaffen::model::UserContent;
 use skaffen::session::{AutosaveDurabilityMode, AutosaveFlushTrigger, Session, SessionMessage};
 use skaffen::session_store_v2::SessionStoreV2;
-use serde_json::json;
 use std::future::Future;
 use std::io::Write as _;
 #[cfg(unix)]

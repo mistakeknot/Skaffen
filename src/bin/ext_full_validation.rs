@@ -16,8 +16,8 @@ use std::time::Instant;
 use anyhow::{Context, Result, bail};
 use chrono::{SecondsFormat, Utc};
 use clap::Parser;
-use skaffen::extension_popularity::CandidatePool;
 use serde::{Deserialize, Serialize};
+use skaffen::extension_popularity::CandidatePool;
 
 #[derive(Debug, Parser)]
 #[command(name = "ext_full_validation")]
@@ -1780,7 +1780,9 @@ fn lookup_by_id_or_alias<'a, T>(
         .find_map(|candidate| map.get(&candidate))
 }
 
-fn derive_candidate_id_variants(item: &skaffen::extension_popularity::CandidateItem) -> Vec<String> {
+fn derive_candidate_id_variants(
+    item: &skaffen::extension_popularity::CandidateItem,
+) -> Vec<String> {
     let mut out = Vec::new();
     push_candidate_id_variants(&item.id, &mut out);
     for alias in &item.aliases {

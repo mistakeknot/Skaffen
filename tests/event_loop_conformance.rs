@@ -4,9 +4,9 @@
 //! Also includes `LabRuntime`-backed deterministic tests (bd-48tv).
 #![forbid(unsafe_code)]
 
+use serde::Deserialize;
 use skaffen::extensions_js::{ClockHandle, MacrotaskKind, ManualClock, PiEventLoop};
 use skaffen::scheduler::{self, HostcallOutcome, Scheduler};
-use serde::Deserialize;
 use std::collections::HashMap;
 use std::fs;
 use std::path::Path;

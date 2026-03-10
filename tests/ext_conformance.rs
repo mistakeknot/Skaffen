@@ -14,13 +14,13 @@
 //! module so there is one source of truth.
 #![forbid(unsafe_code)]
 
+use serde_json::{Value, json};
+use similar::ChangeTag;
 use skaffen::conformance::normalization::{
     self, NormalizationContext, PLACEHOLDER_ARTIFACT_ID, PLACEHOLDER_HOST,
     PLACEHOLDER_PI_MONO_ROOT, PLACEHOLDER_RUN_ID, PLACEHOLDER_SESSION_ID, PLACEHOLDER_SPAN_ID,
     PLACEHOLDER_TIMESTAMP, PLACEHOLDER_TRACE_ID, is_path_key, path_suffix_match,
 };
-use serde_json::{Value, json};
-use similar::ChangeTag;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Write as _;
 use std::io::Write as _;

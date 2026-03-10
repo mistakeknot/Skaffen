@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod tests {
-    use skaffen::tools::{EditTool, Tool};
     use serde_json::json;
+    use skaffen::tools::{EditTool, Tool};
 
     #[test]
     fn repro_edit_off_by_one_on_subsequent_lines() {

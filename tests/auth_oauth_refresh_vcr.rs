@@ -1,11 +1,11 @@
 mod common;
 
 use common::{TestHarness, run_async};
+use serde_json::Value;
+use sha2::{Digest, Sha256};
 use skaffen::auth::{AuthCredential, AuthStorage};
 use skaffen::http::client::Client;
 use skaffen::vcr::{VcrMode, VcrRecorder};
-use serde_json::Value;
-use sha2::{Digest, Sha256};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 

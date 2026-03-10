@@ -4,13 +4,13 @@ mod common;
 
 use chrono::{DateTime, TimeZone, Utc};
 use common::TestHarness;
+use serde_json::Value;
 use skaffen::extension_scoring::{
     CandidateInput, CompatStatus, Compatibility, Gates, InterferenceMatrixCompletenessReport,
     LicenseInfo, MarketplaceSignals, Recency, Redistribution, RiskInfo, RiskLevel, Signals, Tags,
     evaluate_interference_matrix_completeness, format_interference_pair_key,
     parse_interference_pair_key, score_candidates,
 };
-use serde_json::Value;
 use std::collections::HashMap;
 
 fn fixed_as_of() -> DateTime<Utc> {

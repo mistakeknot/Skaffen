@@ -9,11 +9,11 @@
 //! - **Recording**: [`HostcallLog`] — unified interaction recording for all types
 
 use async_trait::async_trait;
+use serde_json::Value;
 use skaffen::error::Result;
 use skaffen::extension_dispatcher::ExtensionUiHandler;
 use skaffen::extensions::{ExtensionSession, ExtensionUiRequest, ExtensionUiResponse};
 use skaffen::session::SessionMessage;
-use serde_json::Value;
 use std::collections::VecDeque;
 use std::fmt;
 use std::path::{Path, PathBuf};

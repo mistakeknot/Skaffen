@@ -1,6 +1,6 @@
-use skaffen::extensions::CompatibilityScanner;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+use skaffen::extensions::CompatibilityScanner;
 use std::collections::BTreeMap;
 use std::fmt::Write as _;
 use std::fs;

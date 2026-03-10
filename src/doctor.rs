@@ -625,7 +625,9 @@ fn check_auth(fix: bool, findings: &mut Vec<Finding>) {
         findings.push(
             Finding::info(cat, "auth.json: not present")
                 .with_detail("No credentials stored yet")
-                .with_remediation("Run `skaffen` and follow the login prompt, or set ANTHROPIC_API_KEY"),
+                .with_remediation(
+                    "Run `skaffen` and follow the login prompt, or set ANTHROPIC_API_KEY",
+                ),
         );
         // Still check env vars
         check_auth_env_vars(cat, findings);
@@ -711,7 +713,9 @@ fn check_auth(fix: bool, findings: &mut Vec<Finding>) {
                     CredentialStatus::OAuthExpired { .. } => {
                         findings.push(
                             Finding::warn(cat, format!("{provider}: OAuth token expired"))
-                                .with_remediation(format!("Run `skaffen /login {provider}` to refresh")),
+                                .with_remediation(format!(
+                                    "Run `skaffen /login {provider}` to refresh"
+                                )),
                         );
                     }
                     CredentialStatus::BearerToken => {

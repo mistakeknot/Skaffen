@@ -16,13 +16,13 @@
 mod common;
 
 use common::TestHarness;
+use serde_json::json;
 use skaffen::models::ModelEntry;
 use skaffen::provider::{Api, CacheRetention, KnownProvider, Model, ModelCost, StreamOptions};
 use skaffen::providers::{
     create_provider, normalize_cohere_base, normalize_openai_base, normalize_openai_responses_base,
 };
 use skaffen::session::{Session, SessionEntry, SessionMessage, SessionOpenDiagnostics};
-use serde_json::json;
 use std::collections::HashMap;
 use std::io::Write;
 
@@ -934,7 +934,8 @@ fn encode_cwd_root() {
 /// encode_cwd handles paths with special characters.
 #[test]
 fn encode_cwd_special_chars() {
-    let encoded = skaffen::session::encode_cwd(std::path::Path::new("/home/user/my project (v2.0)/src"));
+    let encoded =
+        skaffen::session::encode_cwd(std::path::Path::new("/home/user/my project (v2.0)/src"));
     assert!(!encoded.is_empty());
     assert!(!encoded.contains('/'));
 }

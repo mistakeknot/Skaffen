@@ -12,6 +12,7 @@
 mod common;
 
 use common::TestHarness;
+use serde_json::{Value, json};
 use skaffen::agent::AgentEvent;
 use skaffen::extensions::{ExtensionEventName, ExtensionUiRequest, extension_event_from_agent};
 use skaffen::model::{
@@ -19,7 +20,6 @@ use skaffen::model::{
     TextContent, ThinkingContent, ToolCall, Usage,
 };
 use skaffen::tools::ToolOutput;
-use serde_json::{Value, json};
 use std::sync::Arc;
 
 // ============================================================================

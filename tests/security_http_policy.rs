@@ -10,12 +10,12 @@
 //! - Denylist takes precedence over allowlist
 //! - GET requests cannot include a body
 
-use skaffen::connectors::http::{HttpConnector, HttpConnectorConfig};
-use skaffen::connectors::{Connector, HostCallPayload};
-use skaffen::extensions::HostCallErrorCode;
 #[cfg(unix)]
 use serde_json::Value;
 use serde_json::json;
+use skaffen::connectors::http::{HttpConnector, HttpConnectorConfig};
+use skaffen::connectors::{Connector, HostCallPayload};
+use skaffen::extensions::HostCallErrorCode;
 use std::future::Future;
 #[cfg(unix)]
 use std::io::Write;

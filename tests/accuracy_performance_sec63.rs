@@ -11,6 +11,7 @@
 mod common;
 
 use common::TestHarness;
+use serde_json::json;
 use skaffen::connectors::http::HttpConnector;
 use skaffen::extensions::{
     ExtensionManager, ExtensionPolicy, ExtensionPolicyMode, HostCallContext, HostCallPayload,
@@ -20,7 +21,6 @@ use skaffen::extensions::{
     dispatch_host_call_shared, verify_runtime_risk_ledger_artifact,
 };
 use skaffen::tools::ToolRegistry;
-use serde_json::json;
 use std::time::Instant;
 
 // ============================================================================

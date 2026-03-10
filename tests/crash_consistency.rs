@@ -6,9 +6,9 @@
 //! semantics.
 
 use asupersync::runtime::RuntimeBuilder;
+use serde_json::json;
 use skaffen::model::UserContent;
 use skaffen::session::{Session, SessionMessage};
-use serde_json::json;
 use std::future::Future;
 use std::io::Write as _;
 

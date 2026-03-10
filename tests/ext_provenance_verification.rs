@@ -11,8 +11,10 @@
 //! `tests/ext_conformance/artifacts/PROVENANCE_VERIFICATION.json`
 //! for auditability.
 
-use skaffen::conformance::snapshot::{SourceTier, digest_artifact_dir, validate_directory, validate_id};
 use serde::{Deserialize, Serialize};
+use skaffen::conformance::snapshot::{
+    SourceTier, digest_artifact_dir, validate_directory, validate_id,
+};
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;

@@ -209,8 +209,10 @@ impl GoldenTestHarness {
             "VCR_CASSETTE_DIR".to_string(),
             cassette_dir.display().to_string(),
         );
-        self.env
-            .insert("SKAFFEN_VCR_TEST_NAME".to_string(), cassette_name.to_string());
+        self.env.insert(
+            "SKAFFEN_VCR_TEST_NAME".to_string(),
+            cassette_name.to_string(),
+        );
         self.env
             .insert("ANTHROPIC_API_KEY".to_string(), "test-vcr-key".to_string());
         self.env.insert("PI_TEST_MODE".to_string(), "1".to_string());

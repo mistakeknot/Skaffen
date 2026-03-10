@@ -6,10 +6,10 @@
 //! - Round-trip semantics for all session ops
 //! - Validation edge cases and error classification
 
+use serde_json::{Value, json};
 use skaffen::extensions::{ExtensionManager, ExtensionSession};
 use skaffen::model::UserContent;
 use skaffen::session::{Session, SessionHandle, SessionMessage};
-use serde_json::{Value, json};
 use std::sync::Arc;
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────

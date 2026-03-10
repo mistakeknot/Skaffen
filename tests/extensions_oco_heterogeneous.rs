@@ -12,14 +12,14 @@
 mod common;
 
 use chrono::{SecondsFormat, Utc};
+use serde::Serialize;
+use serde_json::{Value, json};
 use skaffen::extensions::{
     ExtensionBudgetControllerConfig, ExtensionEventName, ExtensionManager, ExtensionPolicy,
     HostcallReactorConfig, JsExtensionLoadSpec,
 };
 use skaffen::extensions_js::PiJsRuntimeConfig;
 use skaffen::tools::ToolRegistry;
-use serde::Serialize;
-use serde_json::{Value, json};
 use std::collections::BTreeSet;
 use std::path::PathBuf;
 use std::sync::Arc;

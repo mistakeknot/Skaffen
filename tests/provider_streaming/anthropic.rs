@@ -6,13 +6,17 @@ use super::{
 };
 use crate::common::TestHarness;
 use chrono::{SecondsFormat, Utc};
-use skaffen::http::client::Client;
-use skaffen::model::{Message, StopReason, ThinkingLevel, UserContent};
-use skaffen::provider::{CacheRetention, Context, Provider, StreamOptions, ThinkingBudgets, ToolDef};
-use skaffen::providers::anthropic::AnthropicProvider;
-use skaffen::vcr::{Cassette, Interaction, RecordedRequest, RecordedResponse, VcrMode, VcrRecorder};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use skaffen::http::client::Client;
+use skaffen::model::{Message, StopReason, ThinkingLevel, UserContent};
+use skaffen::provider::{
+    CacheRetention, Context, Provider, StreamOptions, ThinkingBudgets, ToolDef,
+};
+use skaffen::providers::anthropic::AnthropicProvider;
+use skaffen::vcr::{
+    Cassette, Interaction, RecordedRequest, RecordedResponse, VcrMode, VcrRecorder,
+};
 use std::env;
 use std::path::{Path, PathBuf};
 use std::sync::{Mutex, OnceLock};

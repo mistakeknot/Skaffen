@@ -10,10 +10,10 @@ use common::{
     parse_http_status,
 };
 use futures::{FutureExt, StreamExt, pin_mut};
-use skaffen::model::StreamEvent;
-use skaffen::provider::{Context, StreamOptions, ToolDef};
 use serde::Serialize;
 use serde_json::json;
+use skaffen::model::StreamEvent;
+use skaffen::provider::{Context, StreamOptions, ToolDef};
 use std::collections::BTreeMap;
 use std::fmt::Write as _;
 use std::path::Path;

@@ -6,6 +6,7 @@ use asupersync::channel::mpsc;
 use bubbletea::{KeyMsg, KeyType, Message, Model as BubbleteaModel};
 use common::TestHarness;
 use futures::stream;
+use regex::Regex;
 use skaffen::agent::{Agent, AgentConfig};
 use skaffen::config::Config;
 use skaffen::interactive::{ConversationMessage, MessageRole, SkaffenApp, SkaffenMsg};
@@ -16,7 +17,6 @@ use skaffen::provider::{Context, InputType, Model, ModelCost, Provider, StreamOp
 use skaffen::resources::{ResourceCliOptions, ResourceLoader};
 use skaffen::session::Session;
 use skaffen::tools::ToolRegistry;
-use regex::Regex;
 use std::collections::HashMap;
 use std::fs;
 use std::pin::Pin;
@@ -386,7 +386,10 @@ fn tui_snapshot_streaming_thinking() {
         &mut app,
         SkaffenMsg::ThinkingDelta("Considering options...".to_string()),
     );
-    send_pi(&mut app, SkaffenMsg::TextDelta("Partial answer.".to_string()));
+    send_pi(
+        &mut app,
+        SkaffenMsg::TextDelta("Partial answer.".to_string()),
+    );
     let context = vec![
         ("scenario".to_string(), "streaming-thinking".to_string()),
         ("state".to_string(), "processing".to_string()),

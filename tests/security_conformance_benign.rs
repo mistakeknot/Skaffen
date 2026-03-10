@@ -20,6 +20,8 @@
 mod common;
 
 use common::TestHarness;
+use serde::{Deserialize, Serialize};
+use serde_json::json;
 use skaffen::connectors::http::HttpConnector;
 use skaffen::extensions::{
     Capability, ExtensionManager, ExtensionOverride, ExtensionPolicy, ExtensionPolicyMode,
@@ -27,8 +29,6 @@ use skaffen::extensions::{
     SecurityAlertFilter,
 };
 use skaffen::tools::ToolRegistry;
-use serde::{Deserialize, Serialize};
-use serde_json::json;
 use std::path::PathBuf;
 
 // ============================================================================

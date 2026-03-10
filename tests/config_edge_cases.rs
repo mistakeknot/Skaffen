@@ -10,8 +10,8 @@
 mod common;
 
 use common::TestHarness;
-use skaffen::config::{Config, SettingsScope};
 use serde_json::json;
+use skaffen::config::{Config, SettingsScope};
 use std::path::Path;
 use std::sync::{Mutex, OnceLock};
 

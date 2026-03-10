@@ -25,13 +25,13 @@
 mod common;
 
 use common::TestHarness;
+use serde_json::json;
 use skaffen::connectors::http::HttpConnector;
 use skaffen::extensions::{
     ExtensionManager, ExtensionPolicy, ExtensionPolicyMode, HostCallContext, HostCallPayload,
     RollbackTrigger, RolloutPhase, RolloutState, RuntimeRiskConfig, dispatch_host_call_shared,
 };
 use skaffen::tools::ToolRegistry;
-use serde_json::json;
 
 // ============================================================================
 // Helpers

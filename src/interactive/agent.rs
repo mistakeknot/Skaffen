@@ -1210,8 +1210,9 @@ impl SkaffenApp {
                 match asupersync::sync::OwnedMutexGuard::lock(Arc::clone(&agent), &cx).await {
                     Ok(guard) => guard,
                     Err(err) => {
-                        let _ = event_tx
-                            .try_send(SkaffenMsg::AgentError(format!("Failed to lock agent: {err}")));
+                        let _ = event_tx.try_send(SkaffenMsg::AgentError(format!(
+                            "Failed to lock agent: {err}"
+                        )));
                         return;
                     }
                 };
@@ -1252,8 +1253,9 @@ impl SkaffenApp {
                 match asupersync::sync::OwnedMutexGuard::lock(Arc::clone(&session), &cx).await {
                     Ok(guard) => guard,
                     Err(err) => {
-                        let _ = event_tx
-                            .try_send(SkaffenMsg::AgentError(format!("Failed to lock session: {err}")));
+                        let _ = event_tx.try_send(SkaffenMsg::AgentError(format!(
+                            "Failed to lock session: {err}"
+                        )));
                         return;
                     }
                 };
@@ -1348,8 +1350,9 @@ impl SkaffenApp {
                         }
                     }
                     Ok(InputEventOutcome::Block { reason }) => {
-                        let _ = event_tx
-                            .try_send(SkaffenMsg::UpdateLastUserMessage("[input blocked]".to_string()));
+                        let _ = event_tx.try_send(SkaffenMsg::UpdateLastUserMessage(
+                            "[input blocked]".to_string(),
+                        ));
                         let message = reason.unwrap_or_else(|| "Input blocked".to_string());
                         let _ = event_tx.try_send(SkaffenMsg::AgentError(message));
                         return;
@@ -1369,8 +1372,9 @@ impl SkaffenApp {
                 match asupersync::sync::OwnedMutexGuard::lock(Arc::clone(&agent), &cx).await {
                     Ok(guard) => guard,
                     Err(err) => {
-                        let _ = event_tx
-                            .try_send(SkaffenMsg::AgentError(format!("Failed to lock agent: {err}")));
+                        let _ = event_tx.try_send(SkaffenMsg::AgentError(format!(
+                            "Failed to lock agent: {err}"
+                        )));
                         return;
                     }
                 };
@@ -1411,8 +1415,9 @@ impl SkaffenApp {
                 match asupersync::sync::OwnedMutexGuard::lock(Arc::clone(&session), &cx).await {
                     Ok(guard) => guard,
                     Err(err) => {
-                        let _ = event_tx
-                            .try_send(SkaffenMsg::AgentError(format!("Failed to lock session: {err}")));
+                        let _ = event_tx.try_send(SkaffenMsg::AgentError(format!(
+                            "Failed to lock session: {err}"
+                        )));
                         return;
                     }
                 };
@@ -1577,13 +1582,15 @@ impl SkaffenApp {
                         message_for_agent = text;
                         input_images = images;
                         if message_for_agent != displayed_message {
-                            let _ = event_tx
-                                .try_send(SkaffenMsg::UpdateLastUserMessage(message_for_agent.clone()));
+                            let _ = event_tx.try_send(SkaffenMsg::UpdateLastUserMessage(
+                                message_for_agent.clone(),
+                            ));
                         }
                     }
                     Ok(InputEventOutcome::Block { reason }) => {
-                        let _ = event_tx
-                            .try_send(SkaffenMsg::UpdateLastUserMessage("[input blocked]".to_string()));
+                        let _ = event_tx.try_send(SkaffenMsg::UpdateLastUserMessage(
+                            "[input blocked]".to_string(),
+                        ));
                         let message = reason.unwrap_or_else(|| "Input blocked".to_string());
                         let _ = event_tx.try_send(SkaffenMsg::AgentError(message));
                         return;
@@ -1603,8 +1610,9 @@ impl SkaffenApp {
                 match asupersync::sync::OwnedMutexGuard::lock(Arc::clone(&agent), &cx).await {
                     Ok(guard) => guard,
                     Err(err) => {
-                        let _ = event_tx
-                            .try_send(SkaffenMsg::AgentError(format!("Failed to lock agent: {err}")));
+                        let _ = event_tx.try_send(SkaffenMsg::AgentError(format!(
+                            "Failed to lock agent: {err}"
+                        )));
                         return;
                     }
                 };
@@ -1669,8 +1677,9 @@ impl SkaffenApp {
                 match asupersync::sync::OwnedMutexGuard::lock(Arc::clone(&session), &cx).await {
                     Ok(guard) => guard,
                     Err(err) => {
-                        let _ = event_tx
-                            .try_send(SkaffenMsg::AgentError(format!("Failed to lock session: {err}")));
+                        let _ = event_tx.try_send(SkaffenMsg::AgentError(format!(
+                            "Failed to lock session: {err}"
+                        )));
                         return;
                     }
                 };
@@ -1789,7 +1798,9 @@ mod stream_delta_batcher_tests {
         }
     }
 
-    fn build_test_app_with_provider(provider: Arc<dyn Provider>) -> (SkaffenApp, mpsc::Receiver<SkaffenMsg>) {
+    fn build_test_app_with_provider(
+        provider: Arc<dyn Provider>,
+    ) -> (SkaffenApp, mpsc::Receiver<SkaffenMsg>) {
         let current = model_entry("openai", "gpt-4o-mini");
         let agent = Agent::new(
             provider,

@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod tests {
-    use skaffen::tools::{EditTool, Tool};
     use serde_json::json;
+    use skaffen::tools::{EditTool, Tool};
     use std::fs;
     use tempfile::tempdir;
 

@@ -5,9 +5,9 @@
 //! extension dispatcher + VCR matching layers.
 #![forbid(unsafe_code)]
 
-use skaffen::extensions_js::{HostcallKind, HostcallRequest};
 use proptest::prelude::*;
 use serde_json::{Value, json};
+use skaffen::extensions_js::{HostcallKind, HostcallRequest};
 
 fn tool_name_strategy() -> impl Strategy<Value = String> {
     prop_oneof![

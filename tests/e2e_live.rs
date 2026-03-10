@@ -22,6 +22,7 @@ mod common;
 
 use common::TestHarness;
 use futures::StreamExt;
+use serde::Serialize;
 use skaffen::auth::AuthStorage;
 use skaffen::config::Config;
 use skaffen::model::{Message, StopReason, StreamEvent, UserContent, UserMessage};
@@ -34,7 +35,6 @@ use skaffen::providers::gemini::GeminiProvider;
 use skaffen::providers::openai::OpenAIProvider;
 use skaffen::providers::openai_responses::OpenAIResponsesProvider;
 use skaffen::providers::{normalize_openai_base, normalize_openai_responses_base};
-use serde::Serialize;
 use std::collections::BTreeMap;
 use std::env;
 use std::fmt::Write as _;
@@ -1464,7 +1464,9 @@ mod cross_provider {
                                 .content
                                 .iter()
                                 .filter_map(|c| match c {
-                                    skaffen::model::ContentBlock::Text(tc) => Some(tc.text.as_str()),
+                                    skaffen::model::ContentBlock::Text(tc) => {
+                                        Some(tc.text.as_str())
+                                    }
                                     _ => None,
                                 })
                                 .collect();

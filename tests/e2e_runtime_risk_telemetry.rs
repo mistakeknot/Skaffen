@@ -8,13 +8,13 @@
 mod common;
 
 use common::TestHarness;
+use serde_json::json;
 use skaffen::connectors::http::HttpConnector;
 use skaffen::extensions::{
     ExtensionManager, ExtensionPolicy, ExtensionPolicyMode, HostCallContext, HostCallPayload,
     RuntimeRiskConfig, dispatch_host_call_shared,
 };
 use skaffen::tools::ToolRegistry;
-use serde_json::json;
 use std::fs;
 
 fn permissive_policy() -> ExtensionPolicy {

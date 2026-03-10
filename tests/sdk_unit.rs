@@ -7,6 +7,7 @@
 mod common;
 
 use common::{TestHarness, run_async};
+use serde_json::json;
 use skaffen::agent::{AbortHandle, AgentEvent};
 use skaffen::model::{
     AssistantMessage, ContentBlock, StopReason, StreamEvent, TextContent, ThinkingLevel, Usage,
@@ -20,7 +21,6 @@ use skaffen::sdk::{
     create_agent_session,
 };
 use skaffen::tools::{ToolOutput, ToolRegistry};
-use serde_json::json;
 use std::sync::atomic::{AtomicU32, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 

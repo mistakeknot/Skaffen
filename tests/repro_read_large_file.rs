@@ -1,5 +1,5 @@
-use skaffen::tools::{ReadTool, Tool};
 use serde_json::json;
+use skaffen::tools::{ReadTool, Tool};
 use std::io::Write;
 
 #[test]

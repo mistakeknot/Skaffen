@@ -5065,8 +5065,12 @@ mod tests {
 
     #[test]
     fn test_session_new_prefers_cli_durability_mode_over_config() {
-        let cli =
-            crate::cli::Cli::parse_from(["skaffen", "--no-session", "--session-durability", "strict"]);
+        let cli = crate::cli::Cli::parse_from([
+            "skaffen",
+            "--no-session",
+            "--session-durability",
+            "strict",
+        ]);
         let config: Config =
             serde_json::from_str(r#"{ "sessionDurability": "throughput" }"#).expect("config parse");
         let session =

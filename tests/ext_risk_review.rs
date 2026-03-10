@@ -7,11 +7,11 @@
 //!
 //! Generates `tests/ext_conformance/artifacts/RISK_REVIEW.json` evidence log.
 
+use serde::{Deserialize, Serialize};
 use skaffen::extension_license::{
     License, Redistributable, SecuritySeverity, detect_license_from_content,
     detect_license_from_spdx, redistributable, scan_security,
 };
-use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::Path;

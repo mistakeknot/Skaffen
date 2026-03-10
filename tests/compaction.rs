@@ -4,6 +4,8 @@
 mod common;
 
 use common::{TestHarness, run_async};
+use serde_json::{Value, json};
+use sha2::{Digest, Sha256};
 use skaffen::compaction::{CompactionPreparation, CompactionResult, compact, prepare_compaction};
 use skaffen::model::{
     AssistantMessage, ContentBlock, ImageContent, Message, StopReason, TextContent,
@@ -14,8 +16,6 @@ use skaffen::session::{
     BranchSummaryEntry, CompactionEntry, EntryBase, MessageEntry, ModelChangeEntry, Session,
     SessionEntry, SessionMessage,
 };
-use serde_json::{Value, json};
-use sha2::{Digest, Sha256};
 use std::collections::VecDeque;
 use std::pin::Pin;
 use std::sync::{Arc, Mutex};
@@ -62,7 +62,12 @@ impl Provider for ScriptedProvider {
         context: &Context<'_>,
         _options: &StreamOptions,
     ) -> skaffen::error::Result<
-        Pin<Box<dyn futures::Stream<Item = skaffen::error::Result<skaffen::model::StreamEvent>> + Send>>,
+        Pin<
+            Box<
+                dyn futures::Stream<Item = skaffen::error::Result<skaffen::model::StreamEvent>>
+                    + Send,
+            >,
+        >,
     > {
         let prompt_text = extract_prompt_text(context);
         self.prompts.lock().expect("lock prompts").push(prompt_text);
@@ -1088,7 +1093,8 @@ fn compaction_pipeline_save_and_open_round_trip_rehydrates_compaction_context() 
         ctx.push(("sha256".into(), summary_hash));
     });
 
-    let details = skaffen::compaction::compaction_details_to_value(&result.details).expect("details");
+    let details =
+        skaffen::compaction::compaction_details_to_value(&result.details).expect("details");
     session.entries.push(compaction_entry(
         "c1",
         Some("u2"),
@@ -1172,7 +1178,8 @@ fn compaction_pipeline_second_pass_seeds_previous_details_and_updates_summary() 
     let result1 = run_async(async move { compact(prep1, provider1_dyn, "test-key", None).await })
         .expect("compact1");
 
-    let details1 = skaffen::compaction::compaction_details_to_value(&result1.details).expect("details1");
+    let details1 =
+        skaffen::compaction::compaction_details_to_value(&result1.details).expect("details1");
 
     let mut entries2 = entries;
     entries2.push(compaction_entry(
@@ -1252,7 +1259,8 @@ fn compaction_pipeline_second_pass_seeds_previous_details_and_updates_summary() 
     session.header.cwd = "/data/projects/skaffen".to_string();
     session.entries = entries2;
 
-    let details2 = skaffen::compaction::compaction_details_to_value(&result2.details).expect("details2");
+    let details2 =
+        skaffen::compaction::compaction_details_to_value(&result2.details).expect("details2");
     session.entries.push(compaction_entry(
         "c2",
         Some("u4"),
@@ -1355,7 +1363,12 @@ fn compact_returns_error_when_provider_stops_with_error() {
             _context: &Context<'_>,
             _options: &StreamOptions,
         ) -> skaffen::error::Result<
-            Pin<Box<dyn futures::Stream<Item = skaffen::error::Result<skaffen::model::StreamEvent>> + Send>>,
+            Pin<
+                Box<
+                    dyn futures::Stream<Item = skaffen::error::Result<skaffen::model::StreamEvent>>
+                        + Send,
+                >,
+            >,
         > {
             let message = AssistantMessage {
                 content: vec![ContentBlock::Text(TextContent::new("ignored"))],

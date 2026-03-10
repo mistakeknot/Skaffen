@@ -12,6 +12,7 @@ use common::TestHarness;
 #[cfg(unix)]
 use common::tmux::{TmuxInstance, sh_escape};
 use futures::Stream;
+use serde_json::json;
 use skaffen::agent::{Agent, AgentConfig, AgentSession};
 use skaffen::cli::Cli;
 use skaffen::compaction::ResolvedCompactionSettings;
@@ -26,7 +27,6 @@ use skaffen::provider::{Context, Provider, StreamOptions};
 use skaffen::session::encode_cwd;
 use skaffen::session::{Session, SessionEntry, SessionMessage, SessionStoreKind};
 use skaffen::tools::ToolRegistry;
-use serde_json::json;
 use std::collections::{BTreeMap, HashSet};
 use std::io::Write as _;
 use std::path::{Path, PathBuf};
@@ -1173,7 +1173,10 @@ fn cli_continue_tmux_loads_existing_session() {
     .expect("write cassette");
     harness.record_artifact("continue-cassette.json", &cassette_path);
 
-    let sessions_dir = PathBuf::from(env.get("SKAFFEN_SESSIONS_DIR").expect("SKAFFEN_SESSIONS_DIR"));
+    let sessions_dir = PathBuf::from(
+        env.get("SKAFFEN_SESSIONS_DIR")
+            .expect("SKAFFEN_SESSIONS_DIR"),
+    );
     let project_sessions = sessions_dir.join(encode_cwd(harness.temp_dir()));
     std::fs::create_dir_all(&project_sessions).expect("create project sessions dir");
     let session_file = project_sessions.join("2026-02-06T00-00-00.000Z_continue.jsonl");
@@ -1292,7 +1295,9 @@ fn cli_continue_tmux_loads_existing_session() {
             ));
             ctx.push((
                 "cassette_name".into(),
-                env.get("SKAFFEN_VCR_TEST_NAME").cloned().unwrap_or_default(),
+                env.get("SKAFFEN_VCR_TEST_NAME")
+                    .cloned()
+                    .unwrap_or_default(),
             ));
             ctx.push(("cassette_path".into(), cassette_path.display().to_string()));
         });

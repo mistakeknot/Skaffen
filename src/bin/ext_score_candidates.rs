@@ -6,12 +6,12 @@ use std::path::PathBuf;
 use anyhow::{Context, Result, bail};
 use chrono::{DateTime, Utc};
 use clap::Parser;
+use serde::Deserialize;
 use skaffen::extension_popularity::{CandidateItem as PopularityCandidateItem, CandidatePool};
 use skaffen::extension_scoring::{
     CandidateInput, CompatStatus, Compatibility, Gates, LicenseInfo, MarketplaceSignals, Recency,
     Redistribution, RiskInfo, Signals, Tags, score_candidates,
 };
-use serde::Deserialize;
 
 #[derive(Debug, Parser)]
 #[command(name = "ext_score_candidates")]

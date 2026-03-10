@@ -15,6 +15,7 @@
 
 mod common;
 
+use serde_json::json;
 use skaffen::model::{Message, ThinkingLevel, UserContent};
 use skaffen::models::CompatConfig;
 use skaffen::provider::{Context, Provider, StreamOptions, ThinkingBudgets, ToolDef};
@@ -23,7 +24,6 @@ use skaffen::providers::cohere::CohereProvider;
 use skaffen::providers::gemini::GeminiProvider;
 use skaffen::providers::openai::OpenAIProvider;
 use skaffen::providers::openai_responses::OpenAIResponsesProvider;
-use serde_json::json;
 use std::collections::HashMap;
 
 // ═══════════════════════════════════════════════════════════════════════

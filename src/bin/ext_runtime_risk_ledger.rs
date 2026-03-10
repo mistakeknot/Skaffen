@@ -3,12 +3,12 @@
 
 use anyhow::{Context, Result, bail};
 use clap::{Args, Parser, Subcommand, ValueEnum};
+use serde::Serialize;
 use skaffen::extensions::{
     RuntimeRiskCalibrationConfig, RuntimeRiskCalibrationObjective, RuntimeRiskLedgerArtifact,
     calibrate_runtime_risk_from_ledger, replay_runtime_risk_ledger_artifact,
     verify_runtime_risk_ledger_artifact,
 };
-use serde::Serialize;
 use std::fs;
 use std::path::{Path, PathBuf};
 

@@ -4,10 +4,10 @@
 
 use crate::conformance::{FixtureFile, SetupStep, TestCase, TestResult, validate_expected};
 use clap::{Parser, error::ErrorKind};
+use serde_json::{Value, json};
 use skaffen::cli::{Cli, Commands};
 use skaffen::model::ContentBlock;
 use skaffen::tools::Tool;
-use serde_json::{Value, json};
 use std::path::Path;
 use tempfile::TempDir;
 

@@ -11,6 +11,8 @@ mod common;
 
 use async_trait::async_trait;
 use chrono::{SecondsFormat, Utc};
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use skaffen::conformance::normalization::{is_path_key, path_suffix_match};
 use skaffen::extensions::{
     ExtensionManager, ExtensionPolicy, ExtensionPolicyMode, ExtensionSession, HostcallInterceptor,
@@ -20,8 +22,6 @@ use skaffen::extensions_js::{HostcallKind, HostcallRequest, PiJsRuntimeConfig};
 use skaffen::scheduler::HostcallOutcome;
 use skaffen::session::SessionMessage;
 use skaffen::tools::ToolRegistry;
-use serde::{Deserialize, Serialize};
-use serde_json::Value;
 use std::borrow::Cow;
 use std::collections::{BTreeMap, HashMap};
 use std::fs;
@@ -1689,7 +1689,11 @@ impl ExtensionSession for ConformanceSession {
         self.thinking_level.lock().unwrap().clone()
     }
 
-    async fn set_label(&self, target_id: String, label: Option<String>) -> skaffen::error::Result<()> {
+    async fn set_label(
+        &self,
+        target_id: String,
+        label: Option<String>,
+    ) -> skaffen::error::Result<()> {
         self.labels.lock().unwrap().push((target_id, label));
         Ok(())
     }

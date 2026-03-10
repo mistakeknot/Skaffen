@@ -28,6 +28,7 @@ use asupersync::sync::Mutex;
 use bubbletea::{KeyMsg, KeyType, Message, Model as BubbleteaModel};
 use common::harness::TestHarness;
 use futures::stream;
+use serde_json::json;
 use skaffen::agent::{Agent, AgentConfig};
 use skaffen::config::Config;
 use skaffen::interactive::{ConversationMessage, MessageRole, SkaffenApp, SkaffenMsg};
@@ -38,7 +39,6 @@ use skaffen::provider::{Context, InputType, Model, ModelCost, Provider, StreamOp
 use skaffen::resources::{ResourceCliOptions, ResourceLoader};
 use skaffen::session::Session;
 use skaffen::tools::ToolRegistry;
-use serde_json::json;
 use std::collections::HashMap;
 use std::pin::Pin;
 use std::sync::atomic::{AtomicUsize, Ordering};

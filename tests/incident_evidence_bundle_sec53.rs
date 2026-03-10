@@ -13,6 +13,7 @@
 mod common;
 
 use common::TestHarness;
+use serde_json::json;
 use skaffen::connectors::http::HttpConnector;
 use skaffen::extensions::{
     ExecMediationLedgerEntry, ExtensionManager, ExtensionPolicy, ExtensionPolicyMode,
@@ -23,7 +24,6 @@ use skaffen::extensions::{
     query_security_alerts, verify_incident_evidence_bundle,
 };
 use skaffen::tools::ToolRegistry;
-use serde_json::json;
 
 // ============================================================================
 // Helpers

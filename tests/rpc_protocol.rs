@@ -4,6 +4,7 @@
 mod common;
 
 use common::TestHarness;
+use serde_json::Value;
 use skaffen::agent::{Agent, AgentConfig, AgentSession};
 use skaffen::auth::AuthStorage;
 use skaffen::config::Config;
@@ -18,7 +19,6 @@ use skaffen::rpc::{RpcOptions, run};
 use skaffen::session::{Session, SessionMessage};
 use skaffen::tools::ToolRegistry;
 use skaffen::vcr::{VcrMode, VcrRecorder};
-use serde_json::Value;
 use std::env;
 use std::path::{Path, PathBuf};
 use std::sync::mpsc::{Receiver, TryRecvError};

@@ -1046,15 +1046,17 @@ impl SkaffenApp {
             let mut session_guard = match session.lock(&cx).await {
                 Ok(guard) => guard,
                 Err(err) => {
-                    let _ = event_tx
-                        .try_send(SkaffenMsg::AgentError(format!("Failed to lock session: {err}")));
+                    let _ = event_tx.try_send(SkaffenMsg::AgentError(format!(
+                        "Failed to lock session: {err}"
+                    )));
                     return;
                 }
             };
 
             if let Err(err) = session_guard.save().await {
-                let _ =
-                    event_tx.try_send(SkaffenMsg::AgentError(format!("Failed to save session: {err}")));
+                let _ = event_tx.try_send(SkaffenMsg::AgentError(format!(
+                    "Failed to save session: {err}"
+                )));
             }
         });
     }
@@ -1443,8 +1445,9 @@ impl SkaffenApp {
             let mut loaded_session = match Session::open(&path).await {
                 Ok(session) => session,
                 Err(err) => {
-                    let _ = event_tx
-                        .try_send(SkaffenMsg::AgentError(format!("Failed to open session: {err}")));
+                    let _ = event_tx.try_send(SkaffenMsg::AgentError(format!(
+                        "Failed to open session: {err}"
+                    )));
                     return;
                 }
             };
@@ -1458,8 +1461,9 @@ impl SkaffenApp {
                 let mut session_guard = match session.lock(&cx).await {
                     Ok(guard) => guard,
                     Err(err) => {
-                        let _ = event_tx
-                            .try_send(SkaffenMsg::AgentError(format!("Failed to lock session: {err}")));
+                        let _ = event_tx.try_send(SkaffenMsg::AgentError(format!(
+                            "Failed to lock session: {err}"
+                        )));
                         return;
                     }
                 };
@@ -1471,8 +1475,9 @@ impl SkaffenApp {
                 let mut agent_guard = match agent.lock(&cx).await {
                     Ok(guard) => guard,
                     Err(err) => {
-                        let _ = event_tx
-                            .try_send(SkaffenMsg::AgentError(format!("Failed to lock agent: {err}")));
+                        let _ = event_tx.try_send(SkaffenMsg::AgentError(format!(
+                            "Failed to lock agent: {err}"
+                        )));
                         return;
                     }
                 };
@@ -1483,8 +1488,9 @@ impl SkaffenApp {
                 let session_guard = match session.lock(&cx).await {
                     Ok(guard) => guard,
                     Err(err) => {
-                        let _ = event_tx
-                            .try_send(SkaffenMsg::AgentError(format!("Failed to lock session: {err}")));
+                        let _ = event_tx.try_send(SkaffenMsg::AgentError(format!(
+                            "Failed to lock session: {err}"
+                        )));
                         return;
                     }
                 };

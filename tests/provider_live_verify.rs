@@ -34,6 +34,7 @@ mod common;
 
 use common::TestHarness;
 use futures::StreamExt;
+use serde::Serialize;
 use skaffen::model::{Message, StopReason, StreamEvent, UserContent, UserMessage};
 use skaffen::provider::{Context, Provider, StreamOptions, ToolDef};
 use skaffen::provider_metadata::{PROVIDER_METADATA, ProviderMetadata, provider_auth_env_keys};
@@ -43,7 +44,6 @@ use skaffen::providers::gemini::GeminiProvider;
 use skaffen::providers::openai::OpenAIProvider;
 use skaffen::providers::openai_responses::OpenAIResponsesProvider;
 use skaffen::providers::{normalize_openai_base, normalize_openai_responses_base};
-use serde::Serialize;
 use std::env;
 use std::path::PathBuf;
 use std::time::Instant;

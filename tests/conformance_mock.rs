@@ -9,6 +9,8 @@
 mod common;
 
 use async_trait::async_trait;
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use skaffen::PiResult;
 use skaffen::extensions::{
     ExtensionManager, ExtensionSession, JsExtensionLoadSpec, JsExtensionRuntimeHandle,
@@ -16,8 +18,6 @@ use skaffen::extensions::{
 use skaffen::extensions_js::PiJsRuntimeConfig;
 use skaffen::session::SessionMessage;
 use skaffen::tools::ToolRegistry;
-use serde::{Deserialize, Serialize};
-use serde_json::Value;
 use std::sync::{Arc, Mutex};
 
 // ─── Mock Spec ───────────────────────────────────────────────────────────────

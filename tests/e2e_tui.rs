@@ -19,6 +19,8 @@ use clap::Parser as _;
 use common::run_async;
 use common::tmux::TuiSession;
 use fs4::fs_std::FileExt as _;
+use serde_json::{Value, json};
+use sha2::{Digest, Sha256};
 use skaffen::app::build_system_prompt;
 use skaffen::cli;
 use skaffen::model::ContentBlock;
@@ -27,8 +29,6 @@ use skaffen::tools::{ReadTool, Tool};
 use skaffen::vcr::{
     Cassette, Interaction, RecordedRequest, RecordedResponse, VCR_ENV_DIR, VCR_ENV_MODE,
 };
-use serde_json::{Value, json};
-use sha2::{Digest, Sha256};
 use std::fs::{self, OpenOptions};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
@@ -131,7 +131,11 @@ fn setup_config_ui_fixture(session: &TuiSession, package_name: &str) -> PathBuf 
         .harness
         .record_artifact("config-ui-pkg.dir", &package_root);
 
-    let project_settings = session.harness.temp_dir().join(".skaffen").join("settings.json");
+    let project_settings = session
+        .harness
+        .temp_dir()
+        .join(".skaffen")
+        .join("settings.json");
     fs::create_dir_all(
         project_settings
             .parent()

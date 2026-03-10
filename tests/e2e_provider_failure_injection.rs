@@ -28,12 +28,12 @@ mod common;
 
 use common::{MockHttpResponse, TestHarness};
 use futures::StreamExt;
+use serde::Serialize;
+use serde_json::json;
 use skaffen::model::{Message, UserContent, UserMessage};
 use skaffen::models::ModelEntry;
 use skaffen::provider::{Context, InputType, Model, ModelCost, StreamEvent, StreamOptions};
 use skaffen::providers::create_provider;
-use serde::Serialize;
-use serde_json::json;
 use std::collections::HashMap;
 use std::fmt::Write as _;
 use std::sync::Arc;

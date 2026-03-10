@@ -1,9 +1,9 @@
+use serde_json::json;
 use skaffen::Error;
 use skaffen::extensions::{
     ExtensionMessage, ExtensionPolicy, ExtensionPolicyMode, HostCallPayload, PolicyDecision,
     required_capability_for_host_call,
 };
-use serde_json::json;
 
 fn register_message_json(overrides: serde_json::Value) -> String {
     let mut base = json!({
@@ -306,7 +306,9 @@ fn parse_slash_command_with_empty_args() {
     .to_string();
     let parsed = ExtensionMessage::parse_and_validate(&json).expect("parse");
     match parsed.body {
-        skaffen::extensions::ExtensionBody::SlashCommand(payload) => assert!(payload.args.is_empty()),
+        skaffen::extensions::ExtensionBody::SlashCommand(payload) => {
+            assert!(payload.args.is_empty())
+        }
         _ => unreachable!("expected SlashCommand"),
     }
 }
@@ -496,7 +498,10 @@ fn parse_log_message_all_correlation_fields() {
     let parsed = ExtensionMessage::parse_and_validate(&json).expect("parse");
     match parsed.body {
         skaffen::extensions::ExtensionBody::Log(payload) => {
-            assert!(matches!(payload.level, skaffen::extensions::LogLevel::Debug));
+            assert!(matches!(
+                payload.level,
+                skaffen::extensions::LogLevel::Debug
+            ));
             assert_eq!(payload.correlation.session_id.as_deref(), Some("sess-123"));
             assert!(payload.source.is_some());
         }

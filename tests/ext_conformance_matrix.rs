@@ -4,11 +4,11 @@
 //! via `build_test_plan()`, and validates coverage against requirements.
 //! Writes the output to `docs/extension-conformance-test-plan.json`.
 
+use serde_json::{Value, json};
 use skaffen::extension_conformance_matrix::{
     ApiMatrix, ConformanceTestPlan, HostCapability, build_test_plan,
 };
 use skaffen::extension_inclusion::InclusionList;
-use serde_json::{Value, json};
 use std::collections::BTreeSet;
 use std::fs;
 use std::path::{Path, PathBuf};

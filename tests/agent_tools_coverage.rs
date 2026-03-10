@@ -28,6 +28,7 @@ mod common;
 use async_trait::async_trait;
 use common::{TestHarness, run_async};
 use futures::Stream;
+use serde_json::json;
 use skaffen::agent::{Agent, AgentConfig, AgentEvent, AgentSession};
 use skaffen::compaction::ResolvedCompactionSettings;
 use skaffen::error::{Error, Result};
@@ -40,7 +41,6 @@ use skaffen::session::Session;
 use skaffen::tools::{
     Tool, ToolOutput, ToolRegistry, ToolUpdate, TruncatedBy, truncate_head, truncate_tail,
 };
-use serde_json::json;
 use std::io::Write as _;
 use std::pin::Pin;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -1211,9 +1211,9 @@ fn agent_queue_follow_up_only_at_idle() {
 
         // Queue a follow-up before running
         agent.queue_follow_up(Message::User(skaffen::model::UserMessage {
-            content: skaffen::model::UserContent::Blocks(vec![ContentBlock::Text(TextContent::new(
-                "follow-up message",
-            ))]),
+            content: skaffen::model::UserContent::Blocks(vec![ContentBlock::Text(
+                TextContent::new("follow-up message"),
+            )]),
             timestamp: 0,
         }));
 

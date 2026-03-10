@@ -9,8 +9,8 @@ use serde_json::json;
 
 use super::conversation::{assistant_content_to_text, user_content_to_text};
 use super::{
-    AgentState, Cmd, ConversationMessage, EXTENSION_EVENT_TIMEOUT_MS, MessageRole, SkaffenApp, SkaffenMsg,
-    conversation_from_session,
+    AgentState, Cmd, ConversationMessage, EXTENSION_EVENT_TIMEOUT_MS, MessageRole, SkaffenApp,
+    SkaffenMsg, conversation_from_session,
 };
 
 #[derive(Debug, Clone)]
@@ -371,8 +371,9 @@ impl SkaffenApp {
                     .await
                     .unwrap_or(false);
                 if cancelled {
-                    let _ =
-                        event_tx.try_send(SkaffenMsg::System("Fork cancelled by extension".to_string()));
+                    let _ = event_tx.try_send(SkaffenMsg::System(
+                        "Fork cancelled by extension".to_string(),
+                    ));
                     return;
                 }
             }
@@ -381,16 +382,18 @@ impl SkaffenApp {
                 let guard = match session.lock(&cx).await {
                     Ok(guard) => guard,
                     Err(err) => {
-                        let _ = event_tx
-                            .try_send(SkaffenMsg::AgentError(format!("Failed to lock session: {err}")));
+                        let _ = event_tx.try_send(SkaffenMsg::AgentError(format!(
+                            "Failed to lock session: {err}"
+                        )));
                         return;
                     }
                 };
                 let fork_plan = match guard.plan_fork_from_user_message(&selection.id) {
                     Ok(plan) => plan,
                     Err(err) => {
-                        let _ = event_tx
-                            .try_send(SkaffenMsg::AgentError(format!("Failed to build fork: {err}")));
+                        let _ = event_tx.try_send(SkaffenMsg::AgentError(format!(
+                            "Failed to build fork: {err}"
+                        )));
                         return;
                     }
                 };
@@ -413,7 +416,9 @@ impl SkaffenApp {
             let new_session_id = new_session.header.id.clone();
 
             if let Err(err) = new_session.save().await {
-                let _ = event_tx.try_send(SkaffenMsg::AgentError(format!("Failed to save fork: {err}")));
+                let _ = event_tx.try_send(SkaffenMsg::AgentError(format!(
+                    "Failed to save fork: {err}"
+                )));
                 return;
             }
 
@@ -422,8 +427,9 @@ impl SkaffenApp {
                 let mut agent_guard = match agent.lock(&cx).await {
                     Ok(guard) => guard,
                     Err(err) => {
-                        let _ = event_tx
-                            .try_send(SkaffenMsg::AgentError(format!("Failed to lock agent: {err}")));
+                        let _ = event_tx.try_send(SkaffenMsg::AgentError(format!(
+                            "Failed to lock agent: {err}"
+                        )));
                         return;
                     }
                 };
@@ -434,8 +440,9 @@ impl SkaffenApp {
                 let mut guard = match session.lock(&cx).await {
                     Ok(guard) => guard,
                     Err(err) => {
-                        let _ = event_tx
-                            .try_send(SkaffenMsg::AgentError(format!("Failed to lock session: {err}")));
+                        let _ = event_tx.try_send(SkaffenMsg::AgentError(format!(
+                            "Failed to lock session: {err}"
+                        )));
                         return;
                     }
                 };
@@ -446,8 +453,9 @@ impl SkaffenApp {
                 let guard = match session.lock(&cx).await {
                     Ok(guard) => guard,
                     Err(err) => {
-                        let _ = event_tx
-                            .try_send(SkaffenMsg::AgentError(format!("Failed to lock session: {err}")));
+                        let _ = event_tx.try_send(SkaffenMsg::AgentError(format!(
+                            "Failed to lock session: {err}"
+                        )));
                         return;
                     }
                 };

@@ -26,13 +26,13 @@
 mod common;
 
 use chrono::{SecondsFormat, Utc};
+use serde::Serialize;
+use serde_json::Value;
 use skaffen::extensions::{
     ExtensionEventName, ExtensionManager, JsExtensionLoadSpec, JsExtensionRuntimeHandle,
 };
 use skaffen::extensions_js::PiJsRuntimeConfig;
 use skaffen::tools::ToolRegistry;
-use serde::Serialize;
-use serde_json::Value;
 use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, OnceLock};

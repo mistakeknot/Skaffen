@@ -30,14 +30,14 @@ use std::process::Command;
 use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
+use serde::{Deserialize, Serialize};
+use serde_json::{Value, json};
+use sha2::{Digest, Sha256};
 use skaffen::extensions::{
     ExtensionEventName, ExtensionManager, JsExtensionLoadSpec, JsExtensionRuntimeHandle,
 };
 use skaffen::extensions_js::PiJsRuntimeConfig;
 use skaffen::tools::ToolRegistry;
-use serde::{Deserialize, Serialize};
-use serde_json::{Value, json};
-use sha2::{Digest, Sha256};
 use sysinfo::System;
 
 // ─── Configuration ───────────────────────────────────────────────────────────

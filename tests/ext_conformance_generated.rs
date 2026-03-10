@@ -17,10 +17,10 @@
 
 mod common;
 
+use serde_json::Value;
 use skaffen::extensions::{ExtensionManager, JsExtensionLoadSpec, JsExtensionRuntimeHandle};
 use skaffen::extensions_js::PiJsRuntimeConfig;
 use skaffen::tools::ToolRegistry;
-use serde_json::Value;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, OnceLock};
 

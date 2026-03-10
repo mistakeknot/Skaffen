@@ -12,12 +12,12 @@ use asupersync::runtime::reactor::create_reactor;
 use asupersync::time::{sleep, wall_now};
 use chrono::{SecondsFormat, Utc};
 use clap::{ArgAction, Parser};
+use serde_json::Value;
 use skaffen::extensions::{
     ExtensionEventName, ExtensionManager, HostcallReactorConfig, JsExtensionLoadSpec,
 };
 use skaffen::extensions_js::PiJsRuntimeConfig;
 use skaffen::tools::ToolRegistry;
-use serde_json::Value;
 use sysinfo::{ProcessRefreshKind, RefreshKind, System, get_current_pid};
 
 #[derive(Parser, Debug)]

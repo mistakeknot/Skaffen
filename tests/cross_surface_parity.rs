@@ -4,12 +4,12 @@
 
 mod common;
 
+use serde_json::json;
 use skaffen::error::Error;
 use skaffen::model::{
     AssistantMessage, ContentBlock, Message, StopReason, TextContent, ToolCall, Usage,
 };
 use skaffen::session::Session;
-use serde_json::json;
 
 // ============================================================================
 // 1. Exit-Code Classification — every error variant → correct exit code

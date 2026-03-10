@@ -9,13 +9,17 @@ use asupersync::sync::Mutex;
 use bubbletea::{Cmd, KeyMsg, KeyType, Message, Model as BubbleteaModel, QuitMsg};
 use common::TestHarness;
 use futures::stream;
+use regex::Regex;
+use serde_json::json;
 use skaffen::agent::{Agent, AgentConfig};
 use skaffen::config::{Config, TerminalSettings};
 use skaffen::extensions::{
     ExtensionManager, ExtensionUiRequest, JsExtensionLoadSpec, JsExtensionRuntimeHandle,
 };
 use skaffen::extensions_js::PiJsRuntimeConfig;
-use skaffen::interactive::{ConversationMessage, MessageRole, PendingInput, SkaffenApp, SkaffenMsg};
+use skaffen::interactive::{
+    ConversationMessage, MessageRole, PendingInput, SkaffenApp, SkaffenMsg,
+};
 use skaffen::keybindings::KeyBindings;
 use skaffen::model::{
     AssistantMessage, ContentBlock, Cost, ImageContent, StopReason, StreamEvent, TextContent,
@@ -26,8 +30,6 @@ use skaffen::provider::{Context, InputType, Model, ModelCost, Provider, StreamOp
 use skaffen::resources::{ResourceCliOptions, ResourceLoader};
 use skaffen::session::{Session, SessionEntry, SessionMessage, encode_cwd};
 use skaffen::tools::ToolRegistry;
-use regex::Regex;
-use serde_json::json;
 use std::collections::HashMap;
 use std::fs;
 use std::pin::Pin;
@@ -787,7 +789,12 @@ fn log_initial_state(harness: &TestHarness, app: &SkaffenApp) {
     });
 }
 
-fn apply_msg(harness: &TestHarness, app: &mut SkaffenApp, label: &str, msg: Message) -> StepOutcome {
+fn apply_msg(
+    harness: &TestHarness,
+    app: &mut SkaffenApp,
+    label: &str,
+    msg: Message,
+) -> StepOutcome {
     let before = normalize_view(&BubbleteaModel::view(app));
     harness.log().info_ctx("input", label, |ctx| {
         ctx.push((
@@ -824,7 +831,12 @@ fn apply_msg(harness: &TestHarness, app: &mut SkaffenApp, label: &str, msg: Mess
     }
 }
 
-fn apply_pi(harness: &TestHarness, app: &mut SkaffenApp, label: &str, msg: SkaffenMsg) -> StepOutcome {
+fn apply_pi(
+    harness: &TestHarness,
+    app: &mut SkaffenApp,
+    label: &str,
+    msg: SkaffenMsg,
+) -> StepOutcome {
     apply_msg(harness, app, label, Message::new(msg))
 }
 
@@ -1394,7 +1406,12 @@ fn tui_state_agent_start_enters_processing() {
     let mut app = build_app(&harness, Vec::new());
     log_initial_state(&harness, &app);
 
-    let step = apply_pi(&harness, &mut app, "SkaffenMsg::AgentStart", SkaffenMsg::AgentStart);
+    let step = apply_pi(
+        &harness,
+        &mut app,
+        "SkaffenMsg::AgentStart",
+        SkaffenMsg::AgentStart,
+    );
     assert_after_contains(&harness, &step, "Processing...");
 }
 
@@ -1406,7 +1423,12 @@ fn tui_state_pending_message_queue_shows_steering_preview_while_busy() {
     log_initial_state(&harness, &app);
 
     type_text(&harness, &mut app, "queued steering");
-    apply_pi(&harness, &mut app, "SkaffenMsg::AgentStart", SkaffenMsg::AgentStart);
+    apply_pi(
+        &harness,
+        &mut app,
+        "SkaffenMsg::AgentStart",
+        SkaffenMsg::AgentStart,
+    );
 
     let step = press_enter(&harness, &mut app);
     assert_after_contains(&harness, &step, "Pending:");
@@ -1421,7 +1443,12 @@ fn tui_state_pending_message_queue_shows_follow_up_preview_while_busy() {
     log_initial_state(&harness, &app);
 
     type_text(&harness, &mut app, "queued follow-up");
-    apply_pi(&harness, &mut app, "SkaffenMsg::AgentStart", SkaffenMsg::AgentStart);
+    apply_pi(
+        &harness,
+        &mut app,
+        "SkaffenMsg::AgentStart",
+        SkaffenMsg::AgentStart,
+    );
 
     let step = press_alt_enter(&harness, &mut app);
     assert_after_contains(&harness, &step, "Pending:");
@@ -1434,7 +1461,12 @@ fn tui_state_text_delta_renders_while_processing() {
     let mut app = build_app(&harness, Vec::new());
     log_initial_state(&harness, &app);
 
-    apply_pi(&harness, &mut app, "SkaffenMsg::AgentStart", SkaffenMsg::AgentStart);
+    apply_pi(
+        &harness,
+        &mut app,
+        "SkaffenMsg::AgentStart",
+        SkaffenMsg::AgentStart,
+    );
     let step = apply_pi(
         &harness,
         &mut app,
@@ -1452,7 +1484,12 @@ fn tui_state_text_delta_long_response_stays_scrolled_to_bottom() {
     app.set_terminal_size(80, 12);
     log_initial_state(&harness, &app);
 
-    apply_pi(&harness, &mut app, "SkaffenMsg::AgentStart", SkaffenMsg::AgentStart);
+    apply_pi(
+        &harness,
+        &mut app,
+        "SkaffenMsg::AgentStart",
+        SkaffenMsg::AgentStart,
+    );
     let streamed = (1..=80)
         .map(|idx| format!("stream line {idx:03}"))
         .collect::<Vec<_>>()
@@ -1500,7 +1537,12 @@ fn tui_state_text_delta_preserves_manual_scroll_position() {
         "Expected to leave bottom after PgUp, got {pgup_percent}%"
     );
 
-    apply_pi(&harness, &mut app, "SkaffenMsg::AgentStart", SkaffenMsg::AgentStart);
+    apply_pi(
+        &harness,
+        &mut app,
+        "SkaffenMsg::AgentStart",
+        SkaffenMsg::AgentStart,
+    );
     let streamed = (1..=40)
         .map(|idx| format!("delta {idx:03}"))
         .collect::<Vec<_>>()
@@ -1525,7 +1567,12 @@ fn tui_state_thinking_delta_renders_while_processing() {
     let mut app = build_app(&harness, Vec::new());
     log_initial_state(&harness, &app);
 
-    apply_pi(&harness, &mut app, "SkaffenMsg::AgentStart", SkaffenMsg::AgentStart);
+    apply_pi(
+        &harness,
+        &mut app,
+        "SkaffenMsg::AgentStart",
+        SkaffenMsg::AgentStart,
+    );
     let step = apply_pi(
         &harness,
         &mut app,
@@ -1547,7 +1594,12 @@ fn tui_state_hide_thinking_block_hides_thinking_until_toggled() {
         build_app_with_session_and_config(&harness, Vec::new(), Session::in_memory(), config);
     log_initial_state(&harness, &app);
 
-    apply_pi(&harness, &mut app, "SkaffenMsg::AgentStart", SkaffenMsg::AgentStart);
+    apply_pi(
+        &harness,
+        &mut app,
+        "SkaffenMsg::AgentStart",
+        SkaffenMsg::AgentStart,
+    );
     let step = apply_pi(
         &harness,
         &mut app,
@@ -2312,7 +2364,12 @@ fn tui_state_agent_done_appends_assistant_message_and_updates_usage() {
     let mut app = build_app(&harness, Vec::new());
     log_initial_state(&harness, &app);
 
-    apply_pi(&harness, &mut app, "SkaffenMsg::AgentStart", SkaffenMsg::AgentStart);
+    apply_pi(
+        &harness,
+        &mut app,
+        "SkaffenMsg::AgentStart",
+        SkaffenMsg::AgentStart,
+    );
     apply_pi(
         &harness,
         &mut app,
@@ -2344,7 +2401,12 @@ fn tui_state_agent_done_replaces_stream_buffer_without_duplicate_marker() {
 
     let final_marker: &str = "FINAL-MARKER-AGENT-DONE";
 
-    apply_pi(&harness, &mut app, "SkaffenMsg::AgentStart", SkaffenMsg::AgentStart);
+    apply_pi(
+        &harness,
+        &mut app,
+        "SkaffenMsg::AgentStart",
+        SkaffenMsg::AgentStart,
+    );
     let streamed = format!("{}\n{final_marker}", numbered_lines(80));
     apply_pi(
         &harness,
@@ -2381,7 +2443,12 @@ fn tui_state_agent_done_aborted_sets_status_message() {
     let mut app = build_app(&harness, Vec::new());
     log_initial_state(&harness, &app);
 
-    apply_pi(&harness, &mut app, "SkaffenMsg::AgentStart", SkaffenMsg::AgentStart);
+    apply_pi(
+        &harness,
+        &mut app,
+        "SkaffenMsg::AgentStart",
+        SkaffenMsg::AgentStart,
+    );
     let step = apply_pi(
         &harness,
         &mut app,
@@ -2402,7 +2469,12 @@ fn tui_state_agent_done_error_without_response_adds_error_message() {
     let mut app = build_app(&harness, Vec::new());
     log_initial_state(&harness, &app);
 
-    apply_pi(&harness, &mut app, "SkaffenMsg::AgentStart", SkaffenMsg::AgentStart);
+    apply_pi(
+        &harness,
+        &mut app,
+        "SkaffenMsg::AgentStart",
+        SkaffenMsg::AgentStart,
+    );
     let step = apply_pi(
         &harness,
         &mut app,
@@ -2425,7 +2497,12 @@ fn tui_state_agent_done_error_with_response_does_not_duplicate_error_system_mess
     let mut app = build_app(&harness, Vec::new());
     log_initial_state(&harness, &app);
 
-    apply_pi(&harness, &mut app, "SkaffenMsg::AgentStart", SkaffenMsg::AgentStart);
+    apply_pi(
+        &harness,
+        &mut app,
+        "SkaffenMsg::AgentStart",
+        SkaffenMsg::AgentStart,
+    );
     apply_pi(
         &harness,
         &mut app,
@@ -2453,7 +2530,12 @@ fn tui_state_agent_error_adds_system_error_message_and_returns_idle() {
     let mut app = build_app(&harness, Vec::new());
     log_initial_state(&harness, &app);
 
-    apply_pi(&harness, &mut app, "SkaffenMsg::AgentStart", SkaffenMsg::AgentStart);
+    apply_pi(
+        &harness,
+        &mut app,
+        "SkaffenMsg::AgentStart",
+        SkaffenMsg::AgentStart,
+    );
     let step = apply_pi(
         &harness,
         &mut app,
@@ -2530,7 +2612,12 @@ fn tui_state_run_pending_text_submits_next_input() {
     let mut app = build_app(&harness, vec![PendingInput::Text("hello".to_string())]);
     log_initial_state(&harness, &app);
 
-    let step = apply_pi(&harness, &mut app, "SkaffenMsg::RunPending", SkaffenMsg::RunPending);
+    let step = apply_pi(
+        &harness,
+        &mut app,
+        "SkaffenMsg::RunPending",
+        SkaffenMsg::RunPending,
+    );
     assert_after_contains(&harness, &step, "You: hello");
     assert_after_contains(&harness, &step, "Processing...");
 }
@@ -2546,7 +2633,12 @@ fn tui_state_run_pending_content_submits_next_input() {
     );
     log_initial_state(&harness, &app);
 
-    let step = apply_pi(&harness, &mut app, "SkaffenMsg::RunPending", SkaffenMsg::RunPending);
+    let step = apply_pi(
+        &harness,
+        &mut app,
+        "SkaffenMsg::RunPending",
+        SkaffenMsg::RunPending,
+    );
     assert_after_contains(&harness, &step, "You: hello");
     assert_after_contains(&harness, &step, "Processing...");
 }
@@ -3319,7 +3411,8 @@ fn tui_state_slash_share_reports_error_when_gh_missing() {
     // Under load, async command execution plus shell startup for fake `gh`
     // can exceed 1s before AgentError is emitted.
     let events = wait_for_pi_msgs(&event_rx, Duration::from_secs(3), |msgs| {
-        msgs.iter().any(|msg| matches!(msg, SkaffenMsg::AgentError(_)))
+        msgs.iter()
+            .any(|msg| matches!(msg, SkaffenMsg::AgentError(_)))
     });
     let error = events
         .into_iter()
@@ -3357,7 +3450,8 @@ fn tui_state_slash_share_reports_error_when_gh_not_authenticated() {
     assert_after_contains(&harness, &step, "Sharing session...");
 
     let events = wait_for_pi_msgs(&event_rx, Duration::from_secs(1), |msgs| {
-        msgs.iter().any(|msg| matches!(msg, SkaffenMsg::AgentError(_)))
+        msgs.iter()
+            .any(|msg| matches!(msg, SkaffenMsg::AgentError(_)))
     });
     let error = events
         .into_iter()
@@ -3400,7 +3494,8 @@ fn tui_state_slash_share_reports_parse_error_and_cleans_temp_file() {
     assert_after_contains(&harness, &step, "Sharing session...");
 
     let events = wait_for_pi_msgs(&event_rx, Duration::from_secs(1), |msgs| {
-        msgs.iter().any(|msg| matches!(msg, SkaffenMsg::AgentError(_)))
+        msgs.iter()
+            .any(|msg| matches!(msg, SkaffenMsg::AgentError(_)))
     });
     let error = events
         .into_iter()
@@ -3460,12 +3555,15 @@ fn tui_state_slash_share_creates_gist_and_reports_urls_and_cleans_temp_file() {
 
     // Full-suite parallel load can delay command completion past 1s.
     let events = wait_for_pi_msgs(&event_rx, Duration::from_secs(3), |msgs| {
-        msgs.iter()
-            .any(|msg| matches!(msg, SkaffenMsg::System(_)) || matches!(msg, SkaffenMsg::AgentError(_)))
+        msgs.iter().any(|msg| {
+            matches!(msg, SkaffenMsg::System(_)) || matches!(msg, SkaffenMsg::AgentError(_))
+        })
     });
     let msg = events
         .into_iter()
-        .find(|msg| matches!(msg, SkaffenMsg::System(_)) || matches!(msg, SkaffenMsg::AgentError(_)))
+        .find(|msg| {
+            matches!(msg, SkaffenMsg::System(_)) || matches!(msg, SkaffenMsg::AgentError(_))
+        })
         .expect("expected share result");
     let step = apply_pi(&harness, &mut app, "SkaffenMsg share result", msg);
     assert_after_contains(&harness, &step, "Created private gist");
@@ -3535,12 +3633,15 @@ fn tui_state_slash_share_is_cancellable_and_cleans_temp_file() {
     assert_after_contains(&harness, &step, "Aborting request...");
 
     let events = wait_for_pi_msgs(&event_rx, Duration::from_secs(1), |msgs| {
-        msgs.iter()
-            .any(|msg| matches!(msg, SkaffenMsg::System(message) if message.contains("Share cancelled")))
+        msgs.iter().any(
+            |msg| matches!(msg, SkaffenMsg::System(message) if message.contains("Share cancelled")),
+        )
     });
     let msg = events
         .into_iter()
-        .find(|msg| matches!(msg, SkaffenMsg::System(message) if message.contains("Share cancelled")))
+        .find(
+            |msg| matches!(msg, SkaffenMsg::System(message) if message.contains("Share cancelled")),
+        )
         .expect("expected Share cancelled message");
     let step = apply_pi(&harness, &mut app, "SkaffenMsg::System", msg);
     assert_after_contains(&harness, &step, "Share cancelled");
@@ -3595,12 +3696,15 @@ fn tui_state_slash_share_public_flag_creates_public_gist() {
     assert_after_contains(&harness, &step, "Sharing session...");
 
     let events = wait_for_pi_msgs(&event_rx, Duration::from_secs(3), |msgs| {
-        msgs.iter()
-            .any(|msg| matches!(msg, SkaffenMsg::System(_)) || matches!(msg, SkaffenMsg::AgentError(_)))
+        msgs.iter().any(|msg| {
+            matches!(msg, SkaffenMsg::System(_)) || matches!(msg, SkaffenMsg::AgentError(_))
+        })
     });
     let msg = events
         .into_iter()
-        .find(|msg| matches!(msg, SkaffenMsg::System(_)) || matches!(msg, SkaffenMsg::AgentError(_)))
+        .find(|msg| {
+            matches!(msg, SkaffenMsg::System(_)) || matches!(msg, SkaffenMsg::AgentError(_))
+        })
         .expect("expected share result");
     let step = apply_pi(&harness, &mut app, "SkaffenMsg share result", msg);
     assert_after_contains(&harness, &step, "Created public gist");
@@ -3651,12 +3755,15 @@ fn tui_state_slash_share_includes_gist_description() {
     assert_after_contains(&harness, &step, "Sharing session...");
 
     let events = wait_for_pi_msgs(&event_rx, Duration::from_secs(3), |msgs| {
-        msgs.iter()
-            .any(|msg| matches!(msg, SkaffenMsg::System(_)) || matches!(msg, SkaffenMsg::AgentError(_)))
+        msgs.iter().any(|msg| {
+            matches!(msg, SkaffenMsg::System(_)) || matches!(msg, SkaffenMsg::AgentError(_))
+        })
     });
     let msg = events
         .into_iter()
-        .find(|msg| matches!(msg, SkaffenMsg::System(_)) || matches!(msg, SkaffenMsg::AgentError(_)))
+        .find(|msg| {
+            matches!(msg, SkaffenMsg::System(_)) || matches!(msg, SkaffenMsg::AgentError(_))
+        })
         .expect("expected share result");
     apply_pi(&harness, &mut app, "SkaffenMsg share result", msg);
 
@@ -6692,7 +6799,12 @@ fn tui_state_ctrlt_thinking_visible_hidden_visible_cycle() {
     log_initial_state(&harness, &app);
 
     // Generate thinking content while processing.
-    apply_pi(&harness, &mut app, "SkaffenMsg::AgentStart", SkaffenMsg::AgentStart);
+    apply_pi(
+        &harness,
+        &mut app,
+        "SkaffenMsg::AgentStart",
+        SkaffenMsg::AgentStart,
+    );
     let step = apply_pi(
         &harness,
         &mut app,
@@ -6860,7 +6972,12 @@ fn tui_state_thinking_and_tool_toggles_independent() {
     log_initial_state(&harness, &app);
 
     // Generate thinking content.
-    apply_pi(&harness, &mut app, "SkaffenMsg::AgentStart", SkaffenMsg::AgentStart);
+    apply_pi(
+        &harness,
+        &mut app,
+        "SkaffenMsg::AgentStart",
+        SkaffenMsg::AgentStart,
+    );
     apply_pi(
         &harness,
         &mut app,
@@ -6992,7 +7109,12 @@ fn tui_state_model_selector_blocked_during_processing() {
     log_initial_state(&harness, &app);
 
     // Simulate agent processing state.
-    apply_pi(&harness, &mut app, "SkaffenMsg::AgentStart", SkaffenMsg::AgentStart);
+    apply_pi(
+        &harness,
+        &mut app,
+        "SkaffenMsg::AgentStart",
+        SkaffenMsg::AgentStart,
+    );
 
     // Ctrl+L while processing should be blocked.
     let step = press_ctrll(&harness, &mut app);
@@ -7480,7 +7602,12 @@ fn tui_perf_emergency_mode_raw_text_no_cache() {
 fn fill_viewport_with_stream(harness: &TestHarness, app: &mut SkaffenApp, line_count: usize) {
     apply_pi(harness, app, "AgentStart", SkaffenMsg::AgentStart);
     let content = numbered_lines(line_count);
-    apply_pi(harness, app, "TextDelta(long)", SkaffenMsg::TextDelta(content));
+    apply_pi(
+        harness,
+        app,
+        "TextDelta(long)",
+        SkaffenMsg::TextDelta(content),
+    );
 }
 
 fn finalize_agent(harness: &TestHarness, app: &mut SkaffenApp) -> StepOutcome {

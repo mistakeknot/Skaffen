@@ -4,14 +4,14 @@ mod common;
 
 use asupersync::runtime::RuntimeBuilder;
 use common::{TestHarness, validate_jsonl};
+use proptest::prelude::*;
+use serde_json::json;
 use skaffen::Error;
 use skaffen::model::{AssistantMessage, ContentBlock, StopReason, TextContent, Usage, UserContent};
 use skaffen::session::{
     CustomEntry, EntryBase, Session, SessionEntry, SessionHeader, SessionMessage, encode_cwd,
 };
 use skaffen::session_index::SessionIndex;
-use proptest::prelude::*;
-use serde_json::json;
 use std::future::Future;
 use std::path::Path;
 
@@ -1008,7 +1008,9 @@ fn save_round_trips_tool_error_result() {
 
         let tool_result_entry = &loaded.entries[2];
         if let SessionEntry::Message(msg_entry) = tool_result_entry {
-            if let skaffen::session::SessionMessage::ToolResult { is_error, .. } = &msg_entry.message {
+            if let skaffen::session::SessionMessage::ToolResult { is_error, .. } =
+                &msg_entry.message
+            {
                 assert!(*is_error, "is_error flag should be preserved as true");
             } else {
                 panic!("Expected ToolResult message");

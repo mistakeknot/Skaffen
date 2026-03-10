@@ -7,12 +7,12 @@
 mod common;
 
 use common::TestHarness;
+use serde_json::{Value, json};
 use skaffen::model::{
     AssistantMessage, AssistantMessageEvent, ContentBlock, Cost, ImageContent, Message, StopReason,
     TextContent, ThinkingContent, ThinkingLevel, ToolCall, ToolResultMessage, Usage, UserContent,
     UserMessage,
 };
-use serde_json::{Value, json};
 use std::sync::Arc;
 
 // ============================================================================

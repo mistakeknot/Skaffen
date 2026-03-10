@@ -1,5 +1,5 @@
-use skaffen::tools::{EditTool, Tool};
 use serde_json::json;
+use skaffen::tools::{EditTool, Tool};
 use std::fs::File;
 use std::io::Write;
 use tempfile::tempdir;

@@ -11,11 +11,13 @@ mod common;
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD;
 use futures::StreamExt;
+use serde_json::json;
 use skaffen::http::client::Client;
 use skaffen::model::{Message, UserContent, UserMessage};
 use skaffen::provider::{Context, Provider, StreamOptions};
-use skaffen::vcr::{Cassette, Interaction, RecordedRequest, RecordedResponse, VcrMode, VcrRecorder};
-use serde_json::json;
+use skaffen::vcr::{
+    Cassette, Interaction, RecordedRequest, RecordedResponse, VcrMode, VcrRecorder,
+};
 
 fn context_for(prompt: &str) -> Context<'static> {
     Context::owned(
@@ -186,7 +188,8 @@ fn openai_http_500_is_reported() {
         vec!["boom".to_string()],
     );
     common::run_async(async move {
-        let provider = skaffen::providers::openai::OpenAIProvider::new("gpt-test").with_client(client);
+        let provider =
+            skaffen::providers::openai::OpenAIProvider::new("gpt-test").with_client(client);
         let err = provider
             .stream(
                 &context_for("Trigger server error."),
@@ -213,7 +216,8 @@ fn openai_http_200_with_wrong_content_type_is_protocol_error() {
     );
 
     common::run_async(async move {
-        let provider = skaffen::providers::openai::OpenAIProvider::new("gpt-test").with_client(client);
+        let provider =
+            skaffen::providers::openai::OpenAIProvider::new("gpt-test").with_client(client);
         let err = provider
             .stream(
                 &context_for("Trigger protocol mismatch."),
@@ -250,7 +254,8 @@ fn openai_http_200_missing_content_type_is_protocol_error() {
     );
 
     common::run_async(async move {
-        let provider = skaffen::providers::openai::OpenAIProvider::new("gpt-test").with_client(client);
+        let provider =
+            skaffen::providers::openai::OpenAIProvider::new("gpt-test").with_client(client);
         let err = provider
             .stream(
                 &context_for("Trigger missing content type."),
@@ -282,8 +287,8 @@ fn anthropic_http_500_is_reported() {
         vec!["boom".to_string()],
     );
     common::run_async(async move {
-        let provider =
-            skaffen::providers::anthropic::AnthropicProvider::new("claude-test").with_client(client);
+        let provider = skaffen::providers::anthropic::AnthropicProvider::new("claude-test")
+            .with_client(client);
         let err = provider
             .stream(
                 &context_for("Trigger server error."),
@@ -377,7 +382,8 @@ fn openai_invalid_json_event_fails_stream() {
         vec!["data: {not json}\n\n".to_string()],
     );
     common::run_async(async move {
-        let provider = skaffen::providers::openai::OpenAIProvider::new("gpt-test").with_client(client);
+        let provider =
+            skaffen::providers::openai::OpenAIProvider::new("gpt-test").with_client(client);
         let mut stream = provider
             .stream(
                 &context_for("Trigger invalid json."),
@@ -444,8 +450,8 @@ fn anthropic_invalid_json_event_fails_stream() {
         vec!["event: message_start\ndata: {not json}\n\n".to_string()],
     );
     common::run_async(async move {
-        let provider =
-            skaffen::providers::anthropic::AnthropicProvider::new("claude-test").with_client(client);
+        let provider = skaffen::providers::anthropic::AnthropicProvider::new("claude-test")
+            .with_client(client);
         let mut stream = provider
             .stream(
                 &context_for("Trigger invalid json."),
@@ -525,7 +531,8 @@ fn openai_invalid_utf8_in_sse_is_reported() {
     );
 
     common::run_async(async move {
-        let provider = skaffen::providers::openai::OpenAIProvider::new("gpt-test").with_client(client);
+        let provider =
+            skaffen::providers::openai::OpenAIProvider::new("gpt-test").with_client(client);
         let context = context_for("Trigger invalid utf8.");
         let options = options_with_key("test-key");
 

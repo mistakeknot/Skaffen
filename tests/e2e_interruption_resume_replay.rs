@@ -28,6 +28,7 @@ mod common;
 use async_trait::async_trait;
 use common::{TestHarness, run_async};
 use futures::Stream;
+use serde_json::json;
 use skaffen::agent::{AbortHandle, Agent, AgentConfig, AgentEvent, AgentSession};
 use skaffen::compaction::ResolvedCompactionSettings;
 use skaffen::error::Result;
@@ -37,7 +38,6 @@ use skaffen::model::{
 use skaffen::provider::{Context, Provider, StreamOptions};
 use skaffen::session::Session;
 use skaffen::tools::ToolRegistry;
-use serde_json::json;
 use std::path::Path;
 use std::pin::Pin;
 use std::sync::atomic::{AtomicUsize, Ordering};

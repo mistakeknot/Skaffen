@@ -17,6 +17,7 @@ use asupersync::sync::Mutex;
 use bubbletea::{KeyMsg, KeyType, Message, Model as BubbleteaModel};
 use common::TestHarness;
 use futures::stream;
+use serde_json::json;
 use skaffen::agent::{Agent, AgentConfig};
 use skaffen::config::Config;
 use skaffen::extensions::{ExtensionManager, ExtensionUiRequest, ExtensionUiResponse};
@@ -28,7 +29,6 @@ use skaffen::provider::{Context, InputType, Model, ModelCost, Provider, StreamOp
 use skaffen::resources::{ResourceCliOptions, ResourceLoader};
 use skaffen::session::Session;
 use skaffen::tools::ToolRegistry;
-use serde_json::json;
 use std::collections::HashMap;
 use std::pin::Pin;
 use std::sync::{Arc, OnceLock};
@@ -842,7 +842,10 @@ mod tui_prompt {
         manager.set_ui_sender(ui_tx);
         let mut app = build_app(&harness, Some(manager));
 
-        send_pi_msg(&mut app, SkaffenMsg::ExtensionUiRequest(make_non_cap_confirm()));
+        send_pi_msg(
+            &mut app,
+            SkaffenMsg::ExtensionUiRequest(make_non_cap_confirm()),
+        );
 
         let view = view_text(&app);
         // Should NOT show the capability prompt overlay (no Allow Once/Deny Always buttons).

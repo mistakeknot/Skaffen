@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod tests {
-    use skaffen::tools::{EditTool, Tool};
     use serde_json::json;
+    use skaffen::tools::{EditTool, Tool};
 
     #[test]
     fn test_edit_empty_old_text_is_rejected() {

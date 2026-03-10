@@ -16,6 +16,7 @@
 mod common;
 
 use common::TestHarness;
+use serde_json::json;
 use skaffen::connectors::http::HttpConnector;
 use skaffen::extension_preflight::{
     ExtensionTrustState, ExtensionTrustTracker, InstallRecommendation,
@@ -30,7 +31,6 @@ use skaffen::extensions::{
     verify_incident_evidence_bundle,
 };
 use skaffen::tools::ToolRegistry;
-use serde_json::json;
 
 // ============================================================================
 // Helpers

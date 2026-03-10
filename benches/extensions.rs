@@ -15,13 +15,13 @@ use std::time::Duration;
 
 use criterion::{BatchSize, BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
 use futures::executor::block_on;
+use serde_json::{Value, json};
 use skaffen::extensions::{
     ExtensionEventName, ExtensionManager, JsExtensionLoadSpec, JsExtensionRuntimeHandle,
 };
 use skaffen::extensions_js::{HostcallKind, HostcallRequest, PiJsRuntime, PiJsRuntimeConfig};
 use skaffen::scheduler::HostcallOutcome;
 use skaffen::tools::ToolRegistry;
-use serde_json::{Value, json};
 
 const BENCH_TOOL_SETUP: &str = r#"
 __pi_begin_extension("ext.bench", { name: "Bench" });
@@ -86,7 +86,10 @@ impl skaffen::extensions::ExtensionSession for BenchSession {
         Ok(())
     }
 
-    async fn append_message(&self, _message: skaffen::session::SessionMessage) -> skaffen::error::Result<()> {
+    async fn append_message(
+        &self,
+        _message: skaffen::session::SessionMessage,
+    ) -> skaffen::error::Result<()> {
         Ok(())
     }
 
@@ -114,7 +117,11 @@ impl skaffen::extensions::ExtensionSession for BenchSession {
         None
     }
 
-    async fn set_label(&self, _target_id: String, _label: Option<String>) -> skaffen::error::Result<()> {
+    async fn set_label(
+        &self,
+        _target_id: String,
+        _label: Option<String>,
+    ) -> skaffen::error::Result<()> {
         Ok(())
     }
 }
@@ -348,7 +355,11 @@ fn bench_snapshot_lookup(c: &mut Criterion) {
     });
 
     group.bench_function("compile", |b| {
-        b.iter(|| black_box(skaffen::extensions::PolicySnapshot::compile(black_box(&policy))));
+        b.iter(|| {
+            black_box(skaffen::extensions::PolicySnapshot::compile(black_box(
+                &policy,
+            )))
+        });
     });
 
     group.finish();
@@ -392,7 +403,8 @@ fn bench_protocol_dispatch(c: &mut Criterion) {
     let http_connector = Arc::new(skaffen::connectors::http::HttpConnector::new(
         skaffen::connectors::http::HttpConnectorConfig::default(),
     ));
-    let session: Arc<dyn skaffen::extensions::ExtensionSession + Send + Sync> = Arc::new(BenchSession);
+    let session: Arc<dyn skaffen::extensions::ExtensionSession + Send + Sync> =
+        Arc::new(BenchSession);
     let ui_handler: Arc<dyn skaffen::extension_dispatcher::ExtensionUiHandler + Send + Sync> =
         Arc::new(BenchUiHandler);
     let dispatcher =
@@ -881,7 +893,8 @@ fn bench_dispatch_shared_session(c: &mut Criterion) {
     let policy = ExtensionPolicy::default();
 
     let manager = ExtensionManager::new();
-    let session: Arc<dyn skaffen::extensions::ExtensionSession + Send + Sync> = Arc::new(BenchSession);
+    let session: Arc<dyn skaffen::extensions::ExtensionSession + Send + Sync> =
+        Arc::new(BenchSession);
     manager.set_session(session);
 
     let calls: Vec<(&str, HostCallPayload)> = vec![
@@ -1186,7 +1199,8 @@ fn bench_dispatch_overhead_breakdown(c: &mut Criterion) {
 
     // With manager (full overhead: quota + risk eval)
     let manager = ExtensionManager::new();
-    let session: Arc<dyn skaffen::extensions::ExtensionSession + Send + Sync> = Arc::new(BenchSession);
+    let session: Arc<dyn skaffen::extensions::ExtensionSession + Send + Sync> =
+        Arc::new(BenchSession);
     manager.set_session(session);
 
     for (policy_name, policy) in &policies {

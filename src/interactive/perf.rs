@@ -3,7 +3,9 @@ use std::sync::Arc;
 
 use serde_json::json;
 
-use super::{AgentState, Cmd, EXTENSION_EVENT_TIMEOUT_MS, SkaffenApp, SkaffenMsg, conversation_from_session};
+use super::{
+    AgentState, Cmd, EXTENSION_EVENT_TIMEOUT_MS, SkaffenApp, SkaffenMsg, conversation_from_session,
+};
 
 /// Safely convert `Duration::as_micros()` (u128) to u64 with saturation.
 #[inline]
@@ -437,8 +439,9 @@ impl SkaffenApp {
                     Ok(guard) => guard,
                     Err(err) => {
                         is_compacting.store(false, std::sync::atomic::Ordering::SeqCst);
-                        let _ = event_tx
-                            .try_send(SkaffenMsg::AgentError(format!("Failed to lock session: {err}")));
+                        let _ = event_tx.try_send(SkaffenMsg::AgentError(format!(
+                            "Failed to lock session: {err}"
+                        )));
                         return;
                     }
                 };
@@ -498,8 +501,8 @@ impl SkaffenApp {
                 Ok(result) => result,
                 Err(err) => {
                     is_compacting.store(false, std::sync::atomic::Ordering::SeqCst);
-                    let _ =
-                        event_tx.try_send(SkaffenMsg::AgentError(format!("Compaction failed: {err}")));
+                    let _ = event_tx
+                        .try_send(SkaffenMsg::AgentError(format!("Compaction failed: {err}")));
                     return;
                 }
             };
@@ -511,8 +514,9 @@ impl SkaffenApp {
                     Ok(guard) => guard,
                     Err(err) => {
                         is_compacting.store(false, std::sync::atomic::Ordering::SeqCst);
-                        let _ = event_tx
-                            .try_send(SkaffenMsg::AgentError(format!("Failed to lock session: {err}")));
+                        let _ = event_tx.try_send(SkaffenMsg::AgentError(format!(
+                            "Failed to lock session: {err}"
+                        )));
                         return;
                     }
                 };
@@ -533,8 +537,9 @@ impl SkaffenApp {
                     Ok(guard) => guard,
                     Err(err) => {
                         is_compacting.store(false, std::sync::atomic::Ordering::SeqCst);
-                        let _ = event_tx
-                            .try_send(SkaffenMsg::AgentError(format!("Failed to lock agent: {err}")));
+                        let _ = event_tx.try_send(SkaffenMsg::AgentError(format!(
+                            "Failed to lock agent: {err}"
+                        )));
                         return;
                     }
                 };
@@ -546,8 +551,9 @@ impl SkaffenApp {
                     Ok(guard) => guard,
                     Err(err) => {
                         is_compacting.store(false, std::sync::atomic::Ordering::SeqCst);
-                        let _ = event_tx
-                            .try_send(SkaffenMsg::AgentError(format!("Failed to lock session: {err}")));
+                        let _ = event_tx.try_send(SkaffenMsg::AgentError(format!(
+                            "Failed to lock session: {err}"
+                        )));
                         return;
                     }
                 };

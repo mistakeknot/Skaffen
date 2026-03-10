@@ -17,13 +17,13 @@
 )]
 
 use futures::executor::block_on;
+use serde::Serialize;
+use serde_json::{Map, Value, json};
+use sha2::{Digest, Sha256};
 use skaffen::error::Result;
 use skaffen::extensions::JsExtensionLoadSpec;
 use skaffen::extensions_js::{HostcallKind, PiJsRuntime, PiJsRuntimeConfig};
 use skaffen::scheduler::{HostcallOutcome, WallClock};
-use serde::Serialize;
-use serde_json::{Map, Value, json};
-use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, HashSet};
 use std::fmt::Write as _;
 use std::fs;
@@ -387,11 +387,15 @@ async fn resolve_extension_callable(
     let invoke_kind = report
         .get("invoke_kind")
         .and_then(Value::as_str)
-        .ok_or_else(|| skaffen::error::Error::extension("missing invoke_kind in callable report"))?;
+        .ok_or_else(|| {
+            skaffen::error::Error::extension("missing invoke_kind in callable report")
+        })?;
     let invoke_name = report
         .get("invoke_name")
         .and_then(Value::as_str)
-        .ok_or_else(|| skaffen::error::Error::extension("missing invoke_name in callable report"))?;
+        .ok_or_else(|| {
+            skaffen::error::Error::extension("missing invoke_name in callable report")
+        })?;
     if invoke_kind != "tool" && invoke_kind != "command" {
         return Err(skaffen::error::Error::extension(format!(
             "unsupported invoke_kind from callable report: {invoke_kind}"

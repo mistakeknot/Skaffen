@@ -6,12 +6,12 @@ use super::{
     record_stream_contract_artifact, user_text, vcr_mode, vcr_strict,
 };
 use crate::common::TestHarness;
+use serde_json::json;
 use skaffen::http::client::Client;
 use skaffen::model::{Message, StopReason};
 use skaffen::provider::{Context, Provider, StreamOptions, ToolDef};
 use skaffen::providers::openai_responses::OpenAIResponsesProvider;
 use skaffen::vcr::{VcrMode, VcrRecorder};
-use serde_json::json;
 use std::env;
 
 const SYSTEM_PROMPT: &str =

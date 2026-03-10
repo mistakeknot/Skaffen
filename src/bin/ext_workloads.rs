@@ -19,6 +19,8 @@
 use chrono::{DateTime, SecondsFormat, Utc};
 use clap::Parser;
 use futures::executor::block_on;
+use serde::{Deserialize, Serialize};
+use serde_json::{Value, json};
 use skaffen::error::{Error, Result};
 use skaffen::extension_scoring::{
     InterferenceMatrixCompletenessReport, evaluate_interference_matrix_completeness,
@@ -27,8 +29,6 @@ use skaffen::extension_scoring::{
 use skaffen::extensions::JsExtensionLoadSpec;
 use skaffen::extensions_js::{HostcallKind, PiJsRuntime, PiJsRuntimeConfig};
 use skaffen::scheduler::{HostcallOutcome, WallClock};
-use serde::{Deserialize, Serialize};
-use serde_json::{Value, json};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::io::{self, Write};

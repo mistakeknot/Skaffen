@@ -214,7 +214,8 @@ async fn run_debug(mut cli: cli::Cli, _runtime_handle: RuntimeHandle) -> Result<
     );
     let provider =
         providers::create_provider(&selection.model_entry, None).map_err(anyhow::Error::new)?;
-    let stream_options = skaffen::app::build_stream_options(&config, resolved_key, &selection, &session);
+    let stream_options =
+        skaffen::app::build_stream_options(&config, resolved_key, &selection, &session);
     let agent_config = AgentConfig {
         system_prompt: Some(system_prompt),
         max_tool_iterations: 50,

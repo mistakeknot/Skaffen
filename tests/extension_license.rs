@@ -465,7 +465,8 @@ fn golden_corpus_screening() {
         serde_json::from_str(&validated_text).unwrap();
 
     let pool_text = std::fs::read_to_string(pool_path).unwrap();
-    let pool: skaffen::extension_popularity::CandidatePool = serde_json::from_str(&pool_text).unwrap();
+    let pool: skaffen::extension_popularity::CandidatePool =
+        serde_json::from_str(&pool_text).unwrap();
 
     // Build license map.
     let mut license_map = std::collections::HashMap::new();

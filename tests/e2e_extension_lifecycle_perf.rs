@@ -15,13 +15,13 @@
 
 mod common;
 
+use serde::Serialize;
+use serde_json::{Value, json};
 use skaffen::extensions::{
     ExtensionEventName, ExtensionManager, JsExtensionLoadSpec, JsExtensionRuntimeHandle,
 };
 use skaffen::extensions_js::PiJsRuntimeConfig;
 use skaffen::tools::ToolRegistry;
-use serde::Serialize;
-use serde_json::{Value, json};
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};

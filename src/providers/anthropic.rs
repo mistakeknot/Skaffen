@@ -467,18 +467,12 @@ impl Provider for AnthropicProvider {
                 .header("x-app", "cli")
                 .header(
                     "user-agent",
-                    format!(
-                        "skaffen/{} (external, cli)",
-                        env!("CARGO_PKG_VERSION")
-                    ),
+                    format!("skaffen/{} (external, cli)", env!("CARGO_PKG_VERSION")),
                 );
         } else if kimi_oauth_token {
             request = request.header(
                 "user-agent",
-                format!(
-                    "skaffen/{} (kimi-oauth, cli)",
-                    env!("CARGO_PKG_VERSION")
-                ),
+                format!("skaffen/{} (kimi-oauth, cli)", env!("CARGO_PKG_VERSION")),
             );
             for (name, value) in kimi_common_headers() {
                 request = request.header(name, value);

@@ -19,7 +19,9 @@ use futures::StreamExt;
 use skaffen::model::{Message, UserContent, UserMessage};
 use skaffen::models::ModelEntry;
 use skaffen::provider::{Context, InputType, Model, ModelCost, StreamEvent, StreamOptions};
-use skaffen::provider_metadata::{PROVIDER_METADATA, ProviderOnboardingMode, canonical_provider_id};
+use skaffen::provider_metadata::{
+    PROVIDER_METADATA, ProviderOnboardingMode, canonical_provider_id,
+};
 use skaffen::providers::create_provider;
 use std::collections::HashMap;
 use std::sync::Arc;

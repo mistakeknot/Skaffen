@@ -9,13 +9,13 @@
 use anyhow::{Context, Result, bail};
 use clap::{Args, Parser, Subcommand};
 use futures::executor::block_on;
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use skaffen::extension_popularity::{CandidateItem, CandidatePool, CandidateSource};
 use skaffen::extension_validation::{ValidationStatus, classify_source_content};
 use skaffen::extensions::{ExtensionManager, JsExtensionLoadSpec, JsExtensionRuntimeHandle};
 use skaffen::extensions_js::{PiJsRuntimeConfig, RepairMode};
 use skaffen::tools::ToolRegistry;
-use serde::{Deserialize, Serialize};
-use serde_json::Value;
 use std::collections::HashMap;
 use std::fs::{self, File};
 use std::io::{BufWriter, Write};

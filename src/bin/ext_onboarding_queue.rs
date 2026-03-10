@@ -9,8 +9,8 @@ use std::path::PathBuf;
 use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
 use clap::Parser;
-use skaffen::extension_popularity::{CandidateItem, CandidatePool, CandidateSource};
 use serde::Serialize;
+use skaffen::extension_popularity::{CandidateItem, CandidatePool, CandidateSource};
 use url::Url;
 
 #[derive(Debug, Parser)]

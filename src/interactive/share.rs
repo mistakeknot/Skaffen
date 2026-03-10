@@ -349,8 +349,9 @@ impl SkaffenApp {
             let (html, session_name) = match session.lock(&cx).await {
                 Ok(guard) => (guard.to_html(), guard.get_name()),
                 Err(err) => {
-                    let _ = event_tx
-                        .try_send(SkaffenMsg::AgentError(format!("Failed to lock session: {err}")));
+                    let _ = event_tx.try_send(SkaffenMsg::AgentError(format!(
+                        "Failed to lock session: {err}"
+                    )));
                     return;
                 }
             };

@@ -80,10 +80,13 @@ fn initial_window_size_cmd_emits_window_size_message() {
 
 #[test]
 fn startup_init_cmd_sequences_window_size_before_pending() {
-    let msg = SkaffenApp::startup_init_cmd(None, Some(Cmd::new(|| Message::new(SkaffenMsg::RunPending))))
-        .expect("startup init command")
-        .execute()
-        .expect("startup init message");
+    let msg = SkaffenApp::startup_init_cmd(
+        None,
+        Some(Cmd::new(|| Message::new(SkaffenMsg::RunPending))),
+    )
+    .expect("startup init command")
+    .execute()
+    .expect("startup init message");
     let sequence = msg
         .downcast::<bubbletea::message::SequenceMsg>()
         .expect("startup sequence message");

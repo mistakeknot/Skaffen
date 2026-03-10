@@ -4,8 +4,8 @@
 //! slash commands, keyboard shortcuts, CLI flags, and custom LLM providers. No mocks
 //! are used; all tests operate directly on the real `ExtensionManager` and `RegisterPayload`.
 
-use skaffen::extensions::{ExtensionManager, PROTOCOL_VERSION, RegisterPayload};
 use serde_json::{Value, json};
+use skaffen::extensions::{ExtensionManager, PROTOCOL_VERSION, RegisterPayload};
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 

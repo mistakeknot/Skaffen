@@ -6,10 +6,10 @@
 mod common;
 
 use common::TestHarness;
+use proptest::prelude::*;
 use skaffen::extensions::{ExtensionManager, ExtensionRegion};
 use skaffen::theme::{Theme, looks_like_theme_path};
 use skaffen::tui::PiConsole;
-use proptest::prelude::*;
 use std::fmt::Write;
 use std::time::Duration;
 

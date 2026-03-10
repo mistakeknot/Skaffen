@@ -13,9 +13,9 @@
 //! - E2E pipeline (mixed sources → validated output)
 //! - Serde round-trips
 
+use proptest::prelude::*;
 use skaffen::extension_popularity::CandidatePool;
 use skaffen::extension_validation::*;
-use proptest::prelude::*;
 use std::fs;
 
 // ====================================================================

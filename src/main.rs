@@ -23,6 +23,9 @@ use asupersync::runtime::{RuntimeBuilder, RuntimeHandle};
 use asupersync::sync::Mutex;
 use bubbletea::{Cmd, KeyMsg, KeyType, Message as BubbleMessage, Program, quit};
 use clap::error::ErrorKind;
+use serde::{Deserialize, Serialize};
+use serde_json::{Value, json};
+use sha2::{Digest, Sha256};
 use skaffen::agent::{
     AbortHandle, Agent, AgentConfig, AgentEvent, AgentSession, PreWarmedExtensionRuntime,
 };
@@ -52,9 +55,6 @@ use skaffen::session::Session;
 use skaffen::session_index::SessionIndex;
 use skaffen::tools::ToolRegistry;
 use skaffen::tui::PiConsole;
-use serde::{Deserialize, Serialize};
-use serde_json::{Value, json};
-use sha2::{Digest, Sha256};
 use tracing_subscriber::EnvFilter;
 
 const EXIT_CODE_FAILURE: i32 = 1;
@@ -127,7 +127,11 @@ async fn resolve_selection_with_auth(
         let scoped_models = if scoped_patterns.is_empty() {
             Vec::new()
         } else {
-            skaffen::app::resolve_model_scope(scoped_patterns, model_registry, cli.api_key.is_some())
+            skaffen::app::resolve_model_scope(
+                scoped_patterns,
+                model_registry,
+                cli.api_key.is_some(),
+            )
         };
 
         let selection = match skaffen::app::select_model_and_thinking(
@@ -166,7 +170,9 @@ async fn resolve_selection_with_auth(
                             skaffen::provider_metadata::canonical_provider_id(provider)
                                 .unwrap_or(provider.as_str());
                         if canonical_provider == "sap-ai-core" {
-                            if let Some(token) = skaffen::auth::exchange_sap_access_token(auth).await? {
+                            if let Some(token) =
+                                skaffen::auth::exchange_sap_access_token(auth).await?
+                            {
                                 return Ok(Some((selection, Some(token))));
                             }
                         }
@@ -441,7 +447,10 @@ fn main_impl() -> Result<()> {
 fn print_error_with_hints(err: &anyhow::Error) {
     for cause in err.chain() {
         if let Some(pi_error) = cause.downcast_ref::<skaffen::error::Error>() {
-            eprint!("{}", skaffen::error_hints::format_error_with_hints(pi_error));
+            eprint!(
+                "{}",
+                skaffen::error_hints::format_error_with_hints(pi_error)
+            );
             return;
         }
     }
@@ -774,7 +783,9 @@ fn capability_remediation(capability: Capability, decision: PolicyDecision) -> s
     })
 }
 
-fn print_resolved_extension_policy(resolved: &skaffen::config::ResolvedExtensionPolicy) -> Result<()> {
+fn print_resolved_extension_policy(
+    resolved: &skaffen::config::ResolvedExtensionPolicy,
+) -> Result<()> {
     let capability_decisions = ALL_CAPABILITIES
         .iter()
         .map(|capability| {
@@ -1311,16 +1322,18 @@ async fn run(
             extension_model_entries = region.manager().extension_model_entries();
             if !extension_model_entries.is_empty() {
                 // Build OAuth configs map from model entries before merging.
-                let ext_oauth_configs: std::collections::HashMap<String, skaffen::models::OAuthConfig> =
-                    extension_model_entries
-                        .iter()
-                        .filter_map(|entry| {
-                            entry
-                                .oauth_config
-                                .as_ref()
-                                .map(|cfg| (entry.model.provider.clone(), cfg.clone()))
-                        })
-                        .collect();
+                let ext_oauth_configs: std::collections::HashMap<
+                    String,
+                    skaffen::models::OAuthConfig,
+                > = extension_model_entries
+                    .iter()
+                    .filter_map(|entry| {
+                        entry
+                            .oauth_config
+                            .as_ref()
+                            .map(|cfg| (entry.model.provider.clone(), cfg.clone()))
+                    })
+                    .collect();
 
                 model_registry.merge_entries(extension_model_entries.clone());
 
@@ -3619,16 +3632,18 @@ result in account suspension/ban. Prefer using an Anthropic API key (ANTHROPIC_A
                 .redirect_uri
                 .as_deref()
                 .filter(|uri| skaffen::auth::redirect_uri_needs_callback_server(uri))
-                .and_then(|uri| match skaffen::auth::start_oauth_callback_server(uri) {
-                    Ok(server) => {
-                        tracing::info!(port = server.port, "OAuth callback server listening");
-                        Some(server)
-                    }
-                    Err(e) => {
-                        tracing::warn!("Failed to start OAuth callback server: {e}");
-                        None
-                    }
-                });
+                .and_then(
+                    |uri| match skaffen::auth::start_oauth_callback_server(uri) {
+                        Ok(server) => {
+                            tracing::info!(port = server.port, "OAuth callback server listening");
+                            Some(server)
+                        }
+                        Err(e) => {
+                            tracing::warn!("Failed to start OAuth callback server: {e}");
+                            None
+                        }
+                    },
+                );
 
             let has_callback = callback_server.is_some();
             if has_callback {
@@ -3710,10 +3725,12 @@ result in account suspension/ban. Prefer using an Anthropic API key (ANTHROPIC_A
                     skaffen::auth::complete_anthropic_oauth(code_input, &start.verifier).await?
                 }
                 "google-gemini-cli" => {
-                    skaffen::auth::complete_google_gemini_cli_oauth(code_input, &start.verifier).await?
+                    skaffen::auth::complete_google_gemini_cli_oauth(code_input, &start.verifier)
+                        .await?
                 }
                 "google-antigravity" => {
-                    skaffen::auth::complete_google_antigravity_oauth(code_input, &start.verifier).await?
+                    skaffen::auth::complete_google_antigravity_oauth(code_input, &start.verifier)
+                        .await?
                 }
                 other => {
                     console.render_warning(&format!(
@@ -5141,7 +5158,8 @@ mod tests {
         );
 
         let project_value: serde_json::Value = serde_json::from_str(
-            &std::fs::read_to_string(cwd.join(".skaffen").join("settings.json")).expect("read project"),
+            &std::fs::read_to_string(cwd.join(".skaffen").join("settings.json"))
+                .expect("read project"),
         )
         .expect("parse project json");
         let project_pkg = project_value["packages"]
@@ -5279,7 +5297,9 @@ mod tests {
     #[test]
     fn streamed_text_delta_only_matches_text_delta_updates() {
         let partial = Arc::new(AssistantMessage {
-            content: vec![ContentBlock::Text(skaffen::model::TextContent::new("hello"))],
+            content: vec![ContentBlock::Text(skaffen::model::TextContent::new(
+                "hello",
+            ))],
             api: "test-api".to_string(),
             provider: "test-provider".to_string(),
             model: "test-model".to_string(),

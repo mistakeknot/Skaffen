@@ -18,12 +18,12 @@
 mod common;
 
 use chrono::{SecondsFormat, Utc};
+use serde_json::{Value, json};
 use skaffen::extensions::{
     ExtensionEventName, ExtensionManager, JsExtensionLoadSpec, JsExtensionRuntimeHandle,
 };
 use skaffen::extensions_js::PiJsRuntimeConfig;
 use skaffen::tools::ToolRegistry;
-use serde_json::{Value, json};
 use std::fmt::Write as _;
 use std::path::PathBuf;
 use std::sync::Arc;

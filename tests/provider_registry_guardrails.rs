@@ -15,12 +15,12 @@ mod common;
 
 use chrono::{SecondsFormat, Utc};
 use common::harness::TestHarness;
+use serde::Serialize;
+use serde_json::json;
 use skaffen::provider_metadata::{
     PROVIDER_METADATA, canonical_provider_id, provider_auth_env_keys, provider_metadata,
     provider_routing_defaults,
 };
-use serde::Serialize;
-use serde_json::json;
 use std::collections::HashMap;
 use std::fmt::Write as _;
 use std::path::{Path, PathBuf};

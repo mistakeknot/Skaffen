@@ -1,5 +1,5 @@
-use skaffen::sdk;
 use serde_json::json;
+use skaffen::sdk;
 use std::path::PathBuf;
 
 const fn assert_clone_debug_send_sync<T: Clone + std::fmt::Debug + Send + Sync>() {}

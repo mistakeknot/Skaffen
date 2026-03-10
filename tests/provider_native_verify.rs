@@ -31,12 +31,14 @@ mod common;
 
 use common::TestHarness;
 use futures::{Stream, StreamExt};
+use serde_json::{Value, json};
+use sha2::{Digest, Sha256};
 use skaffen::http::client::Client;
 use skaffen::model::{Message, StopReason, StreamEvent, UserContent, UserMessage};
 use skaffen::provider::{Context, Provider, StreamOptions, ToolDef};
-use skaffen::vcr::{Cassette, Interaction, RecordedRequest, RecordedResponse, VcrMode, VcrRecorder};
-use serde_json::{Value, json};
-use sha2::{Digest, Sha256};
+use skaffen::vcr::{
+    Cassette, Interaction, RecordedRequest, RecordedResponse, VcrMode, VcrRecorder,
+};
 use std::env;
 use std::fmt::Write as _;
 use std::path::{Path, PathBuf};

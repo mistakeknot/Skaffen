@@ -1,8 +1,8 @@
 #![forbid(unsafe_code)]
 
+use serde_json::json;
 use skaffen::PiResult;
 use skaffen::session_store_v2::SessionStoreV2;
-use serde_json::json;
 use std::fs;
 use tempfile::tempdir;
 

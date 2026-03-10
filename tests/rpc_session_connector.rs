@@ -15,6 +15,7 @@
 mod common;
 
 use common::TestHarness;
+use serde_json::Value;
 use skaffen::agent::{Agent, AgentConfig, AgentSession};
 use skaffen::auth::AuthStorage;
 use skaffen::config::Config;
@@ -27,7 +28,6 @@ use skaffen::resources::ResourceLoader;
 use skaffen::rpc::{RpcOptions, run};
 use skaffen::session::{AutosaveDurabilityMode, Session, SessionEntry, SessionMessage};
 use skaffen::tools::ToolRegistry;
-use serde_json::Value;
 use std::path::Path;
 use std::sync::mpsc::{Receiver, TryRecvError};
 use std::sync::{Arc, Mutex};

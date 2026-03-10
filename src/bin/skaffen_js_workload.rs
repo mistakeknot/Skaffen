@@ -3,6 +3,7 @@
 
 use clap::{Parser, ValueEnum};
 use futures::executor::block_on;
+use serde_json::json;
 use skaffen::error::{Error, Result};
 use skaffen::extensions::{
     ExtensionManager, ExtensionRuntimeHandle, NativeRustExtensionLoadSpec,
@@ -11,7 +12,6 @@ use skaffen::extensions::{
 use skaffen::extensions_js::PiJsRuntime;
 use skaffen::perf_build;
 use skaffen::scheduler::HostcallOutcome;
-use serde_json::json;
 use std::collections::VecDeque;
 use std::fs;
 use std::sync::Arc;

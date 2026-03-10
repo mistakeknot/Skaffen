@@ -10,6 +10,7 @@ use std::time::Instant;
 use anyhow::{Context, Result, anyhow};
 use chrono::{DateTime, SecondsFormat, Utc};
 use clap::Parser;
+use serde::Serialize;
 use skaffen::extension_popularity::{
     CandidateItem, CandidatePool, CandidateSource, GitHubRepoCandidate, GitHubRepoMetrics,
     GitHubRepoRef, NpmDownloads, NpmRegistryMeta, github_repo_candidate_from_url,
@@ -17,7 +18,6 @@ use skaffen::extension_popularity::{
     parse_npm_registry_response,
 };
 use skaffen::http::client::Client;
-use serde::Serialize;
 
 #[derive(Debug, Parser)]
 #[command(name = "ext_popularity_snapshot")]

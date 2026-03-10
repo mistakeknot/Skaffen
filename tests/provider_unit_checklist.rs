@@ -17,6 +17,7 @@
 
 mod common;
 
+use serde_json::{Value, json};
 use skaffen::model::{Message, UserContent, UserMessage};
 use skaffen::provider::{Context, Provider, StreamOptions, ToolDef};
 use skaffen::providers::anthropic::AnthropicProvider;
@@ -29,7 +30,6 @@ use skaffen::providers::gitlab::GitLabProvider;
 use skaffen::providers::openai::OpenAIProvider;
 use skaffen::providers::openai_responses::OpenAIResponsesProvider;
 use skaffen::providers::vertex::VertexProvider;
-use serde_json::{Value, json};
 use std::path::PathBuf;
 
 // ═══════════════════════════════════════════════════════════════════════

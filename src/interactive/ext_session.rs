@@ -123,7 +123,9 @@ impl ExtensionHostActions for InteractiveExtensionHostActions {
 
         let _ = self
             .event_tx
-            .try_send(SkaffenMsg::EnqueuePendingInput(PendingInput::Text(message.text)));
+            .try_send(SkaffenMsg::EnqueuePendingInput(PendingInput::Text(
+                message.text,
+            )));
         Ok(())
     }
 }

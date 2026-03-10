@@ -15,14 +15,14 @@ mod common;
 
 use common::TestHarness;
 use futures::{Stream, StreamExt};
+use serde_json::json;
+use sha2::{Digest, Sha256};
 use skaffen::model::{
     AssistantMessage, ContentBlock, Message, StopReason, StreamEvent, ToolCall, ToolResultMessage,
     Usage, UserContent, UserMessage,
 };
 use skaffen::provider::ToolDef;
 use skaffen::vcr::VcrMode;
-use serde_json::json;
-use sha2::{Digest, Sha256};
 use std::env;
 use std::fmt::Write as _;
 use std::path::PathBuf;

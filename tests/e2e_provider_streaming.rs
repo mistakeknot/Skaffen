@@ -15,13 +15,15 @@ mod common;
 
 use common::TestHarness;
 use futures::StreamExt;
-use skaffen::http::client::Client;
-use skaffen::model::{Message, StopReason, StreamEvent, ThinkingLevel, UserContent, UserMessage};
-use skaffen::provider::{CacheRetention, Context, Provider, StreamOptions, ThinkingBudgets, ToolDef};
-use skaffen::providers::anthropic::AnthropicProvider;
-use skaffen::vcr::{VcrMode, VcrRecorder};
 use serde_json::json;
 use sha2::{Digest, Sha256};
+use skaffen::http::client::Client;
+use skaffen::model::{Message, StopReason, StreamEvent, ThinkingLevel, UserContent, UserMessage};
+use skaffen::provider::{
+    CacheRetention, Context, Provider, StreamOptions, ThinkingBudgets, ToolDef,
+};
+use skaffen::providers::anthropic::AnthropicProvider;
+use skaffen::vcr::{VcrMode, VcrRecorder};
 use std::fmt::Write as _;
 use std::path::PathBuf;
 use std::time::Instant;

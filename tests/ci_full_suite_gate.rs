@@ -4153,9 +4153,7 @@ fn perf3x_bead_coverage_audit_report_tracks_missing_evidence_fail_closed() {
         .duration_since(std::time::UNIX_EPOCH)
         .expect("clock before unix epoch")
         .as_nanos();
-    temp.push(format!(
-        "skaffen_perf3x_coverage_audit_missing_{nonce}"
-    ));
+    temp.push(format!("skaffen_perf3x_coverage_audit_missing_{nonce}"));
     std::fs::create_dir_all(&temp).expect("create temp root");
 
     let report = build_perf3x_bead_coverage_audit_report(&temp, &perf3x_bead_coverage_contract());
@@ -5165,9 +5163,7 @@ fn assert_non_empty_text_artifact_rejects_whitespace_only_file() {
         .duration_since(std::time::UNIX_EPOCH)
         .expect("clock before unix epoch")
         .as_nanos();
-    path.push(format!(
-        "skaffen_certification_report_empty_{nonce}.md"
-    ));
+    path.push(format!("skaffen_certification_report_empty_{nonce}.md"));
 
     std::fs::write(&path, " \n\t").expect("write whitespace artifact");
     let err =

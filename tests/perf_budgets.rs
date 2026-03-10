@@ -12,9 +12,9 @@
     clippy::unreadable_literal
 )]
 
-use skaffen::perf_build::BINARY_SIZE_RELEASE_BUDGET_MB;
 use serde::Serialize;
 use serde_json::{Value, json};
+use skaffen::perf_build::BINARY_SIZE_RELEASE_BUDGET_MB;
 use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;

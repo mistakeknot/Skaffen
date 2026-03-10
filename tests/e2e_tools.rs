@@ -7,10 +7,10 @@
 mod common;
 
 use common::TestHarness;
+use serde_json::json;
 use skaffen::error::Error;
 use skaffen::model::ContentBlock;
 use skaffen::tools::ToolRegistry;
-use serde_json::json;
 use std::fmt::Write as _;
 #[cfg(unix)]
 use std::fs;

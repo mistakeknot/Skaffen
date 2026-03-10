@@ -20,10 +20,10 @@ use std::time::{Duration, Instant};
 
 use anyhow::{Context as _, Result, bail};
 use clap::{Parser, ValueEnum};
-use skaffen::extensions::{LogComponent, LogCorrelation, LogLevel, LogPayload, LogSource};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
+use skaffen::extensions::{LogComponent, LogCorrelation, LogLevel, LogPayload, LogSource};
 
 #[derive(Debug, Serialize)]
 struct LegacyFixtureFile {

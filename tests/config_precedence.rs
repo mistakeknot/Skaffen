@@ -3,8 +3,8 @@
 mod common;
 
 use common::{TestHarness, validate_jsonl};
-use skaffen::config::{Config, SettingsScope, TerminalSettings};
 use serde_json::json;
+use skaffen::config::{Config, SettingsScope, TerminalSettings};
 use std::env;
 use std::path::{Path, PathBuf};
 use std::sync::{Mutex, OnceLock};

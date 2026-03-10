@@ -10,12 +10,12 @@
 
 mod common;
 
+use serde_json::{Value, json};
 use skaffen::extensions::{
     ExtensionEventName, ExtensionManager, JsExtensionLoadSpec, JsExtensionRuntimeHandle,
 };
 use skaffen::extensions_js::PiJsRuntimeConfig;
 use skaffen::tools::ToolRegistry;
-use serde_json::{Value, json};
 use std::sync::Arc;
 
 // ---------------------------------------------------------------------------

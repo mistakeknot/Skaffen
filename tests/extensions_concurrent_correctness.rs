@@ -13,13 +13,13 @@
 
 mod common;
 
+use serde_json::json;
 use skaffen::extensions::{
     ExtensionEventName, ExtensionManager, JsExtensionLoadSpec, JsExtensionRuntimeHandle,
     PROTOCOL_VERSION, RegisterPayload,
 };
 use skaffen::extensions_js::PiJsRuntimeConfig;
 use skaffen::tools::ToolRegistry;
-use serde_json::json;
 use std::collections::HashSet;
 use std::path::PathBuf;
 use std::sync::Arc;

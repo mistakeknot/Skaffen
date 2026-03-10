@@ -30,6 +30,8 @@
 
 use super::logging::{LogLevel, TestLogger};
 use futures::{FutureExt, StreamExt, pin_mut};
+use serde::Serialize;
+use sha2::{Digest, Sha256};
 use skaffen::auth::AuthStorage;
 use skaffen::config::Config;
 use skaffen::http::client::Client;
@@ -43,8 +45,6 @@ use skaffen::providers::openai::OpenAIProvider;
 use skaffen::providers::openai_responses::OpenAIResponsesProvider;
 use skaffen::providers::{normalize_openai_base, normalize_openai_responses_base};
 use skaffen::vcr::{Cassette, VcrMode, VcrRecorder};
-use serde::Serialize;
-use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::env;
 use std::fmt::Write as _;
@@ -1268,7 +1268,10 @@ pub fn create_openrouter_provider(
     create_openai_provider(entry, client)
 }
 
-pub fn create_xai_provider(entry: &ModelEntry, client: Client) -> skaffen::PiResult<Arc<dyn Provider>> {
+pub fn create_xai_provider(
+    entry: &ModelEntry,
+    client: Client,
+) -> skaffen::PiResult<Arc<dyn Provider>> {
     create_openai_provider(entry, client)
 }
 
@@ -1279,7 +1282,10 @@ pub fn create_deepseek_provider(
     create_openai_provider(entry, client)
 }
 
-pub fn create_live_provider(entry: &ModelEntry, client: Client) -> skaffen::PiResult<Arc<dyn Provider>> {
+pub fn create_live_provider(
+    entry: &ModelEntry,
+    client: Client,
+) -> skaffen::PiResult<Arc<dyn Provider>> {
     match entry.model.provider.as_str() {
         "anthropic" => Ok(create_anthropic_provider(entry, client)),
         "openai" => create_openai_provider(entry, client),

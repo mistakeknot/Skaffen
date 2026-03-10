@@ -8,11 +8,11 @@ use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
+use serde::Serialize;
+use serde_json::json;
 use skaffen::error::Result;
 use skaffen::model::{AssistantMessage, ContentBlock, StopReason, TextContent, Usage, UserContent};
 use skaffen::session::{Session, SessionMessage};
-use serde::Serialize;
-use serde_json::json;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum Mode {

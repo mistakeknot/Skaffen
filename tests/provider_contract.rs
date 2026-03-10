@@ -15,11 +15,11 @@
 mod common;
 
 use futures::StreamExt;
+use serde_json::{Value, json};
 use skaffen::http::client::Client;
 use skaffen::model::{Message, StopReason, StreamEvent, UserContent, UserMessage};
 use skaffen::provider::{Context, Provider, StreamOptions, ToolDef};
 use skaffen::vcr::{VcrMode, VcrRecorder};
-use serde_json::{Value, json};
 use std::env;
 use std::path::PathBuf;
 use std::sync::Arc;

@@ -9,13 +9,13 @@
 use std::future::Future;
 
 use asupersync::runtime::RuntimeBuilder;
+use serde_json::json;
 use skaffen::connectors::http::HttpConnector;
 use skaffen::extensions::{
     ExtensionPolicy, ExtensionPolicyMode, HostCallContext, HostCallErrorCode, HostCallPayload,
     PolicyDecision, dispatch_host_call_shared,
 };
 use skaffen::tools::ToolRegistry;
-use serde_json::json;
 use tempfile::tempdir;
 
 /// Run an async future that may hold non-Send references (like `HostCallContext`).
