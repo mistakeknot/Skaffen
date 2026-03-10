@@ -1,5 +1,7 @@
 # Skaffen
 
+[![CI](https://github.com/mistakeknot/Skaffen/actions/workflows/ci.yml/badge.svg)](https://github.com/mistakeknot/Skaffen/actions/workflows/ci.yml)
+
 **Demarch's sovereign agent runtime.** OODARC-native coding agent forked from [pi_agent_rust](https://github.com/Dicklesworthstone/pi_agent_rust).
 
 Skaffen is the sixth pillar of [Demarch](https://github.com/mistakeknot/Demarch) — an open-source autonomous software development agency platform. Where Clavain rigs existing coding agents (Claude Code, Codex, Gemini), Skaffen IS the agent.
@@ -10,7 +12,7 @@ Existing coding agent CLIs (Claude Code, Codex, Gemini CLI) make runtime decisio
 
 ## Status
 
-Pre-fork. Design brainstorm in progress.
+v0.1 — forked, rebranded, builds and passes CI. OODARC coupling spike behind feature flag.
 
 ## License
 

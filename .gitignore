@@ -48,6 +48,9 @@ tmp_probe*
 _tmp-*/
 _tmp_*/
 
+# Local cargo config (machine-specific: sccache path, mold, job count)
+.cargo/
+
 # Per-agent cargo home directories (Codex/concurrent agents)
 .cargo-home*/
 

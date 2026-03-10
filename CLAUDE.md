@@ -20,7 +20,7 @@ Named after Skaffen-Amtiskaw — the Culture drone that operates with full auton
 
 ## Status
 
-Pre-fork. Brainstorm complete, iterating design.
+v0.1 in progress. Fork complete, rebranded, OODARC coupling spike done. CI + benchmarks remaining.
 
 ## Architecture
 
@@ -44,3 +44,13 @@ cargo build --release
 ./target/release/skaffen --mode rpc   # Headless (CI/orchestration)
 echo "read src/main.rs" | ./target/release/skaffen -p  # Single-shot
 ```
+
+### Build optimization (ethics-gradient)
+
+`.cargo/config.toml` is gitignored (machine-specific). On ethics-gradient it configures:
+- `jobs = 3` (OOM prevention on 30G RAM)
+- `sccache` as rustc-wrapper (3.3x speedup on clean builds)
+- `mold` linker (faster linking)
+- `-Zthreads=3`, `-Zshare-generics=y` (nightly codegen opts)
+
+Fast iteration: `make check` (no linking) or `make fast` (skip wasmtime + image).

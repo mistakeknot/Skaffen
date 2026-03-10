@@ -172,7 +172,7 @@ skaffen-oodarc = []
 
 [profile.release]
 opt-level = 3
-lto = true
+lto = "thin"           # thin LTO: ~80% of full LTO perf, 2-5x faster link
 codegen-units = 1
 panic = "abort"
 strip = true
@@ -180,6 +180,8 @@ strip = true
 [profile.dev]
 opt-level = 0
 debug = true
+split-debuginfo = "unpacked"  # separate .dwo files — avoids slow linker relocations
+incremental = true
 
 # Performance benchmarking profile: opt-level=3, with debug info.
 [profile.perf]
@@ -187,6 +189,7 @@ inherits = "release"
 opt-level = 3
 lto = "thin"
 debug = 1
+split-debuginfo = "unpacked"
 strip = false
 
 [lints.rust]
