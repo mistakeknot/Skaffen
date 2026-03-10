@@ -3,7 +3,7 @@
 Demarch's sovereign agent runtime — a standalone coding agent binary where OODARC, evidence pipelines, phase gates, and model routing are architectural primitives.
 
 **Epic:** Demarch-6qb
-**Monorepo anchor:** `os/skaffen/` in [Demarch](https://github.com/mistakeknot/Demarch)
+**Monorepo anchor:** `os/Skaffen/` in [Demarch](https://github.com/mistakeknot/Demarch)
 **Fork base:** [pi_agent_rust](https://github.com/Dicklesworthstone/pi_agent_rust)
 **Brainstorm:** Demarch `docs/brainstorms/2026-03-10-skaffen-sovereign-agent-brainstorm.md`
 
