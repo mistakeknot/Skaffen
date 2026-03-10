@@ -622,7 +622,7 @@ fn validate_event_sequence(events: &[StreamEvent]) -> Result<(), String> {
 
 /// Collect stream events from a provider, returning collected events or an error string.
 fn collect_events(
-    provider: Arc<dyn pi::provider::Provider>,
+    provider: Arc<dyn skaffen::provider::Provider>,
     context: Context<'static>,
     options: StreamOptions,
 ) -> Result<Vec<StreamEvent>, String> {

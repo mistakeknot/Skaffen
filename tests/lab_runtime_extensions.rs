@@ -286,12 +286,12 @@ fn budget_constants_under_lab() {
         .state
         .create_task(region, Budget::INFINITE, async move {
             const {
-                assert!(pi::extensions::EXTENSION_EVENT_TIMEOUT_MS >= 1_000);
-                assert!(pi::extensions::EXTENSION_EVENT_TIMEOUT_MS <= 60_000);
-                assert!(pi::extensions::EXTENSION_TOOL_BUDGET_MS >= 5_000);
-                assert!(pi::extensions::EXTENSION_TOOL_BUDGET_MS <= 300_000);
-                assert!(pi::extensions::EXTENSION_UI_BUDGET_MS >= 100);
-                assert!(pi::extensions::EXTENSION_UI_BUDGET_MS <= 10_000);
+                assert!(skaffen::extensions::EXTENSION_EVENT_TIMEOUT_MS >= 1_000);
+                assert!(skaffen::extensions::EXTENSION_EVENT_TIMEOUT_MS <= 60_000);
+                assert!(skaffen::extensions::EXTENSION_TOOL_BUDGET_MS >= 5_000);
+                assert!(skaffen::extensions::EXTENSION_TOOL_BUDGET_MS <= 300_000);
+                assert!(skaffen::extensions::EXTENSION_UI_BUDGET_MS >= 100);
+                assert!(skaffen::extensions::EXTENSION_UI_BUDGET_MS <= 10_000);
             };
             p.fetch_add(1, Ordering::SeqCst);
         })

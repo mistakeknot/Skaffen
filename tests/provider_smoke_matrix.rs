@@ -65,7 +65,7 @@ fn request_header(headers: &[(String, String)], key: &str) -> Option<String> {
 }
 
 fn drive_to_done(
-    provider: Arc<dyn pi::provider::Provider>,
+    provider: Arc<dyn skaffen::provider::Provider>,
     context: Context<'static>,
     options: StreamOptions,
 ) {
@@ -1027,7 +1027,7 @@ fn smoke_report_artifact() {
 fn run_smoke_stream(
     harness: &TestHarness,
     provider_id: &str,
-    defaults: pi::provider_metadata::ProviderRoutingDefaults,
+    defaults: skaffen::provider_metadata::ProviderRoutingDefaults,
 ) -> bool {
     let server = harness.start_mock_http_server();
     let safe_id = provider_id.replace('-', "_");

@@ -363,7 +363,7 @@ impl scheduler::Clock for LabBridgeClock {
 }
 
 // Note: `Arc<LabBridgeClock>` implements `scheduler::Clock` via the blanket
-// `impl<C: Clock> Clock for Arc<C>` in pi::scheduler.
+// `impl<C: Clock> Clock for Arc<C>` in skaffen::scheduler.
 
 /// Trace a `Scheduler` macrotask to a string for determinism comparison.
 fn trace_scheduler_task(task: &scheduler::Macrotask) -> String {

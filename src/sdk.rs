@@ -1,7 +1,7 @@
 //! Stable SDK-facing API surface for embedding Pi as a library.
 //!
 //! This module is the supported entry point for external library consumers.
-//! Prefer importing from `pi::sdk` instead of deep internal modules.
+//! Prefer importing from `skaffen::sdk` instead of deep internal modules.
 //!
 //! # Examples
 //!

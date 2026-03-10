@@ -171,7 +171,7 @@ fn write_jsonl_artifacts(harness: &TestHarness, test_name: &str) {
 }
 
 fn cli_binary_path() -> PathBuf {
-    PathBuf::from(env!("CARGO_BIN_EXE_pi"))
+    PathBuf::from(env!("CARGO_BIN_EXE_skaffen"))
 }
 
 fn isolated_cli_env(harness: &TestHarness) -> BTreeMap<String, String> {
@@ -1217,8 +1217,8 @@ fn session_persist_reload_messages_survive() {
     // Verify user message content survived
     let has_user_msg = messages.iter().any(|m| match m {
         Message::User(u) => match &u.content {
-            pi::model::UserContent::Text(t) => t.contains("persist me"),
-            pi::model::UserContent::Blocks(blocks) => blocks.iter().any(|b| match b {
+            skaffen::model::UserContent::Text(t) => t.contains("persist me"),
+            skaffen::model::UserContent::Blocks(blocks) => blocks.iter().any(|b| match b {
                 ContentBlock::Text(t) => t.text.contains("persist me"),
                 _ => false,
             }),
@@ -1713,8 +1713,8 @@ fn session_unicode_messages_round_trip() {
     // Verify unicode survived
     let has_unicode = messages.iter().any(|m| match m {
         Message::User(u) => match &u.content {
-            pi::model::UserContent::Text(t) => t.contains('\u{1F600}'),
-            pi::model::UserContent::Blocks(blocks) => blocks.iter().any(|b| match b {
+            skaffen::model::UserContent::Text(t) => t.contains('\u{1F600}'),
+            skaffen::model::UserContent::Blocks(blocks) => blocks.iter().any(|b| match b {
                 ContentBlock::Text(t) => t.text.contains('\u{1F600}'),
                 _ => false,
             }),

@@ -81,10 +81,10 @@ fn make_runtime() -> asupersync::runtime::Runtime {
 
 /// Collect all stream events into a Vec.
 async fn collect_events(
-    provider: &dyn pi::provider::Provider,
+    provider: &dyn skaffen::provider::Provider,
     ctx: &Context<'_>,
     opts: &StreamOptions,
-) -> Vec<Result<StreamEvent, pi::error::Error>> {
+) -> Vec<Result<StreamEvent, skaffen::error::Error>> {
     let mut stream = provider.stream(ctx, opts).await.expect("stream");
     let mut events = Vec::new();
     while let Some(item) = stream.next().await {
@@ -820,7 +820,7 @@ fn stream_simple_cache_retention_passed_to_options() {
         let ctx = basic_context();
         let opts = StreamOptions {
             api_key: Some("sk-test".to_string()),
-            cache_retention: pi::provider::CacheRetention::Long,
+            cache_retention: skaffen::provider::CacheRetention::Long,
             ..Default::default()
         };
         let events = collect_events(provider.as_ref(), &ctx, &opts).await;

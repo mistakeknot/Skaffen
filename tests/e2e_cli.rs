@@ -53,7 +53,7 @@ struct CliTestHarness {
 impl CliTestHarness {
     fn new(name: &str) -> Self {
         let harness = TestHarness::new(name);
-        let binary_path = PathBuf::from(env!("CARGO_BIN_EXE_pi"));
+        let binary_path = PathBuf::from(env!("CARGO_BIN_EXE_skaffen"));
 
         let mut env = BTreeMap::new();
 
@@ -286,7 +286,7 @@ impl CliTestHarness {
 /// Canonicalize a path and strip the Windows `\\?\` prefix if present.
 fn canon(p: &Path) -> PathBuf {
     let c = fs::canonicalize(p).unwrap_or_else(|_| p.to_path_buf());
-    pi::extensions::strip_unc_prefix(c)
+    skaffen::extensions::strip_unc_prefix(c)
 }
 
 fn assert_contains(harness: &TestHarness, haystack: &str, needle: &str) {
@@ -1234,7 +1234,7 @@ fn e2e_cli_config_paths_honor_env_overrides() {
 
     let env_root = harness.harness.temp_path("env-overrides");
     // Strip \\?\ prefix so env vars and expected paths match CLI output.
-    let env_root = pi::extensions::strip_unc_prefix(env_root);
+    let env_root = skaffen::extensions::strip_unc_prefix(env_root);
     let agent_dir = env_root.join("agent-root");
     let config_path = env_root.join("settings-override.json");
     let sessions_dir = env_root.join("sessions-root");
@@ -1301,7 +1301,7 @@ fn e2e_cli_config_paths_fallback_to_agent_dir() {
     let agent_dir = env_root.join("agent-root");
     std::fs::create_dir_all(&agent_dir).expect("create agent dir");
     // Strip \\?\ prefix so env var and expected paths match CLI output.
-    let agent_dir = pi::extensions::strip_unc_prefix(agent_dir);
+    let agent_dir = skaffen::extensions::strip_unc_prefix(agent_dir);
 
     harness.env.insert(
         "PI_CODING_AGENT_DIR".to_string(),

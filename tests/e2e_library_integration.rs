@@ -358,7 +358,7 @@ fn theme_discover_from_temp_dirs() {
     let theme_json = serde_json::to_string_pretty(&Theme::dark()).unwrap();
     std::fs::write(global_themes_dir.join("custom.json"), &theme_json).unwrap();
 
-    let roots = pi::theme::ThemeRoots {
+    let roots = skaffen::theme::ThemeRoots {
         global_dir,
         project_dir,
     };

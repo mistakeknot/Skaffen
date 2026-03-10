@@ -138,7 +138,7 @@ async fn run(args: Args) -> Result<()> {
         cwd: cwd.clone(),
         ..Default::default()
     };
-    let runtime = pi::extensions::JsExtensionRuntimeHandle::start(
+    let runtime = skaffen::extensions::JsExtensionRuntimeHandle::start(
         js_config,
         Arc::clone(&tools),
         manager.clone(),

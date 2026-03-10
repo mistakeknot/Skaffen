@@ -169,7 +169,7 @@ struct CliResult {
 }
 
 fn cli_binary_path() -> PathBuf {
-    PathBuf::from(env!("CARGO_BIN_EXE_pi"))
+    PathBuf::from(env!("CARGO_BIN_EXE_skaffen"))
 }
 
 fn isolated_cli_env(harness: &TestHarness) -> BTreeMap<String, String> {

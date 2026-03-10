@@ -10,7 +10,7 @@
 //! - Diffs are grouped by `event` and correlation IDs to speed triage.
 //!
 //! **Normalization rules are defined in the canonical contract** at
-//! [`pi::conformance::normalization`].  This test file delegates to that
+//! [`skaffen::conformance::normalization`].  This test file delegates to that
 //! module so there is one source of truth.
 #![forbid(unsafe_code)]
 

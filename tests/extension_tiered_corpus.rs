@@ -242,7 +242,7 @@ fn golden_tiered_corpus() {
     }
 
     let text = std::fs::read_to_string(corpus_path).unwrap();
-    let report: pi::extension_scoring::ScoringReport = serde_json::from_str(&text).unwrap();
+    let report: skaffen::extension_scoring::ScoringReport = serde_json::from_str(&text).unwrap();
 
     // Basic sanity.
     assert!(

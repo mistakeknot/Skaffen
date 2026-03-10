@@ -87,7 +87,7 @@ fn build_agent_session(session: Session, cassette_dir: &Path) -> AgentSession {
         agent,
         session,
         false,
-        pi::compaction::ResolvedCompactionSettings::default(),
+        skaffen::compaction::ResolvedCompactionSettings::default(),
     )
 }
 

@@ -66,7 +66,7 @@ async fn dispatch_call(
 fn run_golden_trace(
     harness: &TestHarness,
     ext_id: &'static str,
-) -> pi::extensions::RuntimeRiskLedgerArtifact {
+) -> skaffen::extensions::RuntimeRiskLedgerArtifact {
     let tools = ToolRegistry::new(&[], harness.temp_dir(), None);
     let http = HttpConnector::with_defaults();
     let manager = ExtensionManager::new();

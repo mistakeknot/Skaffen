@@ -33,7 +33,7 @@ use std::collections::HashMap;
 fn minimal_context() -> Context<'static> {
     Context {
         system_prompt: Some("You are helpful.".to_string().into()),
-        messages: vec![Message::User(pi::model::UserMessage {
+        messages: vec![Message::User(skaffen::model::UserMessage {
             content: UserContent::Text("Hello".to_string()),
             timestamp: 0,
         })]
@@ -45,7 +45,7 @@ fn minimal_context() -> Context<'static> {
 fn context_with_tools() -> Context<'static> {
     Context {
         system_prompt: Some("Be concise.".to_string().into()),
-        messages: vec![Message::User(pi::model::UserMessage {
+        messages: vec![Message::User(skaffen::model::UserMessage {
             content: UserContent::Text("Search for rust".to_string()),
             timestamp: 0,
         })]
@@ -801,9 +801,9 @@ fn factory_routes_google_correctly() {
 // ═══════════════════════════════════════════════════════════════════════
 
 /// Helper: build a minimal `ModelEntry` for an OAI-compatible provider.
-fn oai_compat_entry(provider: &str, base_url: &str) -> pi::models::ModelEntry {
+fn oai_compat_entry(provider: &str, base_url: &str) -> skaffen::models::ModelEntry {
     use skaffen::provider::{InputType, Model, ModelCost};
-    pi::models::ModelEntry {
+    skaffen::models::ModelEntry {
         model: Model {
             id: "test-model".to_string(),
             name: "Test Model".to_string(),
@@ -929,7 +929,7 @@ fn factory_routes_gitlab_native_provider() {
     use skaffen::provider::{InputType, Model, ModelCost};
     use skaffen::providers::create_provider;
 
-    let entry = pi::models::ModelEntry {
+    let entry = skaffen::models::ModelEntry {
         model: Model {
             id: "gitlab-duo-chat".to_string(),
             name: "GitLab Duo Chat".to_string(),

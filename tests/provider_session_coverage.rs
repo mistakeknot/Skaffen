@@ -87,7 +87,7 @@ fn make_message_entry(id: &str, msg_type: &str, text: &str) -> serde_json::Value
 
 fn user_msg(text: &str) -> SessionMessage {
     SessionMessage::User {
-        content: pi::model::UserContent::Text(text.to_string()),
+        content: skaffen::model::UserContent::Text(text.to_string()),
         timestamp: None,
     }
 }
@@ -915,7 +915,7 @@ fn create_provider_no_extensions() {
 /// encode_cwd produces a safe directory name.
 #[test]
 fn encode_cwd_basic() {
-    let encoded = pi::session::encode_cwd(std::path::Path::new("/home/user/projects/test"));
+    let encoded = skaffen::session::encode_cwd(std::path::Path::new("/home/user/projects/test"));
     assert!(!encoded.is_empty(), "encoded cwd should not be empty");
     // Should not contain path separators
     assert!(
@@ -927,14 +927,14 @@ fn encode_cwd_basic() {
 /// encode_cwd handles root path.
 #[test]
 fn encode_cwd_root() {
-    let encoded = pi::session::encode_cwd(std::path::Path::new("/"));
+    let encoded = skaffen::session::encode_cwd(std::path::Path::new("/"));
     assert!(!encoded.is_empty(), "encoded root should not be empty");
 }
 
 /// encode_cwd handles paths with special characters.
 #[test]
 fn encode_cwd_special_chars() {
-    let encoded = pi::session::encode_cwd(std::path::Path::new("/home/user/my project (v2.0)/src"));
+    let encoded = skaffen::session::encode_cwd(std::path::Path::new("/home/user/my project (v2.0)/src"));
     assert!(!encoded.is_empty());
     assert!(!encoded.contains('/'));
 }

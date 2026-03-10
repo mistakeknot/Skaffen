@@ -1040,7 +1040,7 @@ fn benign_workflow_produces_no_security_alerts() {
     }
 
     let filter = SecurityAlertFilter::default();
-    let alerts = pi::extensions::query_security_alerts(&manager, &filter);
+    let alerts = skaffen::extensions::query_security_alerts(&manager, &filter);
     assert!(
         alerts.is_empty(),
         "Benign log-only workflow should produce 0 alerts, got {}",

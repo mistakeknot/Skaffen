@@ -1550,7 +1550,7 @@ pub async fn run_interactive(
         let _ = crossterm::execute!(stdout, cursor::Hide);
     }
 
-    let (event_tx, event_rx) = mpsc::channel::<PiMsg>(1024);
+    let (event_tx, mut event_rx) = mpsc::channel::<PiMsg>(1024);
     let (ui_tx, ui_rx) = std::sync::mpsc::channel::<Message>();
 
     runtime_handle.spawn(async move {
@@ -1566,7 +1566,7 @@ pub async fn run_interactive(
     let extensions = extensions;
 
     if let Some(manager) = &extensions {
-        let (extension_ui_tx, extension_ui_rx) = mpsc::channel::<ExtensionUiRequest>(64);
+        let (extension_ui_tx, mut extension_ui_rx) = mpsc::channel::<ExtensionUiRequest>(64);
         manager.set_ui_sender(extension_ui_tx);
 
         let extension_event_tx = event_tx.clone();

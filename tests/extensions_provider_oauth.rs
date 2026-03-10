@@ -794,7 +794,7 @@ fn resolve_api_key_override_takes_precedence_over_oauth() {
 // ---------------------------------------------------------------------------
 
 /// Mirrors the config-extraction logic in main.rs.
-fn oauth_configs_from_entries(entries: &[pi::models::ModelEntry]) -> HashMap<String, OAuthConfig> {
+fn oauth_configs_from_entries(entries: &[skaffen::models::ModelEntry]) -> HashMap<String, OAuthConfig> {
     entries
         .iter()
         .filter_map(|entry| {
@@ -806,17 +806,17 @@ fn oauth_configs_from_entries(entries: &[pi::models::ModelEntry]) -> HashMap<Str
         .collect()
 }
 
-fn make_model_entry(provider: &str, oauth: Option<OAuthConfig>) -> pi::models::ModelEntry {
-    pi::models::ModelEntry {
-        model: pi::provider::Model {
+fn make_model_entry(provider: &str, oauth: Option<OAuthConfig>) -> skaffen::models::ModelEntry {
+    skaffen::models::ModelEntry {
+        model: skaffen::provider::Model {
             id: format!("{provider}-model-1"),
             name: format!("{provider} Model"),
             api: "anthropic".to_string(),
             provider: provider.to_string(),
             base_url: String::new(),
             reasoning: false,
-            input: vec![pi::provider::InputType::Text],
-            cost: pi::provider::ModelCost {
+            input: vec![skaffen::provider::InputType::Text],
+            cost: skaffen::provider::ModelCost {
                 input: 0.0,
                 output: 0.0,
                 cache_read: 0.0,

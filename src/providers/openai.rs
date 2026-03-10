@@ -1727,7 +1727,7 @@ mod tests {
     ) -> (String, mpsc::Receiver<CapturedRequest>) {
         let listener = TcpListener::bind("127.0.0.1:0").expect("bind test server");
         let addr = listener.local_addr().expect("local addr");
-        let (tx, rx) = mpsc::channel();
+        let (tx, mut rx) = mpsc::channel();
         let body = body.to_string();
         let content_type = content_type.to_string();
 

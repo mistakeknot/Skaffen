@@ -890,7 +890,7 @@ impl Session {
 
         let base_dir_clone = base_dir.clone();
         let cwd_display = cwd.display().to_string();
-        let (tx, rx) = oneshot::channel();
+        let (tx, mut rx) = oneshot::channel();
 
         let handle = thread::spawn(move || {
             let entries: Vec<SessionPickEntry> = SessionIndex::for_sessions_root(&base_dir_clone)
@@ -1238,7 +1238,7 @@ impl Session {
     /// Open using the V2 sidecar store (async wrapper around blocking read).
     async fn open_v2_with_diagnostics(path: &Path) -> Result<(Self, SessionOpenDiagnostics)> {
         let path_buf = path.to_path_buf();
-        let (tx, rx) = oneshot::channel();
+        let (tx, mut rx) = oneshot::channel();
 
         let handle = thread::spawn(move || {
             let res = crate::session::open_from_v2_store_blocking(path_buf);
@@ -1253,7 +1253,7 @@ impl Session {
 
     async fn open_jsonl_with_diagnostics(path: &Path) -> Result<(Self, SessionOpenDiagnostics)> {
         let path_buf = path.to_path_buf();
-        let (tx, rx) = oneshot::channel();
+        let (tx, mut rx) = oneshot::channel();
 
         let handle = thread::spawn(move || {
             let res = open_jsonl_blocking(path_buf);
@@ -1316,7 +1316,7 @@ impl Session {
         // Prefer the session index for fast lookup.
         let base_dir_clone = base_dir.clone();
         let cwd_display_clone = cwd_display.clone();
-        let (tx, rx) = oneshot::channel();
+        let (tx, mut rx) = oneshot::channel();
 
         let handle = thread::spawn(move || {
             let index = SessionIndex::for_sessions_root(&base_dir_clone);
@@ -1658,7 +1658,7 @@ impl Session {
 
                     let session_name = self.cached_name.clone();
                     // === Full rewrite path (first save, header change, checkpoint) ===
-                    let (tx, rx) = oneshot::channel::<Result<()>>();
+                    let (tx, mut rx) = oneshot::channel::<Result<()>>();
 
                     let header_snapshot = self.header.clone();
                     let entries_to_save = self.entries.clone();
@@ -1744,7 +1744,7 @@ impl Session {
                         }
                         let new_count = self.entries.len();
 
-                        let (tx, rx) = oneshot::channel::<Result<()>>();
+                        let (tx, mut rx) = oneshot::channel::<Result<()>>();
                         let header_snapshot = self.header.clone();
 
                         let path_for_thread = path_clone.clone();
@@ -2755,7 +2755,7 @@ async fn scan_sessions_on_disk(
     known: Vec<SessionPickEntry>,
 ) -> Result<Vec<SessionPickEntry>> {
     let path_buf = project_session_dir.to_path_buf();
-    let (tx, rx) = oneshot::channel();
+    let (tx, mut rx) = oneshot::channel();
 
     let handle = thread::Builder::new()
         .name("session-scan".to_string())

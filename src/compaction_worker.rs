@@ -123,7 +123,7 @@ impl CompactionWorkerState {
             "start() called while can_start() is false"
         );
 
-        let (tx, rx) = mpsc::channel();
+        let (tx, mut rx) = mpsc::channel();
         let now = Instant::now();
 
         std::thread::Builder::new()
@@ -259,7 +259,7 @@ mod tests {
     #[test]
     fn try_recv_returns_disconnected_when_sender_dropped() {
         let mut w = default_worker();
-        let (tx, rx) = mpsc::channel::<CompactionOutcome>();
+        let (tx, mut rx) = mpsc::channel::<CompactionOutcome>();
         inject_pending(&mut w, rx);
         drop(tx);
         let outcome = w.try_recv().expect("should return disconnected error");
@@ -289,7 +289,7 @@ mod tests {
     #[test]
     fn try_recv_success() {
         let mut w = default_worker();
-        let (tx, rx) = mpsc::channel::<CompactionOutcome>();
+        let (tx, mut rx) = mpsc::channel::<CompactionOutcome>();
         inject_pending(&mut w, rx);
 
         // Simulate a successful compaction result.

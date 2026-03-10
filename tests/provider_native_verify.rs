@@ -113,7 +113,7 @@ struct StreamOutcome {
 
 async fn collect_events<S>(mut stream: S) -> StreamOutcome
 where
-    S: Stream<Item = pi::PiResult<StreamEvent>> + Unpin,
+    S: Stream<Item = skaffen::PiResult<StreamEvent>> + Unpin,
 {
     let mut events = Vec::new();
     let mut stream_error = None;
@@ -141,7 +141,7 @@ struct StreamSummary {
     has_error_event: bool,
     text: String,
     thinking: String,
-    tool_calls: Vec<pi::model::ToolCall>,
+    tool_calls: Vec<skaffen::model::ToolCall>,
     text_deltas: usize,
     thinking_deltas: usize,
     tool_call_deltas: usize,
@@ -551,7 +551,7 @@ fn assert_error_ok(tag: &str, message: &str, expectation: &ErrorExpectation) {
 fn assert_tool_schema_fidelity(
     tag: &str,
     tool_defs: &[ToolDef],
-    tool_calls: &[pi::model::ToolCall],
+    tool_calls: &[skaffen::model::ToolCall],
 ) {
     for tool_call in tool_calls {
         let tool_def = tool_defs

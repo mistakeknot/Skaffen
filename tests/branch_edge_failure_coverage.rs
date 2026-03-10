@@ -240,7 +240,7 @@ fn truncate_tail_many_empty_lines() {
 fn process_file_arguments_nonexistent_file() {
     let dir = TempDir::new().unwrap();
     let result =
-        pi::tools::process_file_arguments(&["nonexistent.txt".to_string()], dir.path(), false);
+        skaffen::tools::process_file_arguments(&["nonexistent.txt".to_string()], dir.path(), false);
     assert!(result.is_err());
     let err = result.unwrap_err();
     assert!(err.to_string().contains("Cannot access file"));
@@ -251,7 +251,7 @@ fn process_file_arguments_empty_file_skipped() {
     let dir = TempDir::new().unwrap();
     let empty_file = dir.path().join("empty.txt");
     std::fs::write(&empty_file, "").unwrap();
-    let result = pi::tools::process_file_arguments(
+    let result = skaffen::tools::process_file_arguments(
         &[empty_file.to_string_lossy().to_string()],
         dir.path(),
         false,
@@ -266,7 +266,7 @@ fn process_file_arguments_text_file_wrapped_in_tags() {
     let dir = TempDir::new().unwrap();
     let text_file = dir.path().join("hello.txt");
     std::fs::write(&text_file, "hello world").unwrap();
-    let result = pi::tools::process_file_arguments(
+    let result = skaffen::tools::process_file_arguments(
         &[text_file.to_string_lossy().to_string()],
         dir.path(),
         false,
@@ -282,7 +282,7 @@ fn process_file_arguments_text_file_without_trailing_newline() {
     let dir = TempDir::new().unwrap();
     let text_file = dir.path().join("no_newline.txt");
     std::fs::write(&text_file, "no newline at end").unwrap();
-    let result = pi::tools::process_file_arguments(
+    let result = skaffen::tools::process_file_arguments(
         &[text_file.to_string_lossy().to_string()],
         dir.path(),
         false,
@@ -299,7 +299,7 @@ fn process_file_arguments_multiple_files() {
     let f2 = dir.path().join("two.txt");
     std::fs::write(&f1, "first").unwrap();
     std::fs::write(&f2, "second").unwrap();
-    let result = pi::tools::process_file_arguments(
+    let result = skaffen::tools::process_file_arguments(
         &[
             f1.to_string_lossy().to_string(),
             f2.to_string_lossy().to_string(),
@@ -332,7 +332,7 @@ fn process_file_arguments_png_image_detected() {
         0xAE, 0x42, 0x60, 0x82,
     ];
     std::fs::write(&img_file, &png_header).unwrap();
-    let result = pi::tools::process_file_arguments(
+    let result = skaffen::tools::process_file_arguments(
         &[img_file.to_string_lossy().to_string()],
         dir.path(),
         false,
@@ -389,7 +389,7 @@ fn make_interaction(
 #[test]
 fn redact_cassette_empty() {
     let mut cassette = make_cassette(vec![]);
-    let summary = pi::vcr::redact_cassette(&mut cassette);
+    let summary = skaffen::vcr::redact_cassette(&mut cassette);
     assert_eq!(summary.headers_redacted, 0);
     assert_eq!(summary.json_fields_redacted, 0);
 }
@@ -408,7 +408,7 @@ fn redact_cassette_sensitive_headers() {
         vec![("x-azure-api-key", "azure-secret")],
         200,
     )]);
-    let summary = pi::vcr::redact_cassette(&mut cassette);
+    let summary = skaffen::vcr::redact_cassette(&mut cassette);
     // authorization + x-api-key in request, x-azure-api-key in response
     assert_eq!(summary.headers_redacted, 3);
     // Verify values are redacted
@@ -442,7 +442,7 @@ fn redact_cassette_sensitive_json_body_fields() {
         vec![],
         200,
     )]);
-    let summary = pi::vcr::redact_cassette(&mut cassette);
+    let summary = skaffen::vcr::redact_cassette(&mut cassette);
     assert!(summary.json_fields_redacted >= 3); // api_key, access_token, password
     let req_body = cassette.interactions[0].request.body.as_ref().unwrap();
     assert_eq!(req_body["api_key"], "[REDACTED]");
@@ -469,7 +469,7 @@ fn redact_cassette_array_in_body_recurses() {
         vec![],
         200,
     )]);
-    let summary = pi::vcr::redact_cassette(&mut cassette);
+    let summary = skaffen::vcr::redact_cassette(&mut cassette);
     assert_eq!(summary.json_fields_redacted, 2);
     let items = &cassette.interactions[0].request.body.as_ref().unwrap()["items"];
     assert_eq!(items[0]["api_key"], "[REDACTED]");
@@ -496,7 +496,7 @@ fn redact_cassette_deeply_nested_json() {
         vec![],
         200,
     )]);
-    let summary = pi::vcr::redact_cassette(&mut cassette);
+    let summary = skaffen::vcr::redact_cassette(&mut cassette);
     assert_eq!(summary.json_fields_redacted, 1);
 }
 
@@ -518,7 +518,7 @@ fn redact_cassette_token_vs_tokens_distinction() {
         vec![],
         200,
     )]);
-    let _summary = pi::vcr::redact_cassette(&mut cassette);
+    let _summary = skaffen::vcr::redact_cassette(&mut cassette);
     let req_body = cassette.interactions[0].request.body.as_ref().unwrap();
     assert_eq!(req_body["token"], "[REDACTED]");
     assert_eq!(req_body["refresh_token"], "[REDACTED]");
@@ -538,7 +538,7 @@ fn redact_cassette_no_body() {
         vec![],
         200,
     )]);
-    let summary = pi::vcr::redact_cassette(&mut cassette);
+    let summary = skaffen::vcr::redact_cassette(&mut cassette);
     assert_eq!(summary.headers_redacted, 1);
     assert_eq!(summary.json_fields_redacted, 0);
 }
@@ -1492,13 +1492,13 @@ fn truncate_head_both_limits_hit_bytes_first() {
 #[test]
 fn kill_process_tree_none_pid() {
     // Should not panic when given None
-    pi::tools::kill_process_tree(None);
+    skaffen::tools::kill_process_tree(None);
 }
 
 #[test]
 fn kill_process_tree_nonexistent_pid() {
     // Should not panic for a PID that doesn't exist
-    pi::tools::kill_process_tree(Some(999_999_999));
+    skaffen::tools::kill_process_tree(Some(999_999_999));
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -1568,7 +1568,7 @@ fn redact_cassette_multiple_interactions() {
             200,
         ),
     ]);
-    let summary = pi::vcr::redact_cassette(&mut cassette);
+    let summary = skaffen::vcr::redact_cassette(&mut cassette);
     // 1st: Authorization header + api_key body = 1 header + 1 body
     // 2nd: x-api-key header + password body + proxy-authorization resp header = 2 headers + 1 body
     assert_eq!(summary.headers_redacted, 3);
@@ -1595,7 +1595,7 @@ fn redact_cassette_apikey_variations() {
         vec![],
         200,
     )]);
-    let summary = pi::vcr::redact_cassette(&mut cassette);
+    let summary = skaffen::vcr::redact_cassette(&mut cassette);
     assert_eq!(summary.json_fields_redacted, 4);
 }
 
@@ -1616,7 +1616,7 @@ fn redact_cassette_secret_and_password_fields() {
         vec![],
         200,
     )]);
-    let summary = pi::vcr::redact_cassette(&mut cassette);
+    let summary = skaffen::vcr::redact_cassette(&mut cassette);
     assert_eq!(summary.json_fields_redacted, 4);
 }
 
@@ -1632,7 +1632,7 @@ fn redact_cassette_scalar_values_not_recursed() {
         vec![],
         200,
     )]);
-    let summary = pi::vcr::redact_cassette(&mut cassette);
+    let summary = skaffen::vcr::redact_cassette(&mut cassette);
     assert_eq!(summary.json_fields_redacted, 0);
 }
 
@@ -1647,7 +1647,7 @@ fn redact_cassette_null_body_value() {
         vec![],
         200,
     )]);
-    let summary = pi::vcr::redact_cassette(&mut cassette);
+    let summary = skaffen::vcr::redact_cassette(&mut cassette);
     assert_eq!(summary.json_fields_redacted, 0);
 }
 
@@ -1665,6 +1665,6 @@ fn redact_cassette_header_case_insensitive() {
         vec![],
         200,
     )]);
-    let summary = pi::vcr::redact_cassette(&mut cassette);
+    let summary = skaffen::vcr::redact_cassette(&mut cassette);
     assert_eq!(summary.headers_redacted, 3);
 }

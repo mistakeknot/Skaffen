@@ -343,7 +343,7 @@ async fn dispatch_via_manager(mgr: &ExtensionManager, op: &str, payload: Value) 
 
     // Test each op directly on the trait to verify error classification.
     let op_norm = op.trim().to_ascii_lowercase();
-    let result: Result<Value, pi::error::Error> = match op_norm.as_str() {
+    let result: Result<Value, skaffen::error::Error> = match op_norm.as_str() {
         "get_state" | "getstate" => Ok(session.get_state().await),
         "get_name" | "getname" => {
             let state = session.get_state().await;
@@ -428,7 +428,7 @@ async fn dispatch_via_manager(mgr: &ExtensionManager, op: &str, payload: Value) 
                 .await
                 .map(|()| Value::Null)
         }
-        _ => Err(pi::error::Error::validation(format!(
+        _ => Err(skaffen::error::Error::validation(format!(
             "Unknown session op: {op}"
         ))),
     };
@@ -722,30 +722,30 @@ fn error_hostcall_code_covers_all_variants() {
 
 #[test]
 fn validation_error_maps_to_invalid_request() {
-    let err = pi::error::Error::validation("bad input");
+    let err = skaffen::error::Error::validation("bad input");
     assert_eq!(err.hostcall_error_code(), "invalid_request");
 }
 
 #[test]
 fn auth_error_maps_to_denied() {
-    let err = pi::error::Error::auth("unauthorized");
+    let err = skaffen::error::Error::auth("unauthorized");
     assert_eq!(err.hostcall_error_code(), "denied");
 }
 
 #[test]
 fn session_error_maps_to_io() {
-    let err = pi::error::Error::session("lock failed");
+    let err = skaffen::error::Error::session("lock failed");
     assert_eq!(err.hostcall_error_code(), "io");
 }
 
 #[test]
 fn aborted_maps_to_timeout() {
-    let err = pi::error::Error::Aborted;
+    let err = skaffen::error::Error::Aborted;
     assert_eq!(err.hostcall_error_code(), "timeout");
 }
 
 #[test]
 fn extension_error_maps_to_internal() {
-    let err = pi::error::Error::extension("crash");
+    let err = skaffen::error::Error::extension("crash");
     assert_eq!(err.hostcall_error_code(), "internal");
 }

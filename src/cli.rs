@@ -464,7 +464,7 @@ mod tests {
     #[test]
     fn parse_resource_flags_and_mode() {
         let cli = Cli::parse_from([
-            "pi",
+            "skaffen",
             "--mode",
             "rpc",
             "--models",
@@ -602,7 +602,7 @@ mod tests {
     #[test]
     fn parse_system_prompt_flags() {
         let cli = Cli::parse_from([
-            "pi",
+            "skaffen",
             "--system-prompt",
             "You are a helper",
             "--append-system-prompt",
@@ -1068,7 +1068,7 @@ mod tests {
     #[test]
     fn multiple_extensions() {
         let cli = Cli::parse_from([
-            "pi",
+            "skaffen",
             "--extension",
             "ext1.js",
             "-e",
@@ -1167,7 +1167,7 @@ mod tests {
     #[test]
     fn print_mode_with_model_and_thinking() {
         let cli = Cli::parse_from([
-            "pi",
+            "skaffen",
             "-p",
             "--model",
             "gpt-4o",
@@ -1249,7 +1249,7 @@ mod tests {
     fn ts_parity_all_shared_flags_parse() {
         // Every flag from the TS args.ts that Rust must support.
         let cli = Cli::parse_from([
-            "pi",
+            "skaffen",
             "--provider",
             "anthropic",
             "--model",
@@ -1494,7 +1494,7 @@ mod tests {
             #[test]
             fn preprocess_empty_returns_pi_program_name(_dummy in Just(())) {
                 let result = preprocess_extension_flags(&[]);
-                assert_eq!(result.0, vec!["pi"]);
+                assert_eq!(result.0, vec!["skaffen"]);
                 let extracted: &[ExtensionCliFlag] = &result.1;
                 assert!(extracted.is_empty());
             }

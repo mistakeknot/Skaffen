@@ -216,7 +216,7 @@ fn list_sessions_returns_newest_first() {
         let harness = TestHarness::new("list_sessions_returns_newest_first");
         let sessions_root = harness.temp_path("sessions");
         let cwd = harness.temp_dir().display().to_string();
-        let encoded_cwd = pi::session::encode_cwd(harness.temp_dir());
+        let encoded_cwd = skaffen::session::encode_cwd(harness.temp_dir());
 
         // Create the project session directory
         let project_dir = sessions_root.join(&encoded_cwd);

@@ -81,7 +81,7 @@ fn main() -> Result<()> {
     let inputs: Vec<ScreeningInput> = validated
         .candidates
         .iter()
-        .filter(|c| c.status == pi::extension_validation::ValidationStatus::TrueExtension)
+        .filter(|c| c.status == skaffen::extension_validation::ValidationStatus::TrueExtension)
         .map(|c| {
             // Try to find license: first by canonical_id, then by name.
             let known_license = license_map

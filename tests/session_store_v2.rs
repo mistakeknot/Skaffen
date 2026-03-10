@@ -37,7 +37,7 @@ fn append_linear_entries(store: &mut SessionStoreV2, count: usize) -> PiResult<V
     Ok(ids)
 }
 
-fn frame_ids(frames: &[pi::session_store_v2::SegmentFrame]) -> Vec<String> {
+fn frame_ids(frames: &[skaffen::session_store_v2::SegmentFrame]) -> Vec<String> {
     frames.iter().map(|frame| frame.entry_id.clone()).collect()
 }
 
@@ -367,7 +367,7 @@ fn make_custom_entry(id: &str, parent_id: Option<&str>) -> SessionEntry {
 fn append_session_entry(
     store: &mut SessionStoreV2,
     entry: &SessionEntry,
-) -> PiResult<pi::session_store_v2::OffsetIndexEntry> {
+) -> PiResult<skaffen::session_store_v2::OffsetIndexEntry> {
     let (entry_id, parent_id, entry_type, payload) = session_entry_to_frame_args(entry)?;
     store.append_entry(entry_id, parent_id, entry_type, payload)
 }
@@ -1186,11 +1186,11 @@ fn v2_sidecar_path_derivation() {
     use std::path::PathBuf;
 
     let p = PathBuf::from("/home/user/sessions/my-session.jsonl");
-    let sidecar = pi::session_store_v2::v2_sidecar_path(&p);
+    let sidecar = skaffen::session_store_v2::v2_sidecar_path(&p);
     assert_eq!(sidecar, PathBuf::from("/home/user/sessions/my-session.v2"));
 
     let p2 = PathBuf::from("relative/path.jsonl");
-    let sidecar2 = pi::session_store_v2::v2_sidecar_path(&p2);
+    let sidecar2 = skaffen::session_store_v2::v2_sidecar_path(&p2);
     assert_eq!(sidecar2, PathBuf::from("relative/path.v2"));
 }
 
@@ -1200,13 +1200,13 @@ fn has_v2_sidecar_detection() -> PiResult<()> {
     let jsonl_path = dir.path().join("test-session.jsonl");
     fs::write(&jsonl_path, "{}\n")?;
 
-    assert!(!pi::session_store_v2::has_v2_sidecar(&jsonl_path));
+    assert!(!skaffen::session_store_v2::has_v2_sidecar(&jsonl_path));
 
-    let sidecar_root = pi::session_store_v2::v2_sidecar_path(&jsonl_path);
+    let sidecar_root = skaffen::session_store_v2::v2_sidecar_path(&jsonl_path);
     let mut store = SessionStoreV2::create(&sidecar_root, 4 * 1024)?;
     store.append_entry("e1", None, "message", json!({"text":"a"}))?;
 
-    assert!(pi::session_store_v2::has_v2_sidecar(&jsonl_path));
+    assert!(skaffen::session_store_v2::has_v2_sidecar(&jsonl_path));
     Ok(())
 }
 
@@ -1225,14 +1225,14 @@ proptest! {
         }
         jsonl.push(format!("{stem}{ext}"));
 
-        let sidecar = pi::session_store_v2::v2_sidecar_path(&jsonl);
+        let sidecar = skaffen::session_store_v2::v2_sidecar_path(&jsonl);
         let expected_name = format!("{stem}.v2");
         prop_assert_eq!(sidecar.parent(), jsonl.parent());
         prop_assert_eq!(
             sidecar.file_name().and_then(|name| name.to_str()),
             Some(expected_name.as_str())
         );
-        prop_assert_eq!(pi::session_store_v2::v2_sidecar_path(&jsonl), sidecar);
+        prop_assert_eq!(skaffen::session_store_v2::v2_sidecar_path(&jsonl), sidecar);
     }
 
     #[test]
@@ -1250,8 +1250,8 @@ proptest! {
         let path_a = base.join(format!("{stem}{ext1}"));
         let path_b = base.join(format!("{stem}{ext2}"));
         prop_assert_eq!(
-            pi::session_store_v2::v2_sidecar_path(&path_a),
-            pi::session_store_v2::v2_sidecar_path(&path_b)
+            skaffen::session_store_v2::v2_sidecar_path(&path_a),
+            skaffen::session_store_v2::v2_sidecar_path(&path_b)
         );
     }
 
@@ -1264,7 +1264,7 @@ proptest! {
         let jsonl = dir.path().join("session.jsonl");
         fs::write(&jsonl, "{}\n").expect("write jsonl");
 
-        let sidecar_root = pi::session_store_v2::v2_sidecar_path(&jsonl);
+        let sidecar_root = skaffen::session_store_v2::v2_sidecar_path(&jsonl);
         if create_manifest {
             fs::create_dir_all(&sidecar_root).expect("create sidecar root");
             fs::write(sidecar_root.join("manifest.json"), "{}\n").expect("write manifest");
@@ -1276,7 +1276,7 @@ proptest! {
         }
 
         prop_assert_eq!(
-            pi::session_store_v2::has_v2_sidecar(&jsonl),
+            skaffen::session_store_v2::has_v2_sidecar(&jsonl),
             create_manifest || create_index
         );
     }
@@ -1416,14 +1416,14 @@ fn v2_append_has_no_rewrite_amplification() -> PiResult<()> {
 // ─── V2 Resume Integration Tests ─────────────────────────────────────────────
 
 /// Build a minimal JSONL session file with the given entries.
-fn build_test_jsonl(dir: &Path, entries: &[pi::session::SessionEntry]) -> std::path::PathBuf {
+fn build_test_jsonl(dir: &Path, entries: &[skaffen::session::SessionEntry]) -> std::path::PathBuf {
     use std::io::Write;
 
     let path = dir.join("test_session.jsonl");
     let mut file = fs::File::create(&path).unwrap();
 
     // Write header (first line).
-    let header = pi::session::SessionHeader::new();
+    let header = skaffen::session::SessionHeader::new();
     serde_json::to_writer(&mut file, &header).unwrap();
     file.write_all(b"\n").unwrap();
 
@@ -1436,11 +1436,11 @@ fn build_test_jsonl(dir: &Path, entries: &[pi::session::SessionEntry]) -> std::p
     path
 }
 
-fn make_message_entry(id: &str, parent_id: Option<&str>, text: &str) -> pi::session::SessionEntry {
-    pi::session::SessionEntry::Message(pi::session::MessageEntry {
-        base: pi::session::EntryBase::new(parent_id.map(String::from), id.to_string()),
-        message: pi::session::SessionMessage::User {
-            content: pi::model::UserContent::Text(text.to_string()),
+fn make_message_entry(id: &str, parent_id: Option<&str>, text: &str) -> skaffen::session::SessionEntry {
+    skaffen::session::SessionEntry::Message(skaffen::session::MessageEntry {
+        base: skaffen::session::EntryBase::new(parent_id.map(String::from), id.to_string()),
+        message: skaffen::session::SessionMessage::User {
+            content: skaffen::model::UserContent::Text(text.to_string()),
             timestamp: None,
         },
     })
@@ -1449,7 +1449,7 @@ fn make_message_entry(id: &str, parent_id: Option<&str>, text: &str) -> pi::sess
 #[test]
 fn v2_sidecar_path_derives_from_jsonl_stem() {
     let jsonl = Path::new("/tmp/sessions/my_session.jsonl");
-    let sidecar = pi::session_store_v2::v2_sidecar_path(jsonl);
+    let sidecar = skaffen::session_store_v2::v2_sidecar_path(jsonl);
     assert_eq!(sidecar, Path::new("/tmp/sessions/my_session.v2"));
 }
 
@@ -1458,7 +1458,7 @@ fn has_v2_sidecar_returns_false_for_bare_jsonl() {
     let dir = tempdir().unwrap();
     let jsonl = dir.path().join("session.jsonl");
     fs::write(&jsonl, "{}").unwrap();
-    assert!(!pi::session_store_v2::has_v2_sidecar(&jsonl));
+    assert!(!skaffen::session_store_v2::has_v2_sidecar(&jsonl));
 }
 
 #[test]
@@ -1472,10 +1472,10 @@ fn create_v2_sidecar_round_trips_entries() -> PiResult<()> {
     let jsonl = build_test_jsonl(dir.path(), &entries);
 
     // Create sidecar.
-    let store = pi::session::create_v2_sidecar_from_jsonl(&jsonl)?;
+    let store = skaffen::session::create_v2_sidecar_from_jsonl(&jsonl)?;
 
     // Verify sidecar was created.
-    assert!(pi::session_store_v2::has_v2_sidecar(&jsonl));
+    assert!(skaffen::session_store_v2::has_v2_sidecar(&jsonl));
 
     // Verify entry count.
     assert_eq!(store.entry_count(), 3);
@@ -1490,7 +1490,7 @@ fn create_v2_sidecar_round_trips_entries() -> PiResult<()> {
 
     // Convert back to SessionEntry and verify content.
     for (frame, original) in frames.iter().zip(entries.iter()) {
-        let recovered = pi::session_store_v2::frame_to_session_entry(frame)?;
+        let recovered = skaffen::session_store_v2::frame_to_session_entry(frame)?;
         let recovered_id = recovered.base_id().unwrap();
         let original_id = original.base_id().unwrap();
         assert_eq!(recovered_id, original_id);
@@ -1512,7 +1512,7 @@ fn v2_resume_loads_same_entries_as_jsonl() -> PiResult<()> {
     let jsonl = build_test_jsonl(dir.path(), &entries);
 
     // Create V2 sidecar.
-    pi::session::create_v2_sidecar_from_jsonl(&jsonl)?;
+    skaffen::session::create_v2_sidecar_from_jsonl(&jsonl)?;
 
     // Open via Session (will use V2 sidecar if detected) and assert inside
     // runtime harness, since run_test futures return ().
@@ -1521,7 +1521,7 @@ fn v2_resume_loads_same_entries_as_jsonl() -> PiResult<()> {
         .expect("temporary jsonl path must be valid UTF-8")
         .to_string();
     asupersync::test_utils::run_test(|| async move {
-        let (session, diag) = pi::session::Session::open_with_diagnostics(&jsonl_str)
+        let (session, diag) = skaffen::session::Session::open_with_diagnostics(&jsonl_str)
             .await
             .expect("session open should succeed");
 
@@ -1537,7 +1537,7 @@ fn v2_resume_loads_same_entries_as_jsonl() -> PiResult<()> {
     });
 
     // Verify the V2 sidecar path was used (the has_v2_sidecar check).
-    assert!(pi::session_store_v2::has_v2_sidecar(&jsonl));
+    assert!(skaffen::session_store_v2::has_v2_sidecar(&jsonl));
 
     Ok(())
 }
@@ -1545,15 +1545,15 @@ fn v2_resume_loads_same_entries_as_jsonl() -> PiResult<()> {
 #[test]
 fn v2_sidecar_with_empty_entries_produces_empty_session() -> PiResult<()> {
     let dir = tempdir()?;
-    let entries: Vec<pi::session::SessionEntry> = vec![];
+    let entries: Vec<skaffen::session::SessionEntry> = vec![];
     let jsonl = build_test_jsonl(dir.path(), &entries);
 
     // Create sidecar (empty).
-    let store = pi::session::create_v2_sidecar_from_jsonl(&jsonl)?;
+    let store = skaffen::session::create_v2_sidecar_from_jsonl(&jsonl)?;
     assert_eq!(store.entry_count(), 0);
 
     // Verify sidecar directory exists.
-    let sidecar_root = pi::session_store_v2::v2_sidecar_path(&jsonl);
+    let sidecar_root = skaffen::session_store_v2::v2_sidecar_path(&jsonl);
     assert!(sidecar_root.join("index").exists());
 
     Ok(())
@@ -1568,7 +1568,7 @@ fn v2_sidecar_preserves_entry_parent_chain() -> PiResult<()> {
         make_message_entry("child2", Some("child1"), "step 2"),
     ];
     let jsonl = build_test_jsonl(dir.path(), &entries);
-    let store = pi::session::create_v2_sidecar_from_jsonl(&jsonl)?;
+    let store = skaffen::session::create_v2_sidecar_from_jsonl(&jsonl)?;
 
     // Read active path from leaf to root.
     let path_frames = store.read_active_path("child2")?;
@@ -1590,7 +1590,7 @@ fn v2_sidecar_integrity_valid_after_migration() -> PiResult<()> {
         make_message_entry("d", Some("c"), "delta"),
     ];
     let jsonl = build_test_jsonl(dir.path(), &entries);
-    let store = pi::session::create_v2_sidecar_from_jsonl(&jsonl)?;
+    let store = skaffen::session::create_v2_sidecar_from_jsonl(&jsonl)?;
 
     // Validate integrity — should not error.
     store.validate_integrity()?;
@@ -1610,7 +1610,7 @@ fn migrate_jsonl_to_v2_creates_verified_sidecar() -> PiResult<()> {
     ];
     let jsonl = build_test_jsonl(dir.path(), &entries);
 
-    let event = pi::session::migrate_jsonl_to_v2(&jsonl, "test-corr-001")?;
+    let event = skaffen::session::migrate_jsonl_to_v2(&jsonl, "test-corr-001")?;
 
     assert_eq!(event.outcome, "ok");
     assert_eq!(event.source_format, "jsonl_v3");
@@ -1621,7 +1621,7 @@ fn migrate_jsonl_to_v2_creates_verified_sidecar() -> PiResult<()> {
     assert_eq!(event.correlation_id, "test-corr-001");
 
     // Verify ledger was written.
-    let v2_root = pi::session_store_v2::v2_sidecar_path(&jsonl);
+    let v2_root = skaffen::session_store_v2::v2_sidecar_path(&jsonl);
     let store = SessionStoreV2::create(&v2_root, 64 * 1024 * 1024)?;
     let ledger = store.read_migration_events()?;
     assert_eq!(ledger.len(), 1);
@@ -1639,15 +1639,15 @@ fn migrate_jsonl_to_v2_preserves_existing_sidecar_on_rebuild_failure() -> PiResu
     ];
     let jsonl = build_test_jsonl(dir.path(), &entries);
 
-    let initial_event = pi::session::migrate_jsonl_to_v2(&jsonl, "initial-corr")?;
-    let v2_root = pi::session_store_v2::v2_sidecar_path(&jsonl);
+    let initial_event = skaffen::session::migrate_jsonl_to_v2(&jsonl, "initial-corr")?;
+    let v2_root = skaffen::session_store_v2::v2_sidecar_path(&jsonl);
     let baseline_store = SessionStoreV2::create(&v2_root, 64 * 1024 * 1024)?;
     let baseline_ids = frame_ids(&baseline_store.read_all_entries()?);
 
     let mut file = fs::OpenOptions::new().append(true).open(&jsonl)?;
     file.write_all(b"{ definitely-not-json }\n")?;
 
-    let err = pi::session::migrate_jsonl_to_v2(&jsonl, "retry-corr")
+    let err = skaffen::session::migrate_jsonl_to_v2(&jsonl, "retry-corr")
         .expect_err("invalid JSONL should abort remigration");
     assert!(
         err.to_string().contains("Bad JSONL entry"),
@@ -1676,15 +1676,15 @@ fn create_v2_sidecar_from_jsonl_preserves_existing_sidecar_on_rebuild_failure() 
     ];
     let jsonl = build_test_jsonl(dir.path(), &entries);
 
-    pi::session::create_v2_sidecar_from_jsonl(&jsonl)?;
-    let v2_root = pi::session_store_v2::v2_sidecar_path(&jsonl);
+    skaffen::session::create_v2_sidecar_from_jsonl(&jsonl)?;
+    let v2_root = skaffen::session_store_v2::v2_sidecar_path(&jsonl);
     let baseline_store = SessionStoreV2::create(&v2_root, 64 * 1024 * 1024)?;
     let baseline_ids = frame_ids(&baseline_store.read_all_entries()?);
 
     let mut file = fs::OpenOptions::new().append(true).open(&jsonl)?;
     file.write_all(b"{ definitely-not-json }\n")?;
 
-    let err = pi::session::create_v2_sidecar_from_jsonl(&jsonl)
+    let err = skaffen::session::create_v2_sidecar_from_jsonl(&jsonl)
         .expect_err("invalid JSONL should abort sidecar rebuild");
     assert!(
         err.to_string().contains("Bad JSONL entry"),
@@ -1705,7 +1705,7 @@ fn migrate_jsonl_to_v2_failure_does_not_leave_partial_sidecars() -> PiResult<()>
     let dir = tempdir()?;
     let entries = vec![make_message_entry("bad1", None, "first")];
     let jsonl = build_test_jsonl(dir.path(), &entries);
-    let v2_root = pi::session_store_v2::v2_sidecar_path(&jsonl);
+    let v2_root = skaffen::session_store_v2::v2_sidecar_path(&jsonl);
     let file_name = v2_root
         .file_name()
         .expect("sidecar path must have a file name")
@@ -1715,14 +1715,14 @@ fn migrate_jsonl_to_v2_failure_does_not_leave_partial_sidecars() -> PiResult<()>
     let mut file = fs::OpenOptions::new().append(true).open(&jsonl)?;
     file.write_all(b"{ invalid-json }\n")?;
 
-    let err = pi::session::migrate_jsonl_to_v2(&jsonl, "bad-corr")
+    let err = skaffen::session::migrate_jsonl_to_v2(&jsonl, "bad-corr")
         .expect_err("invalid JSONL should fail first migration");
     assert!(
         err.to_string().contains("Bad JSONL entry"),
         "unexpected error: {err}"
     );
     assert!(
-        !pi::session_store_v2::has_v2_sidecar(&jsonl),
+        !skaffen::session_store_v2::has_v2_sidecar(&jsonl),
         "failed migration must not leave a live sidecar"
     );
     assert!(
@@ -1754,9 +1754,9 @@ fn verify_v2_against_jsonl_detects_matching_entries() -> PiResult<()> {
         make_message_entry("v2", Some("v1"), "world"),
     ];
     let jsonl = build_test_jsonl(dir.path(), &entries);
-    let store = pi::session::create_v2_sidecar_from_jsonl(&jsonl)?;
+    let store = skaffen::session::create_v2_sidecar_from_jsonl(&jsonl)?;
 
-    let verification = pi::session::verify_v2_against_jsonl(&jsonl, &store)?;
+    let verification = skaffen::session::verify_v2_against_jsonl(&jsonl, &store)?;
 
     assert!(verification.entry_count_match);
     assert!(verification.hash_chain_match);
@@ -1772,12 +1772,12 @@ fn rollback_v2_sidecar_removes_sidecar_directory() -> PiResult<()> {
     let jsonl = build_test_jsonl(dir.path(), &entries);
 
     // Migrate forward.
-    pi::session::migrate_jsonl_to_v2(&jsonl, "rollback-test")?;
-    assert!(pi::session_store_v2::has_v2_sidecar(&jsonl));
+    skaffen::session::migrate_jsonl_to_v2(&jsonl, "rollback-test")?;
+    assert!(skaffen::session_store_v2::has_v2_sidecar(&jsonl));
 
     // Rollback.
-    pi::session::rollback_v2_sidecar(&jsonl, "rollback-test")?;
-    assert!(!pi::session_store_v2::has_v2_sidecar(&jsonl));
+    skaffen::session::rollback_v2_sidecar(&jsonl, "rollback-test")?;
+    assert!(!skaffen::session_store_v2::has_v2_sidecar(&jsonl));
 
     // Original JSONL still intact.
     assert!(jsonl.exists());
@@ -1791,8 +1791,8 @@ fn rollback_v2_sidecar_is_idempotent() -> PiResult<()> {
     let jsonl = build_test_jsonl(dir.path(), &[make_message_entry("x", None, "data")]);
 
     // Rollback when no sidecar exists — should succeed silently.
-    pi::session::rollback_v2_sidecar(&jsonl, "noop")?;
-    assert!(!pi::session_store_v2::has_v2_sidecar(&jsonl));
+    skaffen::session::rollback_v2_sidecar(&jsonl, "noop")?;
+    assert!(!skaffen::session_store_v2::has_v2_sidecar(&jsonl));
 
     Ok(())
 }
@@ -1802,7 +1802,7 @@ fn migration_status_unmigrated_when_no_sidecar() {
     let dir = tempdir().unwrap();
     let jsonl = build_test_jsonl(dir.path(), &[make_message_entry("s1", None, "data")]);
     assert_eq!(
-        pi::session::migration_status(&jsonl),
+        skaffen::session::migration_status(&jsonl),
         MigrationState::Unmigrated
     );
 }
@@ -1811,10 +1811,10 @@ fn migration_status_unmigrated_when_no_sidecar() {
 fn migration_status_migrated_after_successful_migration() -> PiResult<()> {
     let dir = tempdir()?;
     let jsonl = build_test_jsonl(dir.path(), &[make_message_entry("s1", None, "data")]);
-    pi::session::migrate_jsonl_to_v2(&jsonl, "status-test")?;
+    skaffen::session::migrate_jsonl_to_v2(&jsonl, "status-test")?;
 
     assert_eq!(
-        pi::session::migration_status(&jsonl),
+        skaffen::session::migration_status(&jsonl),
         MigrationState::Migrated
     );
 
@@ -1827,11 +1827,11 @@ fn migration_status_partial_when_sidecar_incomplete() {
     let jsonl = build_test_jsonl(dir.path(), &[make_message_entry("s1", None, "data")]);
 
     // Create a bare sidecar directory without proper structure.
-    let v2_root = pi::session_store_v2::v2_sidecar_path(&jsonl);
+    let v2_root = skaffen::session_store_v2::v2_sidecar_path(&jsonl);
     fs::create_dir_all(&v2_root).unwrap();
 
     assert_eq!(
-        pi::session::migration_status(&jsonl),
+        skaffen::session::migration_status(&jsonl),
         MigrationState::Partial
     );
 }
@@ -1844,16 +1844,16 @@ fn migration_status_self_heals_when_index_damaged() -> PiResult<()> {
         make_message_entry("c2", Some("c1"), "two"),
     ];
     let jsonl = build_test_jsonl(dir.path(), &entries);
-    pi::session::migrate_jsonl_to_v2(&jsonl, "corrupt-test")?;
+    skaffen::session::migrate_jsonl_to_v2(&jsonl, "corrupt-test")?;
 
     // Corrupt the index file.
-    let v2_root = pi::session_store_v2::v2_sidecar_path(&jsonl);
+    let v2_root = skaffen::session_store_v2::v2_sidecar_path(&jsonl);
     let index_path = v2_root.join("index").join("offsets.jsonl");
     fs::write(&index_path, "not valid json\n")?;
 
     // Recoverable index corruption should be rebuilt automatically.
     assert_eq!(
-        pi::session::migration_status(&jsonl),
+        skaffen::session::migration_status(&jsonl),
         MigrationState::Migrated
     );
 
@@ -1877,7 +1877,7 @@ fn migrate_dry_run_validates_without_persisting() -> PiResult<()> {
     ];
     let jsonl = build_test_jsonl(dir.path(), &entries);
 
-    let verification = pi::session::migrate_dry_run(&jsonl)?;
+    let verification = skaffen::session::migrate_dry_run(&jsonl)?;
 
     // Dry run should report success.
     assert!(verification.entry_count_match);
@@ -1885,9 +1885,9 @@ fn migrate_dry_run_validates_without_persisting() -> PiResult<()> {
     assert!(verification.index_consistent);
 
     // No sidecar should have been created.
-    assert!(!pi::session_store_v2::has_v2_sidecar(&jsonl));
+    assert!(!skaffen::session_store_v2::has_v2_sidecar(&jsonl));
     assert_eq!(
-        pi::session::migration_status(&jsonl),
+        skaffen::session::migration_status(&jsonl),
         MigrationState::Unmigrated
     );
 
@@ -1900,19 +1900,19 @@ fn recover_partial_migration_cleans_up_and_optionally_re_migrates() -> PiResult<
     let jsonl = build_test_jsonl(dir.path(), &[make_message_entry("r1", None, "data")]);
 
     // Create a partial sidecar.
-    let v2_root = pi::session_store_v2::v2_sidecar_path(&jsonl);
+    let v2_root = skaffen::session_store_v2::v2_sidecar_path(&jsonl);
     fs::create_dir_all(&v2_root)?;
 
     // Recover without re-migration.
-    let state = pi::session::recover_partial_migration(&jsonl, "recover-test", false)?;
+    let state = skaffen::session::recover_partial_migration(&jsonl, "recover-test", false)?;
     assert_eq!(state, MigrationState::Unmigrated);
     assert!(!v2_root.exists());
 
     // Create partial again, recover WITH re-migration.
     fs::create_dir_all(&v2_root)?;
-    let state = pi::session::recover_partial_migration(&jsonl, "recover-test-2", true)?;
+    let state = skaffen::session::recover_partial_migration(&jsonl, "recover-test-2", true)?;
     assert_eq!(state, MigrationState::Migrated);
-    assert!(pi::session_store_v2::has_v2_sidecar(&jsonl));
+    assert!(skaffen::session_store_v2::has_v2_sidecar(&jsonl));
 
     Ok(())
 }
@@ -1928,26 +1928,26 @@ fn migrate_then_rollback_then_re_migrate_round_trip() -> PiResult<()> {
     let jsonl = build_test_jsonl(dir.path(), &entries);
 
     // Step 1: Migrate.
-    let event1 = pi::session::migrate_jsonl_to_v2(&jsonl, "round-trip")?;
+    let event1 = skaffen::session::migrate_jsonl_to_v2(&jsonl, "round-trip")?;
     assert_eq!(event1.outcome, "ok");
 
     // Step 2: Rollback.
-    pi::session::rollback_v2_sidecar(&jsonl, "round-trip")?;
+    skaffen::session::rollback_v2_sidecar(&jsonl, "round-trip")?;
     assert_eq!(
-        pi::session::migration_status(&jsonl),
+        skaffen::session::migration_status(&jsonl),
         MigrationState::Unmigrated
     );
 
     // Step 3: Re-migrate.
-    let event2 = pi::session::migrate_jsonl_to_v2(&jsonl, "round-trip-2")?;
+    let event2 = skaffen::session::migrate_jsonl_to_v2(&jsonl, "round-trip-2")?;
     assert_eq!(event2.outcome, "ok");
     assert_eq!(
-        pi::session::migration_status(&jsonl),
+        skaffen::session::migration_status(&jsonl),
         MigrationState::Migrated
     );
 
     // Verify the re-migrated store has correct entry count.
-    let v2_root = pi::session_store_v2::v2_sidecar_path(&jsonl);
+    let v2_root = skaffen::session_store_v2::v2_sidecar_path(&jsonl);
     let store = SessionStoreV2::create(&v2_root, 64 * 1024 * 1024)?;
     assert_eq!(store.entry_count(), 3);
 
@@ -1960,11 +1960,11 @@ fn migrate_empty_session_succeeds() -> PiResult<()> {
     let entries: Vec<SessionEntry> = vec![];
     let jsonl = build_test_jsonl(dir.path(), &entries);
 
-    let event = pi::session::migrate_jsonl_to_v2(&jsonl, "empty-test")?;
+    let event = skaffen::session::migrate_jsonl_to_v2(&jsonl, "empty-test")?;
     assert_eq!(event.outcome, "ok");
     assert!(event.verification.entry_count_match);
     assert_eq!(
-        pi::session::migration_status(&jsonl),
+        skaffen::session::migration_status(&jsonl),
         MigrationState::Migrated
     );
 
@@ -1989,12 +1989,12 @@ fn migrate_large_session_preserves_all_entries() -> PiResult<()> {
     }
     let jsonl = build_test_jsonl(dir.path(), &entries);
 
-    let event = pi::session::migrate_jsonl_to_v2(&jsonl, "large-test")?;
+    let event = skaffen::session::migrate_jsonl_to_v2(&jsonl, "large-test")?;
     assert_eq!(event.outcome, "ok");
     assert!(event.verification.entry_count_match);
 
     // Verify all entries round-trip.
-    let v2_root = pi::session_store_v2::v2_sidecar_path(&jsonl);
+    let v2_root = skaffen::session_store_v2::v2_sidecar_path(&jsonl);
     let store = SessionStoreV2::create(&v2_root, 64 * 1024 * 1024)?;
     assert_eq!(store.entry_count(), 100);
 
@@ -2020,12 +2020,12 @@ fn migrate_branching_session_preserves_all_branches() -> PiResult<()> {
     ];
     let jsonl = build_test_jsonl(dir.path(), &entries);
 
-    let event = pi::session::migrate_jsonl_to_v2(&jsonl, "branch-test")?;
+    let event = skaffen::session::migrate_jsonl_to_v2(&jsonl, "branch-test")?;
     assert_eq!(event.outcome, "ok");
     assert!(event.verification.entry_count_match);
 
     // All 4 entries should be in the store.
-    let v2_root = pi::session_store_v2::v2_sidecar_path(&jsonl);
+    let v2_root = skaffen::session_store_v2::v2_sidecar_path(&jsonl);
     let store = SessionStoreV2::create(&v2_root, 64 * 1024 * 1024)?;
     assert_eq!(store.entry_count(), 4);
 
@@ -2048,10 +2048,10 @@ fn migration_ledger_accumulates_events() -> PiResult<()> {
     let jsonl = build_test_jsonl(dir.path(), &[make_message_entry("l1", None, "data")]);
 
     // Migrate.
-    pi::session::migrate_jsonl_to_v2(&jsonl, "ledger-1")?;
+    skaffen::session::migrate_jsonl_to_v2(&jsonl, "ledger-1")?;
 
     // Check ledger has 1 event.
-    let v2_root = pi::session_store_v2::v2_sidecar_path(&jsonl);
+    let v2_root = skaffen::session_store_v2::v2_sidecar_path(&jsonl);
     let store = SessionStoreV2::create(&v2_root, 64 * 1024 * 1024)?;
     let events = store.read_migration_events()?;
     assert_eq!(events.len(), 1);
@@ -2080,12 +2080,12 @@ fn e2e_full_migration_rollback_round_trip_with_forensic_log() -> PiResult<()> {
 
     // Phase 0: Confirm unmigrated state.
     assert_eq!(
-        pi::session::migration_status(&jsonl),
+        skaffen::session::migration_status(&jsonl),
         MigrationState::Unmigrated
     );
 
     // Phase 1: Forward migration.
-    let fwd_event = pi::session::migrate_jsonl_to_v2(&jsonl, "e2e-round-trip")?;
+    let fwd_event = skaffen::session::migrate_jsonl_to_v2(&jsonl, "e2e-round-trip")?;
     assert_eq!(fwd_event.phase, "forward");
     assert_eq!(fwd_event.outcome, "ok");
     assert_eq!(fwd_event.source_format, "jsonl_v3");
@@ -2100,12 +2100,12 @@ fn e2e_full_migration_rollback_round_trip_with_forensic_log() -> PiResult<()> {
 
     // Verify migrated state.
     assert_eq!(
-        pi::session::migration_status(&jsonl),
+        skaffen::session::migration_status(&jsonl),
         MigrationState::Migrated
     );
 
     // Verify V2 store contents are correct.
-    let v2_root = pi::session_store_v2::v2_sidecar_path(&jsonl);
+    let v2_root = skaffen::session_store_v2::v2_sidecar_path(&jsonl);
     let store = SessionStoreV2::create(&v2_root, 64 * 1024 * 1024)?;
     assert_eq!(store.entry_count(), 5);
     let frames = store.read_all_entries()?;
@@ -2129,12 +2129,12 @@ fn e2e_full_migration_rollback_round_trip_with_forensic_log() -> PiResult<()> {
     assert_eq!(jsonl_entry_count, 5);
 
     // Phase 2: Rollback to JSONL-only.
-    pi::session::rollback_v2_sidecar(&jsonl, "e2e-round-trip")?;
+    skaffen::session::rollback_v2_sidecar(&jsonl, "e2e-round-trip")?;
     assert_eq!(
-        pi::session::migration_status(&jsonl),
+        skaffen::session::migration_status(&jsonl),
         MigrationState::Unmigrated
     );
-    assert!(!pi::session_store_v2::has_v2_sidecar(&jsonl));
+    assert!(!skaffen::session_store_v2::has_v2_sidecar(&jsonl));
 
     // JSONL is still intact after rollback.
     assert!(jsonl.exists());
@@ -2156,24 +2156,24 @@ fn e2e_migrate_rollback_remigrate_ledger_accumulates() -> PiResult<()> {
     let jsonl = build_test_jsonl(dir.path(), &entries);
 
     // First migration.
-    let event1 = pi::session::migrate_jsonl_to_v2(&jsonl, "cycle-1")?;
+    let event1 = skaffen::session::migrate_jsonl_to_v2(&jsonl, "cycle-1")?;
     assert_eq!(event1.phase, "forward");
 
     // Check ledger before rollback.
-    let v2_root = pi::session_store_v2::v2_sidecar_path(&jsonl);
+    let v2_root = skaffen::session_store_v2::v2_sidecar_path(&jsonl);
     let store = SessionStoreV2::create(&v2_root, 64 * 1024 * 1024)?;
     assert_eq!(store.read_migration_events()?.len(), 1);
     drop(store);
 
     // Rollback (note: rollback removes the V2 sidecar, so the ledger is lost).
-    pi::session::rollback_v2_sidecar(&jsonl, "cycle-1-rollback")?;
+    skaffen::session::rollback_v2_sidecar(&jsonl, "cycle-1-rollback")?;
     assert_eq!(
-        pi::session::migration_status(&jsonl),
+        skaffen::session::migration_status(&jsonl),
         MigrationState::Unmigrated
     );
 
     // Re-migrate — fresh sidecar, fresh ledger.
-    let event2 = pi::session::migrate_jsonl_to_v2(&jsonl, "cycle-2")?;
+    let event2 = skaffen::session::migrate_jsonl_to_v2(&jsonl, "cycle-2")?;
     assert_eq!(event2.phase, "forward");
     assert_eq!(event2.correlation_id, "cycle-2");
 
@@ -2203,21 +2203,21 @@ fn e2e_dry_run_then_real_migration() -> PiResult<()> {
     let jsonl = build_test_jsonl(dir.path(), &entries);
 
     // Dry run — no sidecar should exist.
-    let dry_verification = pi::session::migrate_dry_run(&jsonl)?;
+    let dry_verification = skaffen::session::migrate_dry_run(&jsonl)?;
     assert!(dry_verification.entry_count_match);
     assert!(dry_verification.hash_chain_match);
     assert!(dry_verification.index_consistent);
     assert_eq!(
-        pi::session::migration_status(&jsonl),
+        skaffen::session::migration_status(&jsonl),
         MigrationState::Unmigrated
     );
-    assert!(!pi::session_store_v2::has_v2_sidecar(&jsonl));
+    assert!(!skaffen::session_store_v2::has_v2_sidecar(&jsonl));
 
     // Real migration.
-    let event = pi::session::migrate_jsonl_to_v2(&jsonl, "dry-then-real")?;
+    let event = skaffen::session::migrate_jsonl_to_v2(&jsonl, "dry-then-real")?;
     assert_eq!(event.outcome, "ok");
     assert_eq!(
-        pi::session::migration_status(&jsonl),
+        skaffen::session::migration_status(&jsonl),
         MigrationState::Migrated
     );
 
@@ -2249,7 +2249,7 @@ fn e2e_partial_migration_recovery_with_forensic_check() -> PiResult<()> {
     let jsonl = build_test_jsonl(dir.path(), &entries);
 
     // Simulate a partial migration: create V2 dir with segments but no index.
-    let v2_root = pi::session_store_v2::v2_sidecar_path(&jsonl);
+    let v2_root = skaffen::session_store_v2::v2_sidecar_path(&jsonl);
     fs::create_dir_all(v2_root.join("segments"))?;
     fs::write(
         v2_root.join("segments").join("0000000000000001.seg"),
@@ -2258,12 +2258,12 @@ fn e2e_partial_migration_recovery_with_forensic_check() -> PiResult<()> {
 
     // Status should be Partial.
     assert_eq!(
-        pi::session::migration_status(&jsonl),
+        skaffen::session::migration_status(&jsonl),
         MigrationState::Partial
     );
 
     // Recover with re-migration.
-    let state = pi::session::recover_partial_migration(&jsonl, "partial-recovery-e2e", true)?;
+    let state = skaffen::session::recover_partial_migration(&jsonl, "partial-recovery-e2e", true)?;
     assert_eq!(state, MigrationState::Migrated);
 
     // Verify data integrity after recovery.
@@ -2288,8 +2288,8 @@ fn e2e_corrupt_migration_recovery_cleanup_only() -> PiResult<()> {
     let jsonl = build_test_jsonl(dir.path(), &entries);
 
     // Create a valid V2 sidecar then corrupt a segment (not recoverable by index rebuild).
-    pi::session::migrate_jsonl_to_v2(&jsonl, "pre-corrupt")?;
-    let v2_root = pi::session_store_v2::v2_sidecar_path(&jsonl);
+    skaffen::session::migrate_jsonl_to_v2(&jsonl, "pre-corrupt")?;
+    let v2_root = skaffen::session_store_v2::v2_sidecar_path(&jsonl);
     let seg_path = v2_root.join("segments").join("0000000000000001.seg");
     assert!(
         seg_path.exists(),
@@ -2298,13 +2298,13 @@ fn e2e_corrupt_migration_recovery_cleanup_only() -> PiResult<()> {
     fs::write(&seg_path, "corrupted segment data\n")?;
 
     // Status should be Corrupt.
-    match pi::session::migration_status(&jsonl) {
+    match skaffen::session::migration_status(&jsonl) {
         MigrationState::Corrupt { .. } => {}
         other => panic!("Expected Corrupt, got {other:?}"),
     }
 
     // Recover WITHOUT re-migration.
-    let state = pi::session::recover_partial_migration(&jsonl, "corrupt-cleanup", false)?;
+    let state = skaffen::session::recover_partial_migration(&jsonl, "corrupt-cleanup", false)?;
     assert_eq!(state, MigrationState::Unmigrated);
     assert!(!v2_root.exists());
 
@@ -2325,7 +2325,7 @@ fn e2e_forensic_event_field_completeness() -> PiResult<()> {
     let jsonl = build_test_jsonl(dir.path(), &entries);
     let jsonl_display = jsonl.display().to_string();
 
-    let event = pi::session::migrate_jsonl_to_v2(&jsonl, "forensic-check-001")?;
+    let event = skaffen::session::migrate_jsonl_to_v2(&jsonl, "forensic-check-001")?;
 
     // Check every field of the forensic event.
     assert_eq!(event.schema, "pi.session_store_v2.migration_event.v1");
@@ -2339,7 +2339,7 @@ fn e2e_forensic_event_field_completeness() -> PiResult<()> {
         event.at
     );
     assert_eq!(event.source_path, jsonl_display);
-    let v2_root = pi::session_store_v2::v2_sidecar_path(&jsonl);
+    let v2_root = skaffen::session_store_v2::v2_sidecar_path(&jsonl);
     assert_eq!(event.target_path, v2_root.display().to_string());
     assert_eq!(event.source_format, "jsonl_v3");
     assert_eq!(event.target_format, "native_v2");
@@ -2366,7 +2366,7 @@ fn e2e_migration_ids_are_unique_across_cycles() -> PiResult<()> {
 
     for cycle in 0..3 {
         let corr = format!("uniqueness-cycle-{cycle}");
-        let event = pi::session::migrate_jsonl_to_v2(&jsonl, &corr)?;
+        let event = skaffen::session::migrate_jsonl_to_v2(&jsonl, &corr)?;
         assert!(
             !seen_ids.contains(&event.migration_id),
             "migration_id collision at cycle {cycle}: {}",
@@ -2375,7 +2375,7 @@ fn e2e_migration_ids_are_unique_across_cycles() -> PiResult<()> {
         seen_ids.push(event.migration_id);
 
         // Rollback for next cycle.
-        pi::session::rollback_v2_sidecar(&jsonl, &corr)?;
+        skaffen::session::rollback_v2_sidecar(&jsonl, &corr)?;
     }
 
     assert_eq!(seen_ids.len(), 3);
@@ -2395,24 +2395,24 @@ fn e2e_migration_state_machine_transitions() -> PiResult<()> {
 
     // State 1: Unmigrated.
     assert_eq!(
-        pi::session::migration_status(&jsonl),
+        skaffen::session::migration_status(&jsonl),
         MigrationState::Unmigrated
     );
 
     // State 2: Migrated.
-    pi::session::migrate_jsonl_to_v2(&jsonl, "sm-forward")?;
+    skaffen::session::migrate_jsonl_to_v2(&jsonl, "sm-forward")?;
     assert_eq!(
-        pi::session::migration_status(&jsonl),
+        skaffen::session::migration_status(&jsonl),
         MigrationState::Migrated
     );
 
     // State 3: Corrupt (tamper with segment data).
-    let v2_root = pi::session_store_v2::v2_sidecar_path(&jsonl);
+    let v2_root = skaffen::session_store_v2::v2_sidecar_path(&jsonl);
     let seg_path = v2_root.join("segments").join("0000000000000001.seg");
     if seg_path.exists() {
         fs::write(&seg_path, "corrupted segment data\n")?;
     }
-    match pi::session::migration_status(&jsonl) {
+    match skaffen::session::migration_status(&jsonl) {
         MigrationState::Corrupt { error } => {
             assert!(!error.is_empty(), "corrupt error message must be non-empty");
         }
@@ -2420,7 +2420,7 @@ fn e2e_migration_state_machine_transitions() -> PiResult<()> {
     }
 
     // State 4: Recovered via recover_partial_migration (with re-migration).
-    let state = pi::session::recover_partial_migration(&jsonl, "sm-recovery", true)?;
+    let state = skaffen::session::recover_partial_migration(&jsonl, "sm-recovery", true)?;
     assert_eq!(state, MigrationState::Migrated);
 
     // Verify integrity post-recovery.
@@ -2454,17 +2454,17 @@ fn e2e_large_session_migration_integrity_and_chain() -> PiResult<()> {
     let jsonl = build_test_jsonl(dir.path(), &entries);
 
     // Dry-run first.
-    let dry = pi::session::migrate_dry_run(&jsonl)?;
+    let dry = skaffen::session::migrate_dry_run(&jsonl)?;
     assert!(dry.entry_count_match);
     assert!(dry.hash_chain_match);
     assert!(dry.index_consistent);
 
     // Real migration.
-    let event = pi::session::migrate_jsonl_to_v2(&jsonl, "large-e2e")?;
+    let event = skaffen::session::migrate_jsonl_to_v2(&jsonl, "large-e2e")?;
     assert_eq!(event.outcome, "ok");
 
     // Verify V2 store fully.
-    let v2_root = pi::session_store_v2::v2_sidecar_path(&jsonl);
+    let v2_root = skaffen::session_store_v2::v2_sidecar_path(&jsonl);
     let store = SessionStoreV2::create(&v2_root, 64 * 1024 * 1024)?;
     assert_eq!(store.entry_count(), 200);
     store.validate_integrity()?;
@@ -2514,11 +2514,11 @@ fn e2e_branching_migration_preserves_all_paths() -> PiResult<()> {
     ];
     let jsonl = build_test_jsonl(dir.path(), &entries);
 
-    let event = pi::session::migrate_jsonl_to_v2(&jsonl, "branch-e2e")?;
+    let event = skaffen::session::migrate_jsonl_to_v2(&jsonl, "branch-e2e")?;
     assert_eq!(event.outcome, "ok");
     assert!(event.verification.entry_count_match);
 
-    let v2_root = pi::session_store_v2::v2_sidecar_path(&jsonl);
+    let v2_root = skaffen::session_store_v2::v2_sidecar_path(&jsonl);
     let store = SessionStoreV2::create(&v2_root, 64 * 1024 * 1024)?;
     assert_eq!(store.entry_count(), 7);
 
@@ -2536,9 +2536,9 @@ fn e2e_branching_migration_preserves_all_paths() -> PiResult<()> {
     assert_eq!(side2_ids, vec!["root", "a", "f"]);
 
     // Rollback preserves JSONL intact.
-    pi::session::rollback_v2_sidecar(&jsonl, "branch-e2e-rollback")?;
+    skaffen::session::rollback_v2_sidecar(&jsonl, "branch-e2e-rollback")?;
     assert_eq!(
-        pi::session::migration_status(&jsonl),
+        skaffen::session::migration_status(&jsonl),
         MigrationState::Unmigrated
     );
     assert!(jsonl.exists());
@@ -2554,11 +2554,11 @@ fn e2e_correlation_id_propagation() -> PiResult<()> {
     let jsonl = build_test_jsonl(dir.path(), &entries);
 
     let corr_id = "CORR-2026-0215-001";
-    let event = pi::session::migrate_jsonl_to_v2(&jsonl, corr_id)?;
+    let event = skaffen::session::migrate_jsonl_to_v2(&jsonl, corr_id)?;
     assert_eq!(event.correlation_id, corr_id);
 
     // Verify it's in the ledger.
-    let v2_root = pi::session_store_v2::v2_sidecar_path(&jsonl);
+    let v2_root = skaffen::session_store_v2::v2_sidecar_path(&jsonl);
     let store = SessionStoreV2::create(&v2_root, 64 * 1024 * 1024)?;
     let ledger = store.read_migration_events()?;
     assert_eq!(ledger[0].correlation_id, corr_id);
@@ -2574,12 +2574,12 @@ fn e2e_recover_unmigrated_is_noop() -> PiResult<()> {
     let jsonl = build_test_jsonl(dir.path(), &entries);
 
     // Already unmigrated — recover should be a noop.
-    let state = pi::session::recover_partial_migration(&jsonl, "noop-test", true)?;
+    let state = skaffen::session::recover_partial_migration(&jsonl, "noop-test", true)?;
     assert_eq!(state, MigrationState::Unmigrated);
 
     // Still unmigrated (recover doesn't migrate an unmigrated session).
     assert_eq!(
-        pi::session::migration_status(&jsonl),
+        skaffen::session::migration_status(&jsonl),
         MigrationState::Unmigrated
     );
 
@@ -2593,14 +2593,14 @@ fn e2e_recover_migrated_is_noop() -> PiResult<()> {
     let entries = vec![make_message_entry("m1", None, "already")];
     let jsonl = build_test_jsonl(dir.path(), &entries);
 
-    pi::session::migrate_jsonl_to_v2(&jsonl, "pre-migrate")?;
+    skaffen::session::migrate_jsonl_to_v2(&jsonl, "pre-migrate")?;
     assert_eq!(
-        pi::session::migration_status(&jsonl),
+        skaffen::session::migration_status(&jsonl),
         MigrationState::Migrated
     );
 
     // Recover on already-migrated — should be a noop.
-    let state = pi::session::recover_partial_migration(&jsonl, "noop-migrated", false)?;
+    let state = skaffen::session::recover_partial_migration(&jsonl, "noop-migrated", false)?;
     assert_eq!(state, MigrationState::Migrated);
 
     Ok(())
@@ -2618,12 +2618,12 @@ fn e2e_migration_mixed_entry_types() -> PiResult<()> {
     ];
     let jsonl = build_test_jsonl(dir.path(), &entries);
 
-    let event = pi::session::migrate_jsonl_to_v2(&jsonl, "mixed-types")?;
+    let event = skaffen::session::migrate_jsonl_to_v2(&jsonl, "mixed-types")?;
     assert_eq!(event.outcome, "ok");
     assert!(event.verification.entry_count_match);
 
     // Verify all entry types round-trip.
-    let v2_root = pi::session_store_v2::v2_sidecar_path(&jsonl);
+    let v2_root = skaffen::session_store_v2::v2_sidecar_path(&jsonl);
     let store = SessionStoreV2::create(&v2_root, 64 * 1024 * 1024)?;
     let frames = store.read_all_entries()?;
     assert_eq!(frames.len(), 4);
@@ -2634,7 +2634,7 @@ fn e2e_migration_mixed_entry_types() -> PiResult<()> {
 
     // Verify conversion back to SessionEntry works for all types.
     for frame in &frames {
-        let recovered = pi::session_store_v2::frame_to_session_entry(frame)?;
+        let recovered = skaffen::session_store_v2::frame_to_session_entry(frame)?;
         assert!(recovered.base_id().is_some());
     }
 
@@ -2648,13 +2648,13 @@ fn e2e_rollback_nonexistent_sidecar_is_safe() -> PiResult<()> {
     let jsonl = build_test_jsonl(dir.path(), &[make_message_entry("x", None, "data")]);
 
     // No sidecar exists.
-    assert!(!pi::session_store_v2::has_v2_sidecar(&jsonl));
+    assert!(!skaffen::session_store_v2::has_v2_sidecar(&jsonl));
 
     // Rollback should succeed silently.
-    pi::session::rollback_v2_sidecar(&jsonl, "phantom-rollback")?;
+    skaffen::session::rollback_v2_sidecar(&jsonl, "phantom-rollback")?;
 
     // Still no sidecar, JSONL intact.
-    assert!(!pi::session_store_v2::has_v2_sidecar(&jsonl));
+    assert!(!skaffen::session_store_v2::has_v2_sidecar(&jsonl));
     assert!(jsonl.exists());
 
     Ok(())
@@ -2671,9 +2671,9 @@ fn e2e_migration_manifest_consistency() -> PiResult<()> {
     ];
     let jsonl = build_test_jsonl(dir.path(), &entries);
 
-    pi::session::migrate_jsonl_to_v2(&jsonl, "manifest-e2e")?;
+    skaffen::session::migrate_jsonl_to_v2(&jsonl, "manifest-e2e")?;
 
-    let v2_root = pi::session_store_v2::v2_sidecar_path(&jsonl);
+    let v2_root = skaffen::session_store_v2::v2_sidecar_path(&jsonl);
     let store = SessionStoreV2::create(&v2_root, 64 * 1024 * 1024)?;
 
     // Write a manifest and verify fields.
@@ -2707,10 +2707,10 @@ fn e2e_forensic_ledger_is_valid_jsonl() -> PiResult<()> {
     ];
     let jsonl = build_test_jsonl(dir.path(), &entries);
 
-    pi::session::migrate_jsonl_to_v2(&jsonl, "jsonl-ledger-test")?;
+    skaffen::session::migrate_jsonl_to_v2(&jsonl, "jsonl-ledger-test")?;
 
     // Read the raw ledger file and verify each line is valid JSON.
-    let v2_root = pi::session_store_v2::v2_sidecar_path(&jsonl);
+    let v2_root = skaffen::session_store_v2::v2_sidecar_path(&jsonl);
     let ledger_path = v2_root.join("migrations").join("ledger.jsonl");
     assert!(
         ledger_path.exists(),
@@ -2746,16 +2746,16 @@ fn e2e_rapid_migrate_rollback_cycles_clean() -> PiResult<()> {
         make_message_entry("rc2", Some("rc1"), "cycle"),
     ];
     let jsonl = build_test_jsonl(dir.path(), &entries);
-    let v2_root = pi::session_store_v2::v2_sidecar_path(&jsonl);
+    let v2_root = skaffen::session_store_v2::v2_sidecar_path(&jsonl);
 
     for cycle in 0..5 {
         let corr = format!("rapid-cycle-{cycle}");
 
         // Migrate.
-        let event = pi::session::migrate_jsonl_to_v2(&jsonl, &corr)?;
+        let event = skaffen::session::migrate_jsonl_to_v2(&jsonl, &corr)?;
         assert_eq!(event.outcome, "ok", "cycle {cycle} migration failed");
         assert_eq!(
-            pi::session::migration_status(&jsonl),
+            skaffen::session::migration_status(&jsonl),
             MigrationState::Migrated
         );
 
@@ -2766,7 +2766,7 @@ fn e2e_rapid_migrate_rollback_cycles_clean() -> PiResult<()> {
         drop(store);
 
         // Rollback.
-        pi::session::rollback_v2_sidecar(&jsonl, &corr)?;
+        skaffen::session::rollback_v2_sidecar(&jsonl, &corr)?;
         assert!(
             !v2_root.exists(),
             "V2 root should not exist after rollback at cycle {cycle}"
@@ -2775,7 +2775,7 @@ fn e2e_rapid_migrate_rollback_cycles_clean() -> PiResult<()> {
 
     // Final state is unmigrated, JSONL intact.
     assert_eq!(
-        pi::session::migration_status(&jsonl),
+        skaffen::session::migration_status(&jsonl),
         MigrationState::Unmigrated
     );
     assert!(jsonl.exists());
@@ -2794,7 +2794,7 @@ fn e2e_verification_detects_post_migration_jsonl_modification() -> PiResult<()> 
     let jsonl = build_test_jsonl(dir.path(), &entries);
 
     // Migrate.
-    pi::session::migrate_jsonl_to_v2(&jsonl, "verify-mod")?;
+    skaffen::session::migrate_jsonl_to_v2(&jsonl, "verify-mod")?;
 
     // Append an extra entry to the JSONL (simulating a post-migration write).
     let extra = make_message_entry("vm3", Some("vm2"), "sneaky");
@@ -2803,9 +2803,9 @@ fn e2e_verification_detects_post_migration_jsonl_modification() -> PiResult<()> 
     file.write_all(b"\n")?;
 
     // Re-verify — should detect mismatch because V2 has 2 entries but JSONL now has 3.
-    let v2_root = pi::session_store_v2::v2_sidecar_path(&jsonl);
+    let v2_root = skaffen::session_store_v2::v2_sidecar_path(&jsonl);
     let store = SessionStoreV2::create(&v2_root, 64 * 1024 * 1024)?;
-    let verification = pi::session::verify_v2_against_jsonl(&jsonl, &store)?;
+    let verification = skaffen::session::verify_v2_against_jsonl(&jsonl, &store)?;
 
     assert!(
         !verification.entry_count_match,

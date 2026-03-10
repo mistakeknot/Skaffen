@@ -24,7 +24,7 @@ mod read_tool {
             let test_file = temp_dir.path().join("test.txt");
             std::fs::write(&test_file, "line1\nline2\nline3\nline4\nline5").unwrap();
 
-            let tool = pi::tools::ReadTool::new(temp_dir.path());
+            let tool = skaffen::tools::ReadTool::new(temp_dir.path());
             let input = serde_json::json!({
                 "path": test_file.to_string_lossy()
             });
@@ -51,7 +51,7 @@ mod read_tool {
             let test_file = temp_dir.path().join("test.txt");
             std::fs::write(&test_file, "line1\nline2\nline3\nline4\nline5").unwrap();
 
-            let tool = pi::tools::ReadTool::new(temp_dir.path());
+            let tool = skaffen::tools::ReadTool::new(temp_dir.path());
             let input = serde_json::json!({
                 "path": test_file.to_string_lossy(),
                 "offset": 2,
@@ -76,7 +76,7 @@ mod read_tool {
         asupersync::test_utils::run_test(|| async {
             let harness = TestHarness::new("read_offset_beyond_eof_reports_error");
             let path = harness.create_file("tiny.txt", b"line1\nline2");
-            let tool = pi::tools::ReadTool::new(harness.temp_dir());
+            let tool = skaffen::tools::ReadTool::new(harness.temp_dir());
             let input = serde_json::json!({
                 "path": path.to_string_lossy(),
                 "offset": 10
@@ -100,9 +100,9 @@ mod read_tool {
     fn test_read_first_line_exceeds_limit_sets_truncation_details() {
         asupersync::test_utils::run_test(|| async {
             let harness = TestHarness::new("read_first_line_exceeds_limit_sets_truncation_details");
-            let long_line = "a".repeat(pi::tools::DEFAULT_MAX_BYTES + 128);
+            let long_line = "a".repeat(skaffen::tools::DEFAULT_MAX_BYTES + 128);
             let path = harness.create_file("huge.txt", long_line.as_bytes());
-            let tool = pi::tools::ReadTool::new(harness.temp_dir());
+            let tool = skaffen::tools::ReadTool::new(harness.temp_dir());
             let input = serde_json::json!({
                 "path": path.to_string_lossy()
             });
@@ -128,11 +128,11 @@ mod read_tool {
     fn test_read_truncation_sets_details_and_hint() {
         asupersync::test_utils::run_test(|| async {
             let harness = TestHarness::new("read_truncation_sets_details_and_hint");
-            let total_lines = pi::tools::DEFAULT_MAX_LINES + 5;
+            let total_lines = skaffen::tools::DEFAULT_MAX_LINES + 5;
             let lines: Vec<String> = (1..=total_lines).map(|i| format!("line{i}")).collect();
             let content = lines.join("\n");
             let path = harness.create_file("big.txt", content.as_bytes());
-            let tool = pi::tools::ReadTool::new(harness.temp_dir());
+            let tool = skaffen::tools::ReadTool::new(harness.temp_dir());
             let input = serde_json::json!({
                 "path": path.to_string_lossy()
             });
@@ -153,14 +153,14 @@ mod read_tool {
                 .join("\n");
             let expected_hint = format!(
                 "Showing lines 1-{} of {}",
-                pi::tools::DEFAULT_MAX_LINES,
+                skaffen::tools::DEFAULT_MAX_LINES,
                 total_lines
             );
             assert!(
                 text.contains(&expected_hint),
                 "expected hint not found.\nexpected: {expected_hint}\ntext tail:\n{tail}"
             );
-            let expected_offset = format!("Use offset={}", pi::tools::DEFAULT_MAX_LINES + 1);
+            let expected_offset = format!("Use offset={}", skaffen::tools::DEFAULT_MAX_LINES + 1);
             assert!(
                 text.contains(&expected_offset),
                 "expected offset not found.\nexpected: {expected_offset}\ntext tail:\n{tail}"
@@ -181,7 +181,7 @@ mod read_tool {
         asupersync::test_utils::run_test(|| async {
             let harness = TestHarness::new("read_blocked_images_returns_error");
             let path = harness.create_file("image.png", b"\x89PNG\r\n\x1A\n");
-            let tool = pi::tools::ReadTool::with_settings(harness.temp_dir(), true, true);
+            let tool = skaffen::tools::ReadTool::with_settings(harness.temp_dir(), true, true);
             let input = serde_json::json!({
                 "path": path.to_string_lossy()
             });
@@ -210,7 +210,7 @@ mod read_tool {
             perms.set_mode(0o000);
             std::fs::set_permissions(&path, perms).unwrap();
 
-            let tool = pi::tools::ReadTool::new(harness.temp_dir());
+            let tool = skaffen::tools::ReadTool::new(harness.temp_dir());
             let input = serde_json::json!({
                 "path": path.to_string_lossy()
             });
@@ -234,7 +234,7 @@ mod read_tool {
     fn test_read_nonexistent_file() {
         asupersync::test_utils::run_test(|| async {
             let temp_dir = tempfile::tempdir().unwrap();
-            let tool = pi::tools::ReadTool::new(temp_dir.path());
+            let tool = skaffen::tools::ReadTool::new(temp_dir.path());
             let input = serde_json::json!({
                 "path": "/nonexistent/path/file.txt"
             });
@@ -248,7 +248,7 @@ mod read_tool {
     fn test_read_directory() {
         asupersync::test_utils::run_test(|| async {
             let temp_dir = tempfile::tempdir().unwrap();
-            let tool = pi::tools::ReadTool::new(temp_dir.path());
+            let tool = skaffen::tools::ReadTool::new(temp_dir.path());
             let input = serde_json::json!({
                 "path": temp_dir.path().to_string_lossy()
             });
@@ -269,7 +269,7 @@ mod write_tool {
             let test_file = temp_dir.path().join("new_file.txt");
             let content = "Hello, World!\nLine 2";
 
-            let tool = pi::tools::WriteTool::new(temp_dir.path());
+            let tool = skaffen::tools::WriteTool::new(temp_dir.path());
             let input = serde_json::json!({
                 "path": test_file.to_string_lossy(),
                 "content": content
@@ -298,7 +298,7 @@ mod write_tool {
             let content = "A😃";
             let expected = content.encode_utf16().count();
 
-            let tool = pi::tools::WriteTool::new(harness.temp_dir());
+            let tool = skaffen::tools::WriteTool::new(harness.temp_dir());
             let input = serde_json::json!({
                 "path": test_file.to_string_lossy(),
                 "content": content
@@ -325,7 +325,7 @@ mod write_tool {
             perms.set_mode(0o500);
             std::fs::set_permissions(&dir, perms).unwrap();
 
-            let tool = pi::tools::WriteTool::new(harness.temp_dir());
+            let tool = skaffen::tools::WriteTool::new(harness.temp_dir());
             let input = serde_json::json!({
                 "path": dir.join("file.txt").to_string_lossy(),
                 "content": "data"
@@ -351,7 +351,7 @@ mod write_tool {
             let temp_dir = tempfile::tempdir().unwrap();
             let test_file = temp_dir.path().join("nested/dir/file.txt");
 
-            let tool = pi::tools::WriteTool::new(temp_dir.path());
+            let tool = skaffen::tools::WriteTool::new(temp_dir.path());
             let input = serde_json::json!({
                 "path": test_file.to_string_lossy(),
                 "content": "content"
@@ -374,7 +374,7 @@ mod edit_tool {
             let test_file = temp_dir.path().join("test.txt");
             std::fs::write(&test_file, "Hello, World!\nHow are you?").unwrap();
 
-            let tool = pi::tools::EditTool::new(temp_dir.path());
+            let tool = skaffen::tools::EditTool::new(temp_dir.path());
             let input = serde_json::json!({
                 "path": test_file.to_string_lossy(),
                 "oldText": "World",
@@ -408,7 +408,7 @@ mod edit_tool {
     fn test_edit_missing_file_reports_not_found() {
         asupersync::test_utils::run_test(|| async {
             let harness = TestHarness::new("edit_missing_file_reports_not_found");
-            let tool = pi::tools::EditTool::new(harness.temp_dir());
+            let tool = skaffen::tools::EditTool::new(harness.temp_dir());
             let input = serde_json::json!({
                 "path": "missing.txt",
                 "oldText": "old",
@@ -436,7 +436,7 @@ mod edit_tool {
             let test_file = temp_dir.path().join("test.txt");
             std::fs::write(&test_file, "Hello, World!").unwrap();
 
-            let tool = pi::tools::EditTool::new(temp_dir.path());
+            let tool = skaffen::tools::EditTool::new(temp_dir.path());
             let input = serde_json::json!({
                 "path": test_file.to_string_lossy(),
                 "oldText": "NotFound",
@@ -455,7 +455,7 @@ mod edit_tool {
             let test_file = temp_dir.path().join("test.txt");
             std::fs::write(&test_file, "Hello, Hello, Hello!").unwrap();
 
-            let tool = pi::tools::EditTool::new(temp_dir.path());
+            let tool = skaffen::tools::EditTool::new(temp_dir.path());
             let input = serde_json::json!({
                 "path": test_file.to_string_lossy(),
                 "oldText": "Hello",
@@ -479,7 +479,7 @@ mod bash_tool {
     fn test_bash_simple_command() {
         asupersync::test_utils::run_test(|| async {
             let temp_dir = tempfile::tempdir().unwrap();
-            let tool = pi::tools::BashTool::new(temp_dir.path());
+            let tool = skaffen::tools::BashTool::new(temp_dir.path());
             let input = serde_json::json!({
                 "command": "echo 'Hello, World!'"
             });
@@ -499,7 +499,7 @@ mod bash_tool {
     fn test_bash_timeout_is_reported() {
         asupersync::test_utils::run_test(|| async {
             let harness = TestHarness::new("bash_timeout_is_reported");
-            let tool = pi::tools::BashTool::new(harness.temp_dir());
+            let tool = skaffen::tools::BashTool::new(harness.temp_dir());
             let input = serde_json::json!({
                 "command": "sleep 2",
                 "timeout": 1
@@ -522,7 +522,7 @@ mod bash_tool {
     fn test_bash_truncation_sets_details() {
         asupersync::test_utils::run_test(|| async {
             let harness = TestHarness::new("bash_truncation_sets_details");
-            let tool = pi::tools::BashTool::new(harness.temp_dir());
+            let tool = skaffen::tools::BashTool::new(harness.temp_dir());
             let input = serde_json::json!({
                 "command": "head -c 60000 /dev/zero | tr '\\\\0' 'a'"
             });
@@ -544,7 +544,7 @@ mod bash_tool {
     fn test_bash_exit_code() {
         asupersync::test_utils::run_test(|| async {
             let temp_dir = tempfile::tempdir().unwrap();
-            let tool = pi::tools::BashTool::new(temp_dir.path());
+            let tool = skaffen::tools::BashTool::new(temp_dir.path());
             let input = serde_json::json!({
                 "command": "exit 42"
             });
@@ -563,7 +563,7 @@ mod bash_tool {
             let temp_dir = tempfile::tempdir().unwrap();
             std::fs::write(temp_dir.path().join("test.txt"), "content").unwrap();
 
-            let tool = pi::tools::BashTool::new(temp_dir.path());
+            let tool = skaffen::tools::BashTool::new(temp_dir.path());
             let input = serde_json::json!({
                 "command": "ls test.txt"
             });
@@ -587,7 +587,7 @@ mod grep_tool {
             )
             .unwrap();
 
-            let tool = pi::tools::GrepTool::new(temp_dir.path());
+            let tool = skaffen::tools::GrepTool::new(temp_dir.path());
             let input = serde_json::json!({
                 "pattern": "hello"
             });
@@ -608,7 +608,7 @@ mod grep_tool {
     fn test_grep_invalid_path_reports_error() {
         asupersync::test_utils::run_test(|| async {
             let harness = TestHarness::new("grep_invalid_path_reports_error");
-            let tool = pi::tools::GrepTool::new(harness.temp_dir());
+            let tool = skaffen::tools::GrepTool::new(harness.temp_dir());
             let input = serde_json::json!({
                 "pattern": "needle",
                 "path": "missing_dir"
@@ -634,7 +634,7 @@ mod grep_tool {
             let temp_dir = tempfile::tempdir().unwrap();
             std::fs::write(temp_dir.path().join("test.txt"), "Hello World\nHELLO WORLD").unwrap();
 
-            let tool = pi::tools::GrepTool::new(temp_dir.path());
+            let tool = skaffen::tools::GrepTool::new(temp_dir.path());
             let input = serde_json::json!({
                 "pattern": "hello",
                 "ignoreCase": true
@@ -657,7 +657,7 @@ mod grep_tool {
         asupersync::test_utils::run_test(|| async {
             let harness = TestHarness::new("grep_limit_reached_sets_details");
             harness.create_file("test.txt", b"match\nmatch\nmatch\n");
-            let tool = pi::tools::GrepTool::new(harness.temp_dir());
+            let tool = skaffen::tools::GrepTool::new(harness.temp_dir());
             let input = serde_json::json!({
                 "pattern": "match",
                 "limit": 1
@@ -687,7 +687,7 @@ mod grep_tool {
             let harness = TestHarness::new("grep_long_line_truncates_and_marks_details");
             let long_line = format!("match {}", "a".repeat(600));
             harness.create_file("long.txt", long_line.as_bytes());
-            let tool = pi::tools::GrepTool::new(harness.temp_dir());
+            let tool = skaffen::tools::GrepTool::new(harness.temp_dir());
             let input = serde_json::json!({
                 "pattern": "match"
             });
@@ -716,7 +716,7 @@ mod grep_tool {
             let temp_dir = tempfile::tempdir().unwrap();
             std::fs::write(temp_dir.path().join("test.txt"), "hello world").unwrap();
 
-            let tool = pi::tools::GrepTool::new(temp_dir.path());
+            let tool = skaffen::tools::GrepTool::new(temp_dir.path());
             let input = serde_json::json!({
                 "pattern": "notfound"
             });
@@ -743,7 +743,7 @@ mod find_tool {
             std::fs::write(temp_dir.path().join("file2.txt"), "").unwrap();
             std::fs::write(temp_dir.path().join("file.rs"), "").unwrap();
 
-            let tool = pi::tools::FindTool::new(temp_dir.path());
+            let tool = skaffen::tools::FindTool::new(temp_dir.path());
             let input = serde_json::json!({
                 "pattern": "*.txt"
             });
@@ -765,7 +765,7 @@ mod find_tool {
     fn test_find_invalid_path_reports_error() {
         asupersync::test_utils::run_test(|| async {
             let harness = TestHarness::new("find_invalid_path_reports_error");
-            let tool = pi::tools::FindTool::new(harness.temp_dir());
+            let tool = skaffen::tools::FindTool::new(harness.temp_dir());
             let input = serde_json::json!({
                 "pattern": "*.txt",
                 "path": "missing_dir"
@@ -791,7 +791,7 @@ mod find_tool {
             let harness = TestHarness::new("find_limit_reached_sets_details");
             harness.create_file("file1.txt", b"");
             harness.create_file("file2.txt", b"");
-            let tool = pi::tools::FindTool::new(harness.temp_dir());
+            let tool = skaffen::tools::FindTool::new(harness.temp_dir());
             let input = serde_json::json!({
                 "pattern": "*.txt",
                 "limit": 1
@@ -818,7 +818,7 @@ mod find_tool {
             let temp_dir = tempfile::tempdir().unwrap();
             std::fs::write(temp_dir.path().join("file.txt"), "").unwrap();
 
-            let tool = pi::tools::FindTool::new(temp_dir.path());
+            let tool = skaffen::tools::FindTool::new(temp_dir.path());
             let input = serde_json::json!({
                 "pattern": "*.rs"
             });
@@ -844,7 +844,7 @@ mod ls_tool {
             std::fs::write(temp_dir.path().join("file.txt"), "content").unwrap();
             std::fs::create_dir(temp_dir.path().join("subdir")).unwrap();
 
-            let tool = pi::tools::LsTool::new(temp_dir.path());
+            let tool = skaffen::tools::LsTool::new(temp_dir.path());
             let input = serde_json::json!({});
 
             let result = tool
@@ -863,7 +863,7 @@ mod ls_tool {
     fn test_ls_nonexistent_directory() {
         asupersync::test_utils::run_test(|| async {
             let temp_dir = tempfile::tempdir().unwrap();
-            let tool = pi::tools::LsTool::new(temp_dir.path());
+            let tool = skaffen::tools::LsTool::new(temp_dir.path());
             let input = serde_json::json!({
                 "path": "/nonexistent/directory"
             });
@@ -878,7 +878,7 @@ mod ls_tool {
         asupersync::test_utils::run_test(|| async {
             let harness = TestHarness::new("ls_path_is_file_reports_error");
             let path = harness.create_file("file.txt", b"content");
-            let tool = pi::tools::LsTool::new(harness.temp_dir());
+            let tool = skaffen::tools::LsTool::new(harness.temp_dir());
             let input = serde_json::json!({
                 "path": path.to_string_lossy()
             });
@@ -902,7 +902,7 @@ mod ls_tool {
             perms.set_mode(0o000);
             std::fs::set_permissions(&dir, perms).unwrap();
 
-            let tool = pi::tools::LsTool::new(harness.temp_dir());
+            let tool = skaffen::tools::LsTool::new(harness.temp_dir());
             let input = serde_json::json!({
                 "path": dir.to_string_lossy()
             });
@@ -922,7 +922,7 @@ mod ls_tool {
             let harness = TestHarness::new("ls_limit_reached_sets_details");
             harness.create_file("file1.txt", b"");
             harness.create_file("file2.txt", b"");
-            let tool = pi::tools::LsTool::new(harness.temp_dir());
+            let tool = skaffen::tools::LsTool::new(harness.temp_dir());
             let input = serde_json::json!({
                 "limit": 1
             });
@@ -946,7 +946,7 @@ mod ls_tool {
     fn test_ls_empty_directory() {
         asupersync::test_utils::run_test(|| async {
             let temp_dir = tempfile::tempdir().unwrap();
-            let tool = pi::tools::LsTool::new(temp_dir.path());
+            let tool = skaffen::tools::LsTool::new(temp_dir.path());
             let input = serde_json::json!({});
 
             let result = tool
@@ -961,11 +961,11 @@ mod ls_tool {
 }
 
 // Helper function to extract text content from tool output
-fn get_text_content(content: &[pi::model::ContentBlock]) -> String {
+fn get_text_content(content: &[skaffen::model::ContentBlock]) -> String {
     content
         .iter()
         .filter_map(|block| {
-            if let pi::model::ContentBlock::Text(text) = block {
+            if let skaffen::model::ContentBlock::Text(text) = block {
                 Some(text.text.clone())
             } else {
                 None
@@ -1205,7 +1205,7 @@ fn tool_diagnostic_artifact_root() -> PathBuf {
 
 fn tool_command_transcript(
     input: &serde_json::Value,
-    result: &pi::PiResult<pi::tools::ToolOutput>,
+    result: &skaffen::PiResult<skaffen::tools::ToolOutput>,
 ) -> serde_json::Value {
     match result {
         Ok(output) => serde_json::json!({
@@ -1233,7 +1233,7 @@ async fn execute_tool_with_diagnostics<T: Tool + ?Sized>(
     tool_name: &str,
     tool_call_id: &str,
     input: serde_json::Value,
-) -> pi::PiResult<pi::tools::ToolOutput> {
+) -> skaffen::PiResult<skaffen::tools::ToolOutput> {
     let execute_started = Instant::now();
     let result = tool.execute(tool_call_id, input.clone(), None).await;
     log_tool_execution(
@@ -1255,7 +1255,7 @@ fn log_tool_execution(
     tool_call_id: &str,
     input: &serde_json::Value,
     execute_elapsed: Duration,
-    result: &pi::PiResult<pi::tools::ToolOutput>,
+    result: &skaffen::PiResult<skaffen::tools::ToolOutput>,
 ) {
     let logger = harness.log();
     let workspace_root = harness.temp_dir();
@@ -1381,7 +1381,7 @@ mod e2e_read {
         asupersync::test_utils::run_test(|| async {
             let harness = TestHarness::new("e2e_read_success_with_artifacts");
             let path = harness.create_file("sample.txt", b"alpha\nbeta\ngamma");
-            let tool = pi::tools::ReadTool::new(harness.temp_dir());
+            let tool = skaffen::tools::ReadTool::new(harness.temp_dir());
             let input = serde_json::json!({
                 "path": path.to_string_lossy()
             });
@@ -1403,7 +1403,7 @@ mod e2e_read {
         asupersync::test_utils::run_test(|| async {
             let harness = TestHarness::new("e2e_read_empty_file");
             let path = harness.create_file("empty.txt", b"");
-            let tool = pi::tools::ReadTool::new(harness.temp_dir());
+            let tool = skaffen::tools::ReadTool::new(harness.temp_dir());
             let input = serde_json::json!({
                 "path": path.to_string_lossy()
             });
@@ -1425,7 +1425,7 @@ mod e2e_read {
     fn e2e_read_missing_file_with_artifacts() {
         asupersync::test_utils::run_test(|| async {
             let harness = TestHarness::new("e2e_read_missing_file_with_artifacts");
-            let tool = pi::tools::ReadTool::new(harness.temp_dir());
+            let tool = skaffen::tools::ReadTool::new(harness.temp_dir());
             let input = serde_json::json!({
                 "path": "/nonexistent/path/ghost.txt"
             });
@@ -1442,7 +1442,7 @@ mod e2e_read {
     fn e2e_read_truncation_details_captured() {
         asupersync::test_utils::run_test(|| async {
             let harness = TestHarness::new("e2e_read_truncation_details_captured");
-            let total_lines = pi::tools::DEFAULT_MAX_LINES + 10;
+            let total_lines = skaffen::tools::DEFAULT_MAX_LINES + 10;
             let mut content = String::new();
             for i in 1..=total_lines {
                 content.push_str("line");
@@ -1450,7 +1450,7 @@ mod e2e_read {
                 content.push('\n');
             }
             let path = harness.create_file("big.txt", content.as_bytes());
-            let tool = pi::tools::ReadTool::new(harness.temp_dir());
+            let tool = skaffen::tools::ReadTool::new(harness.temp_dir());
             let input = serde_json::json!({
                 "path": path.to_string_lossy()
             });
@@ -1489,7 +1489,7 @@ mod e2e_write {
         asupersync::test_utils::run_test(|| async {
             let harness = TestHarness::new("e2e_write_new_file_with_artifacts");
             let path = harness.temp_path("output.txt");
-            let tool = pi::tools::WriteTool::new(harness.temp_dir());
+            let tool = skaffen::tools::WriteTool::new(harness.temp_dir());
             let input = serde_json::json!({
                 "path": path.to_string_lossy(),
                 "content": "hello world\nline two"
@@ -1512,7 +1512,7 @@ mod e2e_write {
         asupersync::test_utils::run_test(|| async {
             let harness = TestHarness::new("e2e_write_overwrite_existing");
             let path = harness.create_file("existing.txt", b"old content");
-            let tool = pi::tools::WriteTool::new(harness.temp_dir());
+            let tool = skaffen::tools::WriteTool::new(harness.temp_dir());
             let input = serde_json::json!({
                 "path": path.to_string_lossy(),
                 "content": "new content"
@@ -1538,7 +1538,7 @@ mod e2e_edit {
         asupersync::test_utils::run_test(|| async {
             let harness = TestHarness::new("e2e_edit_success_with_artifacts");
             let path = harness.create_file("code.rs", b"fn main() {\n    println!(\"old\");\n}\n");
-            let tool = pi::tools::EditTool::new(harness.temp_dir());
+            let tool = skaffen::tools::EditTool::new(harness.temp_dir());
             let input = serde_json::json!({
                 "path": path.to_string_lossy(),
                 "oldText": "\"old\"",
@@ -1566,7 +1566,7 @@ mod e2e_edit {
         asupersync::test_utils::run_test(|| async {
             let harness = TestHarness::new("e2e_edit_text_not_found_with_artifacts");
             let path = harness.create_file("stable.txt", b"content stays");
-            let tool = pi::tools::EditTool::new(harness.temp_dir());
+            let tool = skaffen::tools::EditTool::new(harness.temp_dir());
             let input = serde_json::json!({
                 "path": path.to_string_lossy(),
                 "oldText": "nonexistent needle",
@@ -1592,7 +1592,7 @@ mod e2e_bash {
     fn e2e_bash_success_with_artifacts() {
         asupersync::test_utils::run_test(|| async {
             let harness = TestHarness::new("e2e_bash_success_with_artifacts");
-            let tool = pi::tools::BashTool::new(harness.temp_dir());
+            let tool = skaffen::tools::BashTool::new(harness.temp_dir());
             let input = serde_json::json!({
                 "command": "echo hello && echo world"
             });
@@ -1612,7 +1612,7 @@ mod e2e_bash {
     fn e2e_bash_stderr_captured() {
         asupersync::test_utils::run_test(|| async {
             let harness = TestHarness::new("e2e_bash_stderr_captured");
-            let tool = pi::tools::BashTool::new(harness.temp_dir());
+            let tool = skaffen::tools::BashTool::new(harness.temp_dir());
             let input = serde_json::json!({
                 "command": "echo stdout_msg && echo stderr_msg >&2"
             });
@@ -1633,7 +1633,7 @@ mod e2e_bash {
     fn e2e_bash_nonexistent_command() {
         asupersync::test_utils::run_test(|| async {
             let harness = TestHarness::new("e2e_bash_nonexistent_command");
-            let tool = pi::tools::BashTool::new(harness.temp_dir());
+            let tool = skaffen::tools::BashTool::new(harness.temp_dir());
             let input = serde_json::json!({
                 "command": "totally_nonexistent_binary_xyz_123"
             });
@@ -1656,7 +1656,7 @@ mod e2e_bash {
     fn e2e_bash_timeout_with_artifacts() {
         asupersync::test_utils::run_test(|| async {
             let harness = TestHarness::new("e2e_bash_timeout_with_artifacts");
-            let tool = pi::tools::BashTool::new(harness.temp_dir());
+            let tool = skaffen::tools::BashTool::new(harness.temp_dir());
             let input = serde_json::json!({
                 "command": "sleep 10",
                 "timeout": 1
@@ -1676,7 +1676,7 @@ mod e2e_bash {
     fn e2e_bash_diagnostic_artifact_contains_required_fields() {
         asupersync::test_utils::run_test(|| async {
             let harness = TestHarness::new("e2e_bash_diagnostic_artifact_contains_required_fields");
-            let tool = pi::tools::BashTool::new(harness.temp_dir());
+            let tool = skaffen::tools::BashTool::new(harness.temp_dir());
             let input = serde_json::json!({
                 "command": "echo diagnostic_probe"
             });
@@ -1756,7 +1756,7 @@ mod e2e_grep {
                 b"# Project\nNo hello here... actually hello.\n",
             );
 
-            let tool = pi::tools::GrepTool::new(harness.temp_dir());
+            let tool = skaffen::tools::GrepTool::new(harness.temp_dir());
             let input = serde_json::json!({
                 "pattern": "hello"
             });
@@ -1780,7 +1780,7 @@ mod e2e_grep {
         asupersync::test_utils::run_test(|| async {
             let harness = TestHarness::new("e2e_grep_invalid_regex");
             harness.create_file("data.txt", b"some text");
-            let tool = pi::tools::GrepTool::new(harness.temp_dir());
+            let tool = skaffen::tools::GrepTool::new(harness.temp_dir());
             let input = serde_json::json!({
                 "pattern": "[invalid("
             });
@@ -1803,7 +1803,7 @@ mod e2e_grep {
             let harness = TestHarness::new("e2e_grep_with_context_lines");
             harness.create_file("data.txt", b"line1\nline2\nTARGET\nline4\nline5");
 
-            let tool = pi::tools::GrepTool::new(harness.temp_dir());
+            let tool = skaffen::tools::GrepTool::new(harness.temp_dir());
             let input = serde_json::json!({
                 "pattern": "TARGET",
                 "context": 1
@@ -1841,7 +1841,7 @@ mod e2e_find {
             harness.create_file("tests/test.rs", b"");
             harness.create_file("readme.md", b"");
 
-            let tool = pi::tools::FindTool::new(harness.temp_dir());
+            let tool = skaffen::tools::FindTool::new(harness.temp_dir());
             let input = serde_json::json!({
                 "pattern": "*.rs"
             });
@@ -1867,7 +1867,7 @@ mod e2e_find {
         }
         asupersync::test_utils::run_test(|| async {
             let harness = TestHarness::new("e2e_find_invalid_path_with_artifacts");
-            let tool = pi::tools::FindTool::new(harness.temp_dir());
+            let tool = skaffen::tools::FindTool::new(harness.temp_dir());
             let input = serde_json::json!({
                 "pattern": "*.txt",
                 "path": "does_not_exist"
@@ -1895,7 +1895,7 @@ mod e2e_ls {
             harness.create_file("beta.txt", b"b");
             harness.create_dir("subdir");
 
-            let tool = pi::tools::LsTool::new(harness.temp_dir());
+            let tool = skaffen::tools::LsTool::new(harness.temp_dir());
             let input = serde_json::json!({});
 
             let result =
@@ -1913,7 +1913,7 @@ mod e2e_ls {
     fn e2e_ls_nonexistent_with_artifacts() {
         asupersync::test_utils::run_test(|| async {
             let harness = TestHarness::new("e2e_ls_nonexistent_with_artifacts");
-            let tool = pi::tools::LsTool::new(harness.temp_dir());
+            let tool = skaffen::tools::LsTool::new(harness.temp_dir());
             let input = serde_json::json!({
                 "path": "/no/such/directory"
             });
@@ -1930,7 +1930,7 @@ mod e2e_ls {
         asupersync::test_utils::run_test(|| async {
             let harness = TestHarness::new("e2e_ls_file_not_dir_with_artifacts");
             let path = harness.create_file("just_a_file.txt", b"contents");
-            let tool = pi::tools::LsTool::new(harness.temp_dir());
+            let tool = skaffen::tools::LsTool::new(harness.temp_dir());
             let input = serde_json::json!({
                 "path": path.to_string_lossy()
             });
@@ -1953,7 +1953,7 @@ mod e2e_ls {
             harness.create_file("b.txt", b"");
             harness.create_file("c.txt", b"");
 
-            let tool = pi::tools::LsTool::new(harness.temp_dir());
+            let tool = skaffen::tools::LsTool::new(harness.temp_dir());
             let input = serde_json::json!({
                 "limit": 2
             });
@@ -1982,7 +1982,7 @@ fn e2e_all_tools_roundtrip() {
         harness.section("Setup workspace");
 
         // Write a file
-        let write_tool = pi::tools::WriteTool::new(harness.temp_dir());
+        let write_tool = skaffen::tools::WriteTool::new(harness.temp_dir());
         let write_input = serde_json::json!({
             "path": harness.temp_path("project/hello.rs").to_string_lossy().to_string(),
             "content": "fn main() {\n    println!(\"Hello, world!\");\n}\n"
@@ -1999,7 +1999,7 @@ fn e2e_all_tools_roundtrip() {
 
         // Read the file back
         harness.section("Read");
-        let read_tool = pi::tools::ReadTool::new(harness.temp_dir());
+        let read_tool = skaffen::tools::ReadTool::new(harness.temp_dir());
         let read_input = serde_json::json!({
             "path": harness.temp_path("project/hello.rs").to_string_lossy().to_string()
         });
@@ -2017,7 +2017,7 @@ fn e2e_all_tools_roundtrip() {
 
         // Edit the file
         harness.section("Edit");
-        let edit_tool = pi::tools::EditTool::new(harness.temp_dir());
+        let edit_tool = skaffen::tools::EditTool::new(harness.temp_dir());
         let edit_input = serde_json::json!({
             "path": harness.temp_path("project/hello.rs").to_string_lossy().to_string(),
             "oldText": "Hello, world!",
@@ -2044,7 +2044,7 @@ fn e2e_all_tools_roundtrip() {
 
         // Ls the directory
         harness.section("Ls");
-        let ls_tool = pi::tools::LsTool::new(harness.temp_dir());
+        let ls_tool = skaffen::tools::LsTool::new(harness.temp_dir());
         let ls_input = serde_json::json!({
             "path": harness.temp_path("project").to_string_lossy().to_string()
         });
@@ -2057,7 +2057,7 @@ fn e2e_all_tools_roundtrip() {
 
         // Bash
         harness.section("Bash");
-        let bash_tool = pi::tools::BashTool::new(harness.temp_dir());
+        let bash_tool = skaffen::tools::BashTool::new(harness.temp_dir());
         let bash_input = serde_json::json!({
             "command": "wc -l project/hello.rs"
         });
@@ -2077,7 +2077,7 @@ fn e2e_all_tools_roundtrip() {
         // Grep (if rg available)
         if binary_available("rg") {
             harness.section("Grep");
-            let grep_tool = pi::tools::GrepTool::new(harness.temp_dir());
+            let grep_tool = skaffen::tools::GrepTool::new(harness.temp_dir());
             let grep_input = serde_json::json!({
                 "pattern": "Rust"
             });
@@ -2101,7 +2101,7 @@ fn e2e_all_tools_roundtrip() {
         // Find (if fd available)
         if binary_available("fd") {
             harness.section("Find");
-            let find_tool = pi::tools::FindTool::new(harness.temp_dir());
+            let find_tool = skaffen::tools::FindTool::new(harness.temp_dir());
             let find_input = serde_json::json!({
                 "pattern": "*.rs"
             });
@@ -2150,7 +2150,7 @@ mod security_path_traversal {
             let secret = parent.path().join("secret.txt");
             std::fs::write(&secret, "TOP_SECRET_DATA").unwrap();
 
-            let tool = pi::tools::ReadTool::new(&child_dir);
+            let tool = skaffen::tools::ReadTool::new(&child_dir);
             let input = serde_json::json!({
                 "path": "../secret.txt"
             });
@@ -2172,7 +2172,7 @@ mod security_path_traversal {
             let child_dir = parent.path().join("child");
             std::fs::create_dir_all(&child_dir).unwrap();
 
-            let tool = pi::tools::WriteTool::new(&child_dir);
+            let tool = skaffen::tools::WriteTool::new(&child_dir);
             let escaped_path = child_dir.join("../escaped.txt");
             let input = serde_json::json!({
                 "path": escaped_path.to_string_lossy(),
@@ -2196,7 +2196,7 @@ mod security_path_traversal {
             let target = parent.path().join("target.txt");
             std::fs::write(&target, "ORIGINAL_CONTENT").unwrap();
 
-            let tool = pi::tools::EditTool::new(&child_dir);
+            let tool = skaffen::tools::EditTool::new(&child_dir);
             let escaped_path = child_dir.join("../target.txt");
             let input = serde_json::json!({
                 "path": escaped_path.to_string_lossy(),
@@ -2220,7 +2220,7 @@ mod security_path_traversal {
             std::fs::write(&outside_file, "OUTSIDE_DATA").unwrap();
 
             let cwd = tempfile::tempdir().unwrap();
-            let tool = pi::tools::ReadTool::new(cwd.path());
+            let tool = skaffen::tools::ReadTool::new(cwd.path());
             let input = serde_json::json!({
                 "path": outside_file.to_string_lossy()
             });
@@ -2244,7 +2244,7 @@ mod security_path_traversal {
             let link = cwd.path().join("link.txt");
             std::os::unix::fs::symlink(&secret, &link).unwrap();
 
-            let tool = pi::tools::ReadTool::new(cwd.path());
+            let tool = skaffen::tools::ReadTool::new(cwd.path());
             let input = serde_json::json!({
                 "path": link.to_string_lossy()
             });
@@ -2269,7 +2269,7 @@ mod security_path_traversal {
             let link = cwd.path().join("link.txt");
             std::os::unix::fs::symlink(&target, &link).unwrap();
 
-            let tool = pi::tools::WriteTool::new(cwd.path());
+            let tool = skaffen::tools::WriteTool::new(cwd.path());
             let input = serde_json::json!({
                 "path": link.to_string_lossy(),
                 "content": "NEW_CONTENT"
@@ -2303,7 +2303,7 @@ mod security_command_injection {
     fn bash_stdin_is_null() {
         asupersync::test_utils::run_test(|| async {
             let cwd = tempfile::tempdir().unwrap();
-            let tool = pi::tools::BashTool::new(cwd.path());
+            let tool = skaffen::tools::BashTool::new(cwd.path());
             let input = serde_json::json!({
                 "command": "read -t 1 line; echo \"got: $line\""
             });
@@ -2328,7 +2328,7 @@ mod security_command_injection {
     fn bash_has_exit_trap() {
         asupersync::test_utils::run_test(|| async {
             let cwd = tempfile::tempdir().unwrap();
-            let tool = pi::tools::BashTool::new(cwd.path());
+            let tool = skaffen::tools::BashTool::new(cwd.path());
             let input = serde_json::json!({
                 "command": "trap -p EXIT"
             });
@@ -2348,7 +2348,7 @@ mod security_command_injection {
     fn bash_metacharacter_execution() {
         asupersync::test_utils::run_test(|| async {
             let cwd = tempfile::tempdir().unwrap();
-            let tool = pi::tools::BashTool::new(cwd.path());
+            let tool = skaffen::tools::BashTool::new(cwd.path());
             let input = serde_json::json!({
                 "command": "echo A; echo B && echo C || echo D | cat"
             });
@@ -2366,7 +2366,7 @@ mod security_command_injection {
     fn bash_command_substitution() {
         asupersync::test_utils::run_test(|| async {
             let cwd = tempfile::tempdir().unwrap();
-            let tool = pi::tools::BashTool::new(cwd.path());
+            let tool = skaffen::tools::BashTool::new(cwd.path());
             let input = serde_json::json!({
                 "command": "echo \"user: $(whoami)\""
             });
@@ -2394,7 +2394,7 @@ mod security_environment {
     fn bash_env_inheritance() {
         asupersync::test_utils::run_test(|| async {
             let cwd = tempfile::tempdir().unwrap();
-            let tool = pi::tools::BashTool::new(cwd.path());
+            let tool = skaffen::tools::BashTool::new(cwd.path());
             // PATH must be inherited for any command to work
             let input = serde_json::json!({
                 "command": "echo \"PATH=$PATH\""
@@ -2414,7 +2414,7 @@ mod security_environment {
     fn bash_cwd_matches_configured() {
         asupersync::test_utils::run_test(|| async {
             let cwd = tempfile::tempdir().unwrap();
-            let tool = pi::tools::BashTool::new(cwd.path());
+            let tool = skaffen::tools::BashTool::new(cwd.path());
             let input = serde_json::json!({
                 "command": "pwd"
             });
@@ -2439,7 +2439,7 @@ mod security_environment {
     fn bash_home_accessible() {
         asupersync::test_utils::run_test(|| async {
             let cwd = tempfile::tempdir().unwrap();
-            let tool = pi::tools::BashTool::new(cwd.path());
+            let tool = skaffen::tools::BashTool::new(cwd.path());
             let input = serde_json::json!({
                 "command": "echo $HOME"
             });
@@ -2459,7 +2459,7 @@ mod security_unsafe_writes {
     fn write_creates_arbitrary_dirs() {
         asupersync::test_utils::run_test(|| async {
             let cwd = tempfile::tempdir().unwrap();
-            let tool = pi::tools::WriteTool::new(cwd.path());
+            let tool = skaffen::tools::WriteTool::new(cwd.path());
             let deep_path = cwd.path().join("a/b/c/d/e/f/deeply_nested.txt");
             let input = serde_json::json!({
                 "path": deep_path.to_string_lossy(),
@@ -2481,7 +2481,7 @@ mod security_unsafe_writes {
             let file = cwd.path().join("overwrite_me.txt");
             std::fs::write(&file, "ORIGINAL_VALUABLE_DATA").unwrap();
 
-            let tool = pi::tools::WriteTool::new(cwd.path());
+            let tool = skaffen::tools::WriteTool::new(cwd.path());
             let input = serde_json::json!({
                 "path": file.to_string_lossy(),
                 "content": "REPLACEMENT"
@@ -2505,7 +2505,7 @@ mod security_unsafe_writes {
             let cwd = tempfile::tempdir().unwrap();
             let file = cwd.path().join("direct_write.txt");
 
-            let tool = pi::tools::WriteTool::new(cwd.path());
+            let tool = skaffen::tools::WriteTool::new(cwd.path());
             let input = serde_json::json!({
                 "path": file.to_string_lossy(),
                 "content": "DIRECT"
@@ -2532,7 +2532,7 @@ mod security_unsafe_writes {
     fn write_dangerous_filenames() {
         asupersync::test_utils::run_test(|| async {
             let cwd = tempfile::tempdir().unwrap();
-            let tool = pi::tools::WriteTool::new(cwd.path());
+            let tool = skaffen::tools::WriteTool::new(cwd.path());
 
             // File starting with dot (hidden)
             let hidden = cwd.path().join(".hidden_config");
@@ -2564,7 +2564,7 @@ mod security_unsafe_writes {
             let file = cwd.path().join("edit_target.txt");
             std::fs::write(&file, "BEFORE_EDIT").unwrap();
 
-            let tool = pi::tools::EditTool::new(cwd.path());
+            let tool = skaffen::tools::EditTool::new(cwd.path());
             let input = serde_json::json!({
                 "path": file.to_string_lossy(),
                 "oldText": "BEFORE_EDIT",

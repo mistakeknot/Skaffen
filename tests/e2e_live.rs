@@ -396,27 +396,27 @@ fn oai_auth_failure_script_matrix_maps_to_taxonomy() {
         (
             "openrouter",
             "You didn't provide an API key in the Authorization header",
-            pi::error::AuthDiagnosticCode::MissingApiKey,
+            skaffen::error::AuthDiagnosticCode::MissingApiKey,
         ),
         (
             "xai",
             "Malformed API key: expected Bearer token format",
-            pi::error::AuthDiagnosticCode::InvalidApiKey,
+            skaffen::error::AuthDiagnosticCode::InvalidApiKey,
         ),
         (
             "deepseek",
             "API key revoked for this project",
-            pi::error::AuthDiagnosticCode::InvalidApiKey,
+            skaffen::error::AuthDiagnosticCode::InvalidApiKey,
         ),
         (
             "openai",
             "HTTP 429 insufficient_quota: You exceeded your current quota",
-            pi::error::AuthDiagnosticCode::QuotaExceeded,
+            skaffen::error::AuthDiagnosticCode::QuotaExceeded,
         ),
     ];
 
     for (provider, message, expected_code) in cases {
-        let err = pi::Error::provider(provider, message);
+        let err = skaffen::Error::provider(provider, message);
         let diagnostic = err
             .auth_diagnostic()
             .unwrap_or_else(|| panic!("expected auth diagnostic for {provider}: {message}"));
@@ -819,7 +819,7 @@ fn assert_basic_stream_success(
         StreamEvent::Done { message, .. } => message
             .content
             .iter()
-            .any(|c| matches!(c, pi::model::ContentBlock::Text(tc) if !tc.text.is_empty())),
+            .any(|c| matches!(c, skaffen::model::ContentBlock::Text(tc) if !tc.text.is_empty())),
         _ => false,
     });
     assert!(
@@ -1020,7 +1020,7 @@ mod azure_openai {
         Context::owned(
             Some("You are a test harness assistant. Use tools when explicitly asked.".to_string()),
             vec![user_text(prompt)],
-            vec![pi::provider::ToolDef {
+            vec![skaffen::provider::ToolDef {
                 name: "list_dir".to_string(),
                 description: "List files in a directory".to_string(),
                 parameters: serde_json::json!({
@@ -1449,7 +1449,7 @@ mod cross_provider {
                 });
                 let done_has_text = events.iter().any(|e| match e {
                     StreamEvent::Done { message, .. } => message.content.iter().any(
-                        |c| matches!(c, pi::model::ContentBlock::Text(tc) if !tc.text.is_empty()),
+                        |c| matches!(c, skaffen::model::ContentBlock::Text(tc) if !tc.text.is_empty()),
                     ),
                     _ => false,
                 });
@@ -1464,7 +1464,7 @@ mod cross_provider {
                                 .content
                                 .iter()
                                 .filter_map(|c| match c {
-                                    pi::model::ContentBlock::Text(tc) => Some(tc.text.as_str()),
+                                    skaffen::model::ContentBlock::Text(tc) => Some(tc.text.as_str()),
                                     _ => None,
                                 })
                                 .collect();

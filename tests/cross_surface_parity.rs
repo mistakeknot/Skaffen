@@ -109,7 +109,7 @@ mod cli_combinations {
     #[test]
     fn print_mode_with_provider_and_model() {
         let cli = Cli::parse_from([
-            "pi",
+            "skaffen",
             "-p",
             "--provider",
             "openai",
@@ -127,7 +127,7 @@ mod cli_combinations {
     #[test]
     fn session_flags_are_mutually_parsed() {
         let cli = Cli::parse_from([
-            "pi",
+            "skaffen",
             "-c",
             "--session",
             "/tmp/sess.jsonl",
@@ -142,7 +142,7 @@ mod cli_combinations {
     #[test]
     fn no_flags_disable_discovery() {
         let cli = Cli::parse_from([
-            "pi",
+            "skaffen",
             "--no-tools",
             "--no-extensions",
             "--no-skills",
@@ -159,7 +159,7 @@ mod cli_combinations {
     #[test]
     fn multiple_extensions_and_skills() {
         let cli = Cli::parse_from([
-            "pi", "-e", "ext1.js", "-e", "ext2.js", "--skill", "s1.md", "--skill", "s2.md",
+            "skaffen", "-e", "ext1.js", "-e", "ext2.js", "--skill", "s1.md", "--skill", "s2.md",
         ]);
         assert_eq!(cli.extension, vec!["ext1.js", "ext2.js"]);
         assert_eq!(cli.skill, vec!["s1.md", "s2.md"]);
@@ -238,7 +238,7 @@ mod cli_combinations {
     #[test]
     fn system_prompt_with_append() {
         let cli = Cli::parse_from([
-            "pi",
+            "skaffen",
             "--system-prompt",
             "Be helpful",
             "--append-system-prompt",
@@ -271,20 +271,20 @@ mod cli_flag_combinations {
 
     #[test]
     fn provider_flag_sets_provider() {
-        let cli = parse_args(&["pi", "--provider", "openai"]);
+        let cli = parse_args(&["skaffen", "--provider", "openai"]);
         assert_eq!(cli.provider.as_deref(), Some("openai"));
     }
 
     #[test]
     fn model_flag_sets_model() {
-        let cli = parse_args(&["pi", "--model", "gpt-4o"]);
+        let cli = parse_args(&["skaffen", "--model", "gpt-4o"]);
         assert_eq!(cli.model.as_deref(), Some("gpt-4o"));
     }
 
     #[test]
     fn both_flags_together() {
         let cli = parse_args(&[
-            "pi",
+            "skaffen",
             "--provider",
             "anthropic",
             "--model",
@@ -296,14 +296,14 @@ mod cli_flag_combinations {
 
     #[test]
     fn model_flag_without_provider() {
-        let cli = parse_args(&["pi", "--model", "gpt-4o-mini"]);
+        let cli = parse_args(&["skaffen", "--model", "gpt-4o-mini"]);
         assert!(cli.provider.is_none());
         assert_eq!(cli.model.as_deref(), Some("gpt-4o-mini"));
     }
 
     #[test]
     fn provider_flag_without_model() {
-        let cli = parse_args(&["pi", "--provider", "openai"]);
+        let cli = parse_args(&["skaffen", "--provider", "openai"]);
         assert_eq!(cli.provider.as_deref(), Some("openai"));
         assert!(cli.model.is_none());
     }
@@ -317,8 +317,8 @@ mod session_invariants {
     use super::*;
 
     fn user_msg(text: &str) -> Message {
-        Message::User(pi::model::UserMessage {
-            content: pi::model::UserContent::Text(text.to_string()),
+        Message::User(skaffen::model::UserMessage {
+            content: skaffen::model::UserContent::Text(text.to_string()),
             timestamp: 0,
         })
     }
@@ -526,8 +526,8 @@ mod message_serde_invariants {
 
     #[test]
     fn user_text_message_round_trips() {
-        let msg = Message::User(pi::model::UserMessage {
-            content: pi::model::UserContent::Text("hello".to_string()),
+        let msg = Message::User(skaffen::model::UserMessage {
+            content: skaffen::model::UserContent::Text("hello".to_string()),
             timestamp: 12345,
         });
         let json = serde_json::to_value(&msg).expect("serialize");

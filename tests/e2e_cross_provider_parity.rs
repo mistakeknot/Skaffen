@@ -346,7 +346,7 @@ fn write_markdown_report(path: &Path, records: &[ParityRecord]) -> std::io::Resu
 }
 
 async fn collect_stream_events(
-    provider: std::sync::Arc<dyn pi::provider::Provider>,
+    provider: std::sync::Arc<dyn skaffen::provider::Provider>,
     context: Context<'static>,
     options: StreamOptions,
 ) -> Result<Vec<StreamEvent>, String> {
@@ -456,7 +456,7 @@ async fn run_parity_case(
         };
     };
 
-    let client = pi::http::client::Client::new();
+    let client = skaffen::http::client::Client::new();
     let provider = match create_live_provider(&entry, client) {
         Ok(provider) => provider,
         Err(err) => {

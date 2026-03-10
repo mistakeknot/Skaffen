@@ -87,8 +87,8 @@ impl Provider for DummyProvider {
         &self,
         _context: &Context<'_>,
         _options: &StreamOptions,
-    ) -> pi::error::Result<
-        Pin<Box<dyn futures::Stream<Item = pi::error::Result<StreamEvent>> + Send>>,
+    ) -> skaffen::error::Result<
+        Pin<Box<dyn futures::Stream<Item = skaffen::error::Result<StreamEvent>> + Send>>,
     > {
         Ok(Box::pin(stream::empty()))
     }

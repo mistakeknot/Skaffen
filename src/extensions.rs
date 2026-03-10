@@ -17017,8 +17017,8 @@ impl JsExtensionRuntimeHandle {
         interceptor: Option<Arc<dyn HostcallInterceptor>>,
         policy: Option<ExtensionPolicy>,
     ) -> Result<Self> {
-        let (tx, rx) = mpsc::channel(32);
-        let (init_tx, init_rx) = oneshot::channel();
+        let (tx, mut rx) = mpsc::channel(32);
+        let (init_tx, mut init_rx) = oneshot::channel();
         let (exit_tx, exit_rx) = oneshot::channel();
         let policy = policy.unwrap_or_default();
         let runtime_policy = policy.clone();
@@ -17402,7 +17402,7 @@ impl JsExtensionRuntimeHandle {
             guard.take()
         };
 
-        let Some(rx) = exit_rx else {
+        let Some(mut rx) = exit_rx else {
             // Already shut down or another caller is waiting.
             return true;
         };
@@ -17437,7 +17437,7 @@ impl JsExtensionRuntimeHandle {
     ) -> Result<Vec<JsExtensionSnapshot>> {
         let timeout_ms = EXTENSION_LOAD_BUDGET_MS;
         let cx = cx_with_deadline(timeout_ms);
-        let (reply_tx, reply_rx) = oneshot::channel();
+        let (reply_tx, mut reply_rx) = oneshot::channel();
         let command = JsRuntimeCommand::LoadExtensions {
             specs,
             reply: reply_tx,
@@ -17465,7 +17465,7 @@ impl JsExtensionRuntimeHandle {
     pub async fn get_registered_tools(&self) -> Result<Vec<ExtensionToolDef>> {
         let timeout_ms = EXTENSION_QUERY_BUDGET_MS;
         let cx = cx_with_deadline(timeout_ms);
-        let (reply_tx, reply_rx) = oneshot::channel();
+        let (reply_tx, mut reply_rx) = oneshot::channel();
         let command = JsRuntimeCommand::GetRegisteredTools { reply: reply_tx };
         let fut = async move {
             self.sender
@@ -17490,7 +17490,7 @@ impl JsExtensionRuntimeHandle {
     pub async fn pump_once(&self) -> Result<bool> {
         let timeout_ms = EXTENSION_QUERY_BUDGET_MS;
         let cx = cx_with_deadline(timeout_ms);
-        let (reply_tx, reply_rx) = oneshot::channel();
+        let (reply_tx, mut reply_rx) = oneshot::channel();
         let command = JsRuntimeCommand::PumpOnce { reply: reply_tx };
         let fut = async move {
             self.sender
@@ -17520,7 +17520,7 @@ impl JsExtensionRuntimeHandle {
         timeout_ms: u64,
     ) -> Result<Value> {
         let cx = cx_with_deadline(timeout_ms);
-        let (reply_tx, reply_rx) = oneshot::channel();
+        let (reply_tx, mut reply_rx) = oneshot::channel();
         let command = JsRuntimeCommand::DispatchEvent {
             event_name,
             event_payload,
@@ -17559,7 +17559,7 @@ impl JsExtensionRuntimeHandle {
             return Ok(Vec::new());
         }
         let cx = cx_with_deadline(timeout_ms);
-        let (reply_tx, reply_rx) = oneshot::channel();
+        let (reply_tx, mut reply_rx) = oneshot::channel();
         let command = JsRuntimeCommand::DispatchEventBatch {
             events,
             ctx_payload,
@@ -17595,7 +17595,7 @@ impl JsExtensionRuntimeHandle {
         timeout_ms: u64,
     ) -> Result<Value> {
         let cx = cx_with_deadline(timeout_ms);
-        let (reply_tx, reply_rx) = oneshot::channel();
+        let (reply_tx, mut reply_rx) = oneshot::channel();
         let command = JsRuntimeCommand::ExecuteTool {
             tool_name,
             tool_call_id,
@@ -17632,7 +17632,7 @@ impl JsExtensionRuntimeHandle {
         timeout_ms: u64,
     ) -> Result<Value> {
         let cx = cx_with_deadline(timeout_ms);
-        let (reply_tx, reply_rx) = oneshot::channel();
+        let (reply_tx, mut reply_rx) = oneshot::channel();
         let command = JsRuntimeCommand::ExecuteCommand {
             command_name,
             args,
@@ -17667,7 +17667,7 @@ impl JsExtensionRuntimeHandle {
         timeout_ms: u64,
     ) -> Result<Value> {
         let cx = cx_with_deadline(timeout_ms);
-        let (reply_tx, reply_rx) = oneshot::channel();
+        let (reply_tx, mut reply_rx) = oneshot::channel();
         let command = JsRuntimeCommand::ExecuteShortcut {
             key_id,
             ctx_payload,
@@ -17702,7 +17702,7 @@ impl JsExtensionRuntimeHandle {
     ) -> Result<()> {
         let timeout_ms = EXTENSION_QUERY_BUDGET_MS;
         let cx = cx_with_deadline(timeout_ms);
-        let (reply_tx, reply_rx) = oneshot::channel();
+        let (reply_tx, mut reply_rx) = oneshot::channel();
         let command = JsRuntimeCommand::SetFlagValue {
             extension_id,
             flag_name,
@@ -17732,7 +17732,7 @@ impl JsExtensionRuntimeHandle {
     /// Drain all accumulated auto-repair events from the JS runtime.
     pub async fn drain_repair_events(&self) -> Vec<ExtensionRepairEvent> {
         let cx = cx_with_deadline(EXTENSION_QUERY_BUDGET_MS);
-        let (reply_tx, reply_rx) = oneshot::channel();
+        let (reply_tx, mut reply_rx) = oneshot::channel();
         let command = JsRuntimeCommand::DrainRepairEvents { reply: reply_tx };
         let Ok(()) = self.sender.send(&cx, command).await else {
             return Vec::new();
@@ -17748,7 +17748,7 @@ impl JsExtensionRuntimeHandle {
     /// extensions without paying the full cold-start cost.
     pub async fn reset_transient_state(&self) -> Result<()> {
         let cx = cx_with_deadline(EXTENSION_QUERY_BUDGET_MS);
-        let (reply_tx, reply_rx) = oneshot::channel();
+        let (reply_tx, mut reply_rx) = oneshot::channel();
         let command = JsRuntimeCommand::ResetTransientState { reply: reply_tx };
         self.sender
             .send(&cx, command)
@@ -17769,7 +17769,7 @@ impl JsExtensionRuntimeHandle {
         timeout_ms: u64,
     ) -> Result<String> {
         let cx = cx_with_deadline(timeout_ms);
-        let (reply_tx, reply_rx) = oneshot::channel();
+        let (reply_tx, mut reply_rx) = oneshot::channel();
         let command = JsRuntimeCommand::ProviderStreamSimpleStart {
             provider_id,
             model,
@@ -17804,7 +17804,7 @@ impl JsExtensionRuntimeHandle {
         timeout_ms: u64,
     ) -> Result<Option<Value>> {
         let cx = cx_with_deadline(timeout_ms);
-        let (reply_tx, reply_rx) = oneshot::channel();
+        let (reply_tx, mut reply_rx) = oneshot::channel();
         let command = JsRuntimeCommand::ProviderStreamSimpleNext {
             stream_id,
             timeout_ms,
@@ -17836,7 +17836,7 @@ impl JsExtensionRuntimeHandle {
         timeout_ms: u64,
     ) -> Result<()> {
         let cx = cx_with_deadline(timeout_ms);
-        let (reply_tx, reply_rx) = oneshot::channel();
+        let (reply_tx, mut reply_rx) = oneshot::channel();
         let command = JsRuntimeCommand::ProviderStreamSimpleCancel {
             stream_id,
             timeout_ms,
@@ -22452,7 +22452,7 @@ async fn dispatch_hostcall_exec_ref(
     }
 
     let cmd = cmd.to_string();
-    let (tx, rx) = oneshot::channel();
+    let (tx, mut rx) = oneshot::channel();
     thread::spawn(move || {
         let result: std::result::Result<Value, String> = (|| {
             let mut command = Command::new(&cmd);
@@ -27636,7 +27636,7 @@ impl ExtensionManager {
             return Ok(None);
         }
 
-        let (tx, rx) = oneshot::channel();
+        let (tx, mut rx) = oneshot::channel();
         {
             let mut guard = self
                 .inner
@@ -29863,7 +29863,7 @@ mod tests {
         let handle = runtime.handle();
 
         runtime.block_on(async move {
-            let (ui_tx, ui_rx) = mpsc::channel(16);
+            let (ui_tx, mut ui_rx) = mpsc::channel(16);
             manager.set_ui_sender(ui_tx);
 
             let responder = manager.clone();
@@ -29895,7 +29895,7 @@ mod tests {
         runtime.block_on(async move {
             use std::sync::atomic::{AtomicUsize, Ordering};
 
-            let (ui_tx, ui_rx) = mpsc::channel(16);
+            let (ui_tx, mut ui_rx) = mpsc::channel(16);
             manager.set_ui_sender(ui_tx);
 
             let prompt_count = Arc::new(AtomicUsize::new(0));
@@ -31587,7 +31587,7 @@ mod tests {
                 use std::time::Duration;
 
                 let cx = asupersync::Cx::for_request();
-                let (ui_tx, ui_rx) = asupersync::channel::mpsc::channel(8);
+                let (ui_tx, mut ui_rx) = asupersync::channel::mpsc::channel(8);
                 manager.set_ui_sender(ui_tx);
 
                 let ui_task = async {
@@ -32095,7 +32095,7 @@ mod tests {
                 use std::time::Duration;
 
                 let cx = asupersync::Cx::for_request();
-                let (ui_tx, ui_rx) = asupersync::channel::mpsc::channel(16);
+                let (ui_tx, mut ui_rx) = asupersync::channel::mpsc::channel(16);
                 manager_prompt.set_ui_sender(ui_tx);
                 let prompt_count = prompt_cases.len();
 
@@ -35011,7 +35011,7 @@ mod tests {
             let mut runtime = ext_lab(42);
             let root = runtime.state.create_root_region(Budget::INFINITE);
 
-            let (tx, rx) = oneshot::channel::<String>();
+            let (tx, mut rx) = oneshot::channel::<String>();
             let received = Arc::new(std::sync::Mutex::new(None));
             let received_clone = received.clone();
 
@@ -35056,7 +35056,7 @@ mod tests {
             let mut runtime = ext_lab(0xDEAD);
             let root = runtime.state.create_root_region(Budget::INFINITE);
 
-            let (tx, rx) = oneshot::channel::<String>();
+            let (tx, mut rx) = oneshot::channel::<String>();
             let got_error = Arc::new(AtomicBool::new(false));
             let got_error_clone = got_error.clone();
 
@@ -35106,7 +35106,7 @@ mod tests {
                         .create_task(root, Budget::INFINITE, async move {
                             let cx = Cx::current().expect("cx");
                             // Simulate extension dispatch: send/recv on a channel.
-                            let (tx, rx) = oneshot::channel::<u32>();
+                            let (tx, mut rx) = oneshot::channel::<u32>();
                             tx.send(&cx, i).expect("send");
                             let val = rx.recv(&cx).await.expect("recv");
                             log.lock()
@@ -35471,7 +35471,7 @@ mod tests {
         fn tight_deadline_cancels_blocked_recv() {
             asupersync::test_utils::run_test(|| async {
                 // Create a oneshot where nobody will send.
-                let (_tx, rx) = oneshot::channel::<()>();
+                let (_tx, mut rx) = oneshot::channel::<()>();
                 let cx = cx_with_deadline(50); // 50ms deadline
                 let start = wall_now();
                 let result = timeout(wall_now(), Duration::from_millis(50), rx.recv(&cx)).await;
@@ -38411,7 +38411,7 @@ mod tests {
         let policy = permissive_policy();
 
         let manager = extension_manager_no_persisted_permissions();
-        let (ui_tx, ui_rx) = mpsc::channel(8);
+        let (ui_tx, mut ui_rx) = mpsc::channel(8);
         manager.set_ui_sender(ui_tx);
 
         let ctx = HostCallContext {
@@ -38544,7 +38544,7 @@ mod tests {
         let policy = permissive_policy();
 
         let manager = extension_manager_no_persisted_permissions();
-        let (ui_tx, ui_rx) = mpsc::channel(8);
+        let (ui_tx, mut ui_rx) = mpsc::channel(8);
         manager.set_ui_sender(ui_tx);
 
         let ctx = HostCallContext {

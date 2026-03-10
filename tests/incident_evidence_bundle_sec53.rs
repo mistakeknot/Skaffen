@@ -1325,8 +1325,8 @@ fn summary_tracks_peak_risk_and_enforcement() {
         .filter(|e| {
             matches!(
                 e.selected_action,
-                pi::extensions::RuntimeRiskActionValue::Deny
-                    | pi::extensions::RuntimeRiskActionValue::Terminate
+                skaffen::extensions::RuntimeRiskActionValue::Deny
+                    | skaffen::extensions::RuntimeRiskActionValue::Terminate
             )
         })
         .count();

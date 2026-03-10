@@ -461,11 +461,11 @@ fn golden_corpus_screening() {
     }
 
     let validated_text = std::fs::read_to_string(validated_path).unwrap();
-    let validated: pi::extension_validation::ValidationReport =
+    let validated: skaffen::extension_validation::ValidationReport =
         serde_json::from_str(&validated_text).unwrap();
 
     let pool_text = std::fs::read_to_string(pool_path).unwrap();
-    let pool: pi::extension_popularity::CandidatePool = serde_json::from_str(&pool_text).unwrap();
+    let pool: skaffen::extension_popularity::CandidatePool = serde_json::from_str(&pool_text).unwrap();
 
     // Build license map.
     let mut license_map = std::collections::HashMap::new();
@@ -479,7 +479,7 @@ fn golden_corpus_screening() {
     let inputs: Vec<ScreeningInput> = validated
         .candidates
         .iter()
-        .filter(|c| c.status == pi::extension_validation::ValidationStatus::TrueExtension)
+        .filter(|c| c.status == skaffen::extension_validation::ValidationStatus::TrueExtension)
         .map(|c| ScreeningInput {
             canonical_id: c.canonical_id.clone(),
             known_license: license_map

@@ -275,7 +275,7 @@ fn main() -> Result<()> {
 
     let list = InclusionList {
         schema: "pi.ext.inclusion.v1".to_string(),
-        generated_at: pi::extension_validation::chrono_now_iso(),
+        generated_at: skaffen::extension_validation::chrono_now_iso(),
         task: Some(args.task_id),
         stats: Some(stats),
         tier0,

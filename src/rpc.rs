@@ -399,7 +399,7 @@ pub async fn run_stdio(mut session: AgentSession, options: RpcOptions) -> Result
 pub async fn run(
     session: AgentSession,
     options: RpcOptions,
-    in_rx: mpsc::Receiver<String>,
+    mut in_rx: mpsc::Receiver<String>,
     out_tx: std::sync::mpsc::Sender<String>,
 ) -> Result<()> {
     let cx = AgentCx::for_request();
@@ -469,7 +469,7 @@ pub async fn run(
         .map(|_| Arc::new(Mutex::new(RpcUiBridgeState::default())));
 
     if let Some(ref manager) = rpc_extension_manager {
-        let (extension_ui_tx, extension_ui_rx) =
+        let (extension_ui_tx, mut extension_ui_rx) =
             asupersync::channel::mpsc::channel::<ExtensionUiRequest>(64);
         manager.set_ui_sender(extension_ui_tx);
 
@@ -3729,7 +3729,7 @@ async fn ingest_bash_rpc_chunk(
 async fn run_bash_rpc(
     cwd: &std::path::Path,
     command: &str,
-    abort_rx: oneshot::Receiver<()>,
+    mut abort_rx: oneshot::Receiver<()>,
 ) -> Result<BashRpcResult> {
     #[derive(Clone, Copy)]
     enum StreamKind {
@@ -4839,7 +4839,7 @@ export default function init(pi) {
                 .expect("enable extensions");
 
             let options = build_test_rpc_options(&handle, cwd.join("auth.json"));
-            let (in_tx, in_rx) = asupersync::channel::mpsc::channel::<String>(16);
+            let (in_tx, mut in_rx) = asupersync::channel::mpsc::channel::<String>(16);
             let (out_tx, out_rx) = std::sync::mpsc::channel::<String>();
             let out_rx = Arc::new(Mutex::new(out_rx));
 
@@ -4907,14 +4907,14 @@ export default function init(pi) {
 
     #[test]
     fn try_send_line_with_backpressure_stops_when_receiver_closed() {
-        let (tx, rx) = mpsc::channel::<String>(1);
+        let (tx, mut rx) = mpsc::channel::<String>(1);
         drop(rx);
         assert!(!try_send_line_with_backpressure(&tx, "line".to_string()));
     }
 
     #[test]
     fn try_send_line_with_backpressure_waits_until_capacity_is_available() {
-        let (tx, rx) = mpsc::channel::<String>(1);
+        let (tx, mut rx) = mpsc::channel::<String>(1);
         tx.try_send("occupied".to_string())
             .expect("seed initial occupied slot");
 
@@ -4945,7 +4945,7 @@ export default function init(pi) {
 
     #[test]
     fn try_send_line_with_backpressure_preserves_large_payload() {
-        let (tx, rx) = mpsc::channel::<String>(1);
+        let (tx, mut rx) = mpsc::channel::<String>(1);
         tx.try_send("busy".to_string())
             .expect("seed initial busy slot");
 
@@ -4975,7 +4975,7 @@ export default function init(pi) {
 
     #[test]
     fn try_send_line_with_backpressure_detects_disconnect_while_waiting() {
-        let (tx, rx) = mpsc::channel::<String>(1);
+        let (tx, mut rx) = mpsc::channel::<String>(1);
         tx.try_send("busy".to_string())
             .expect("seed initial busy slot");
 
@@ -4993,7 +4993,7 @@ export default function init(pi) {
 
     #[test]
     fn try_send_line_with_backpressure_high_volume_preserves_order_and_count() {
-        let (tx, rx) = mpsc::channel::<String>(4);
+        let (tx, mut rx) = mpsc::channel::<String>(4);
         let lines: Vec<String> = (0..256)
             .map(|idx| format!("line-{idx:03}: {}", "x".repeat(64)))
             .collect();
@@ -5025,7 +5025,7 @@ export default function init(pi) {
 
     #[test]
     fn try_send_line_with_backpressure_preserves_partial_line_without_newline() {
-        let (tx, rx) = mpsc::channel::<String>(1);
+        let (tx, mut rx) = mpsc::channel::<String>(1);
         tx.try_send("busy".to_string())
             .expect("seed initial busy slot");
 

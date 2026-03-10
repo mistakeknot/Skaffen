@@ -94,7 +94,7 @@ fn make_sse_response(body: &str) -> MockHttpResponse {
 }
 
 fn collect_events(
-    provider: Arc<dyn pi::provider::Provider>,
+    provider: Arc<dyn skaffen::provider::Provider>,
     context: Context<'static>,
     options: StreamOptions,
 ) -> Result<Vec<StreamEvent>, String> {
@@ -234,7 +234,7 @@ fn anthropic_route() -> String {
 fn setup_openai(
     harness: &TestHarness,
     response: MockHttpResponse,
-) -> (Arc<dyn pi::provider::Provider>, common::MockHttpServer) {
+) -> (Arc<dyn skaffen::provider::Provider>, common::MockHttpServer) {
     let server = harness.start_mock_http_server();
     let route = oai_route();
     server.add_route("POST", &route, response);
@@ -248,7 +248,7 @@ fn setup_openai(
 fn setup_anthropic(
     harness: &TestHarness,
     response: MockHttpResponse,
-) -> (Arc<dyn pi::provider::Provider>, common::MockHttpServer) {
+) -> (Arc<dyn skaffen::provider::Provider>, common::MockHttpServer) {
     let server = harness.start_mock_http_server();
     let route = anthropic_route();
     server.add_route("POST", &route, response);
@@ -971,7 +971,7 @@ fn comprehensive_failure_injection_report() {
 fn setup_gemini(
     harness: &TestHarness,
     response: MockHttpResponse,
-) -> (Arc<dyn pi::provider::Provider>, common::MockHttpServer) {
+) -> (Arc<dyn skaffen::provider::Provider>, common::MockHttpServer) {
     let server = harness.start_mock_http_server();
     // Gemini uses /models/<model>:streamGenerateContent?alt=sse&key=<key>
     server.add_route("POST", "/models/fail-test:streamGenerateContent", response);

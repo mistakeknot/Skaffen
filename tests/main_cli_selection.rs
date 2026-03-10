@@ -144,7 +144,7 @@ fn select_model_and_thinking_clamps_reasoning_disabled_models_to_off() {
         TestHarness::new("select_model_and_thinking_clamps_reasoning_disabled_models_to_off");
     let registry = make_registry(&harness, &[]);
     let cli = cli::Cli::parse_from([
-        "pi",
+        "skaffen",
         "--provider",
         "anthropic",
         "--model",
@@ -191,7 +191,7 @@ fn select_model_and_thinking_clamps_xhigh_when_model_does_not_support_it() {
         TestHarness::new("select_model_and_thinking_clamps_xhigh_when_model_does_not_support_it");
     let registry = make_registry(&harness, &[]);
     let cli = cli::Cli::parse_from([
-        "pi",
+        "skaffen",
         "--provider",
         "openai",
         "--model",
@@ -413,7 +413,7 @@ fn build_system_prompt_includes_custom_append_context_and_skills() {
 
     let custom_prompt_path = harness.create_file("prompt.txt", "CUSTOM PROMPT");
     let cli = cli::Cli::parse_from([
-        "pi",
+        "skaffen",
         "--system-prompt",
         custom_prompt_path.to_string_lossy().as_ref(),
         "--append-system-prompt",
@@ -894,7 +894,7 @@ fn cli_no_tools_returns_empty() {
 }
 
 fn cli_flag_parity_result(flag_args: &[&str]) -> Result<(), String> {
-    let args = std::iter::once("pi")
+    let args = std::iter::once("skaffen")
         .chain(flag_args.iter().copied())
         .collect::<Vec<_>>();
     match cli::Cli::try_parse_from(args) {
@@ -1007,7 +1007,7 @@ fn cli_ts_flag_parity_matrix_reports_full_coverage() {
 
 #[test]
 fn extension_registered_flags_can_be_passed_through_cli_parser() {
-    let manager = pi::extensions::ExtensionManager::new();
+    let manager = skaffen::extensions::ExtensionManager::new();
     manager.register_flag(serde_json::json!({
         "name": "plan",
         "type": "string",

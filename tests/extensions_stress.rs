@@ -475,7 +475,7 @@ fn load_extensions_with_policy(
         let manager = manager.clone();
         let tools = Arc::clone(&tools);
         async move {
-            pi::extensions::JsExtensionRuntimeHandle::start_with_policy(
+            skaffen::extensions::JsExtensionRuntimeHandle::start_with_policy(
                 js_config, tools, manager, policy,
             )
             .await

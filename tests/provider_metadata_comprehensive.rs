@@ -341,9 +341,9 @@ fn context_window_and_max_tokens_are_positive() {
 // ═══════════════════════════════════════════════════════════════════════
 
 /// Helper: build a `ModelEntry` for an OAI-compatible provider.
-fn oai_entry(provider: &str, api: &str, base_url: &str) -> pi::models::ModelEntry {
+fn oai_entry(provider: &str, api: &str, base_url: &str) -> skaffen::models::ModelEntry {
     use skaffen::provider::{InputType, Model, ModelCost};
-    pi::models::ModelEntry {
+    skaffen::models::ModelEntry {
         model: Model {
             id: "test-model".to_string(),
             name: "Test Model".to_string(),
@@ -401,7 +401,7 @@ fn factory_dispatches_native_established_providers() {
     // Anthropic
     let anthropic_entry = {
         use skaffen::provider::{InputType, Model, ModelCost};
-        pi::models::ModelEntry {
+        skaffen::models::ModelEntry {
             model: Model {
                 id: "claude-sonnet-4-5".to_string(),
                 name: "Claude Sonnet".to_string(),
@@ -433,7 +433,7 @@ fn factory_dispatches_native_established_providers() {
     // Google/Gemini
     let google_entry = {
         use skaffen::provider::{InputType, Model, ModelCost};
-        pi::models::ModelEntry {
+        skaffen::models::ModelEntry {
             model: Model {
                 id: "gemini-2.0-flash".to_string(),
                 name: "Gemini Flash".to_string(),
@@ -465,7 +465,7 @@ fn factory_dispatches_native_established_providers() {
     // Cohere
     let cohere_entry = {
         use skaffen::provider::{InputType, Model, ModelCost};
-        pi::models::ModelEntry {
+        skaffen::models::ModelEntry {
             model: Model {
                 id: "command-r-plus".to_string(),
                 name: "Command R+".to_string(),
@@ -497,7 +497,7 @@ fn factory_dispatches_native_established_providers() {
     // Amazon Bedrock
     let bedrock_entry = {
         use skaffen::provider::{InputType, Model, ModelCost};
-        pi::models::ModelEntry {
+        skaffen::models::ModelEntry {
             model: Model {
                 id: "anthropic.claude-3-5-sonnet-20240620-v1:0".to_string(),
                 name: "Claude Sonnet via Bedrock".to_string(),

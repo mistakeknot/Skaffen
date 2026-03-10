@@ -1,6 +1,6 @@
 //! SDK integration test suite (bd-2hcex: PARITY-V3).
 //!
-//! Validates that the programmatic SDK API (`pi::sdk`) works correctly:
+//! Validates that the programmatic SDK API (`skaffen::sdk`) works correctly:
 //! session creation, model selection, event streaming, tool execution,
 //! persistence, abort, compaction, error handling.
 //!
@@ -186,7 +186,7 @@ fn run_scripted(
             },
             block_images: false,
         };
-        let agent = pi::agent::Agent::new(provider, tools, config);
+        let agent = skaffen::agent::Agent::new(provider, tools, config);
         let session = Arc::new(asupersync::sync::Mutex::new(Session::create_with_dir(
             Some(cwd),
         )));
@@ -628,7 +628,7 @@ fn sdk_model_switching() {
 fn sdk_thinking_level() {
     let harness = TestHarness::new("sdk_thinking_level");
     let options = SessionOptions {
-        thinking: Some(pi::model::ThinkingLevel::High),
+        thinking: Some(skaffen::model::ThinkingLevel::High),
         working_directory: Some(harness.temp_dir().to_path_buf()),
         no_session: true,
         ..SessionOptions::default()
@@ -637,7 +637,7 @@ fn sdk_thinking_level() {
     let handle = run_async(create_agent_session(options)).expect("create session");
     assert_eq!(
         handle.thinking_level(),
-        Some(pi::model::ThinkingLevel::High),
+        Some(skaffen::model::ThinkingLevel::High),
         "thinking level should be High"
     );
 
@@ -974,7 +974,7 @@ fn sdk_conformance_agent_event_json_schema() {
         AgentEvent::ToolExecutionEnd {
             tool_call_id: "tc-1".to_string(),
             tool_name: "read".to_string(),
-            result: pi::tools::ToolOutput {
+            result: skaffen::tools::ToolOutput {
                 content: vec![ContentBlock::Text(TextContent::new("file contents"))],
                 details: None,
                 is_error: false,
@@ -1047,7 +1047,7 @@ fn sdk_conformance_session_tool_hooks() {
             },
             block_images: false,
         };
-        let agent = pi::agent::Agent::new(provider, tools, config);
+        let agent = skaffen::agent::Agent::new(provider, tools, config);
         let session = Arc::new(asupersync::sync::Mutex::new(Session::create_with_dir(
             Some(cwd),
         )));
@@ -1129,7 +1129,7 @@ fn sdk_conformance_combined_callback_ordering() {
             },
             block_images: false,
         };
-        let agent = pi::agent::Agent::new(provider, tools, config);
+        let agent = skaffen::agent::Agent::new(provider, tools, config);
         let session = Arc::new(asupersync::sync::Mutex::new(Session::create_with_dir(
             Some(cwd),
         )));
@@ -1238,7 +1238,7 @@ fn sdk_continue_turn_uses_combined_listener_path() {
             },
             block_images: false,
         };
-        let agent = pi::agent::Agent::new(provider, tools, config);
+        let agent = skaffen::agent::Agent::new(provider, tools, config);
         let session = Arc::new(asupersync::sync::Mutex::new(Session::create_with_dir(
             Some(cwd),
         )));
@@ -1250,7 +1250,7 @@ fn sdk_continue_turn_uses_combined_listener_path() {
         );
 
         {
-            let cx = pi::agent_cx::AgentCx::for_request();
+            let cx = skaffen::agent_cx::AgentCx::for_request();
             let mut guard = session.lock(cx.cx()).await.expect("lock session");
             guard.append_model_message(Message::User(UserMessage {
                 content: UserContent::Text("prior user message".to_string()),
@@ -1324,7 +1324,7 @@ fn sdk_continue_turn_with_abort_returns_aborted_message() {
             },
             block_images: false,
         };
-        let agent = pi::agent::Agent::new(provider, tools, config);
+        let agent = skaffen::agent::Agent::new(provider, tools, config);
         let session = Arc::new(asupersync::sync::Mutex::new(Session::create_with_dir(
             Some(cwd),
         )));

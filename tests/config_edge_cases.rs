@@ -493,7 +493,7 @@ fn repair_policy_defaults_to_suggest() {
     assert_eq!(resolved.source, "cli");
     assert_eq!(
         resolved.effective_mode,
-        pi::extensions::RepairPolicyMode::Suggest
+        skaffen::extensions::RepairPolicyMode::Suggest
     );
 }
 
@@ -506,7 +506,7 @@ fn repair_policy_cli_override_wins() {
     assert_eq!(resolved.source, "cli");
     assert_eq!(
         resolved.effective_mode,
-        pi::extensions::RepairPolicyMode::Off
+        skaffen::extensions::RepairPolicyMode::Off
     );
 }
 
@@ -521,7 +521,7 @@ fn repair_policy_auto_strict_from_config() {
     assert_eq!(resolved.source, "cli");
     assert_eq!(
         resolved.effective_mode,
-        pi::extensions::RepairPolicyMode::AutoStrict
+        skaffen::extensions::RepairPolicyMode::AutoStrict
     );
 }
 
@@ -532,7 +532,7 @@ fn repair_policy_unknown_mode_falls_back_to_suggest() {
     let resolved = config.resolve_repair_policy_with_metadata(Some("invalid-mode"));
     assert_eq!(
         resolved.effective_mode,
-        pi::extensions::RepairPolicyMode::Suggest
+        skaffen::extensions::RepairPolicyMode::Suggest
     );
 }
 

@@ -41,9 +41,9 @@
     clippy::wildcard_imports
 )]
 
-// Allow in-crate tests that include integration test helpers to resolve `pi::...`
+// Allow in-crate tests that include integration test helpers to resolve `skaffen::...`
 // paths the same way integration tests do.
-extern crate self as pi;
+extern crate self as skaffen;
 
 // Gap H: jemalloc allocator for allocation-heavy paths.
 // Declared in the library so all project binaries/tests share allocator behavior.

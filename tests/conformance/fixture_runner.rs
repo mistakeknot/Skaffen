@@ -44,13 +44,13 @@ async fn run_test_case(tool_name: &str, case: &TestCase) -> TestResult {
 
     // Create the tool
     let tool: Box<dyn Tool> = match tool_name {
-        "read" => Box::new(pi::tools::ReadTool::new(temp_dir.path())),
-        "bash" => Box::new(pi::tools::BashTool::new(temp_dir.path())),
-        "edit" => Box::new(pi::tools::EditTool::new(temp_dir.path())),
-        "write" => Box::new(pi::tools::WriteTool::new(temp_dir.path())),
-        "grep" => Box::new(pi::tools::GrepTool::new(temp_dir.path())),
-        "find" => Box::new(pi::tools::FindTool::new(temp_dir.path())),
-        "ls" => Box::new(pi::tools::LsTool::new(temp_dir.path())),
+        "read" => Box::new(skaffen::tools::ReadTool::new(temp_dir.path())),
+        "bash" => Box::new(skaffen::tools::BashTool::new(temp_dir.path())),
+        "edit" => Box::new(skaffen::tools::EditTool::new(temp_dir.path())),
+        "write" => Box::new(skaffen::tools::WriteTool::new(temp_dir.path())),
+        "grep" => Box::new(skaffen::tools::GrepTool::new(temp_dir.path())),
+        "find" => Box::new(skaffen::tools::FindTool::new(temp_dir.path())),
+        "ls" => Box::new(skaffen::tools::LsTool::new(temp_dir.path())),
         _ => {
             return TestResult::fail(&case.name, format!("Unknown tool: {tool_name}"));
         }
@@ -399,8 +399,8 @@ fn run_truncation_test_case(case: &TestCase) -> TestResult {
     let details = serde_json::json!({
         "truncated": result.truncated,
         "truncated_by": result.truncated_by.map(|t| match t {
-            pi::tools::TruncatedBy::Lines => "lines",
-            pi::tools::TruncatedBy::Bytes => "bytes",
+            skaffen::tools::TruncatedBy::Lines => "lines",
+            skaffen::tools::TruncatedBy::Bytes => "bytes",
         }),
         "total_lines": result.total_lines,
         "output_lines": result.output_lines,

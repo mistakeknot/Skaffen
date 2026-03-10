@@ -388,7 +388,7 @@ fn safe_profile_uses_strict_exec_mediation() {
     assert!(policy.exec_mediation.enabled);
     assert_eq!(
         policy.exec_mediation.deny_threshold,
-        pi::extensions::ExecRiskTier::High
+        skaffen::extensions::ExecRiskTier::High
     );
     assert!(policy.exec_mediation.audit_all_classified);
 }
@@ -399,7 +399,7 @@ fn permissive_profile_uses_permissive_exec_mediation() {
     assert!(policy.exec_mediation.enabled);
     assert_eq!(
         policy.exec_mediation.deny_threshold,
-        pi::extensions::ExecRiskTier::Critical
+        skaffen::extensions::ExecRiskTier::Critical
     );
     assert!(!policy.exec_mediation.audit_all_classified);
 }

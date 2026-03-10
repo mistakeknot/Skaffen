@@ -461,7 +461,7 @@ fn agent_mixed_tool_batch_success_and_not_found() {
 fn tool_bash_nonexistent_working_directory() {
     asupersync::test_utils::run_test(|| async {
         let _h = TestHarness::new("bash_nonexistent_cwd");
-        let tool = pi::tools::BashTool::new(std::path::Path::new(
+        let tool = skaffen::tools::BashTool::new(std::path::Path::new(
             "/nonexistent/path/that/does/not/exist",
         ));
         let input = json!({ "command": "echo hello" });
@@ -486,7 +486,7 @@ fn tool_bash_nonexistent_working_directory() {
 fn tool_bash_timeout_kills_process() {
     asupersync::test_utils::run_test(|| async {
         let _h = TestHarness::new("bash_timeout_kills");
-        let tool = pi::tools::BashTool::new(std::path::Path::new("/tmp"));
+        let tool = skaffen::tools::BashTool::new(std::path::Path::new("/tmp"));
         let input = json!({
             "command": "sleep 30",
             "timeout": 1
@@ -509,7 +509,7 @@ fn tool_edit_empty_old_text() {
     asupersync::test_utils::run_test(|| async {
         let h = TestHarness::new("edit_empty_old");
         let target = h.create_file("target.txt", b"some content here\n");
-        let tool = pi::tools::EditTool::new(h.temp_dir());
+        let tool = skaffen::tools::EditTool::new(h.temp_dir());
         let input = json!({
             "path": target.to_string_lossy(),
             "old": "",
@@ -537,7 +537,7 @@ fn tool_write_deeply_nested_dirs() {
     asupersync::test_utils::run_test(|| async {
         let h = TestHarness::new("write_deep_dirs");
         let deep_path = h.temp_dir().join("a/b/c/d/e/deep.txt");
-        let tool = pi::tools::WriteTool::new(h.temp_dir());
+        let tool = skaffen::tools::WriteTool::new(h.temp_dir());
         let input = json!({
             "path": deep_path.to_string_lossy(),
             "content": "deeply nested content"
@@ -565,7 +565,7 @@ fn tool_read_permission_denied() {
         let target = h.create_file("noperm.txt", b"secret\n");
         std::fs::set_permissions(&target, std::fs::Permissions::from_mode(0o000)).unwrap();
 
-        let tool = pi::tools::ReadTool::new(h.temp_dir());
+        let tool = skaffen::tools::ReadTool::new(h.temp_dir());
         let input = json!({ "path": target.to_string_lossy() });
         let result = exec_tool(&tool, "read-perm-1", input).await;
 
@@ -602,7 +602,7 @@ fn tool_edit_permission_denied() {
         let target = h.create_file("readonly.txt", b"old content\n");
         std::fs::set_permissions(&target, std::fs::Permissions::from_mode(0o444)).unwrap();
 
-        let tool = pi::tools::EditTool::new(h.temp_dir());
+        let tool = skaffen::tools::EditTool::new(h.temp_dir());
         let input = json!({
             "path": target.to_string_lossy(),
             "old": "old content",
@@ -774,7 +774,7 @@ fn fuzzy_find_normalized_curly_quotes() {
         let h = TestHarness::new("fuzzy_curly_quotes");
         // File contains curly quotes
         let target = h.create_file("curly.txt", "\u{201C}hello world\u{201D}\n".as_bytes());
-        let tool = pi::tools::EditTool::new(h.temp_dir());
+        let tool = skaffen::tools::EditTool::new(h.temp_dir());
 
         // Search with straight quotes should match via normalization
         let input = json!({
@@ -803,7 +803,7 @@ fn fuzzy_find_normalized_em_dash() {
         let h = TestHarness::new("fuzzy_em_dash");
         // File contains em dash
         let target = h.create_file("dash.txt", "foo\u{2014}bar\n".as_bytes());
-        let tool = pi::tools::EditTool::new(h.temp_dir());
+        let tool = skaffen::tools::EditTool::new(h.temp_dir());
 
         // Search with ASCII hyphen should match via normalization
         let input = json!({
@@ -833,7 +833,7 @@ fn fuzzy_find_normalized_em_dash() {
 fn tool_read_invalid_json_type() {
     asupersync::test_utils::run_test(|| async {
         let h = TestHarness::new("read_invalid_json");
-        let tool = pi::tools::ReadTool::new(h.temp_dir());
+        let tool = skaffen::tools::ReadTool::new(h.temp_dir());
         // Pass a number instead of string for path
         let input = json!({ "path": 42 });
         let result = exec_tool(&tool, "read-bad-1", input).await;
@@ -846,7 +846,7 @@ fn tool_read_invalid_json_type() {
 fn tool_write_missing_content() {
     asupersync::test_utils::run_test(|| async {
         let h = TestHarness::new("write_missing_content");
-        let tool = pi::tools::WriteTool::new(h.temp_dir());
+        let tool = skaffen::tools::WriteTool::new(h.temp_dir());
         // Missing content field
         let input = json!({ "path": h.temp_dir().join("test.txt").to_string_lossy().to_string() });
         let result = exec_tool(&tool, "write-bad-1", input).await;
@@ -859,7 +859,7 @@ fn tool_write_missing_content() {
 fn tool_bash_missing_command() {
     asupersync::test_utils::run_test(|| async {
         let _h = TestHarness::new("bash_missing_command");
-        let tool = pi::tools::BashTool::new(std::path::Path::new("/tmp"));
+        let tool = skaffen::tools::BashTool::new(std::path::Path::new("/tmp"));
         // Missing command field
         let input = json!({ "timeout": 5 });
         let result = exec_tool(&tool, "bash-bad-1", input).await;
@@ -872,7 +872,7 @@ fn tool_bash_missing_command() {
 fn tool_edit_missing_path() {
     asupersync::test_utils::run_test(|| async {
         let h = TestHarness::new("edit_missing_path");
-        let tool = pi::tools::EditTool::new(h.temp_dir());
+        let tool = skaffen::tools::EditTool::new(h.temp_dir());
         let input = json!({ "old": "x", "new": "y" });
         let result = exec_tool(&tool, "edit-bad-1", input).await;
         assert!(result.is_error, "missing path should be an error");
@@ -886,7 +886,7 @@ fn tool_grep_invalid_regex() {
         let h = TestHarness::new("grep_invalid_regex");
         h.create_file("sample.txt", b"hello\n");
 
-        let tool = pi::tools::GrepTool::new(h.temp_dir());
+        let tool = skaffen::tools::GrepTool::new(h.temp_dir());
         // Invalid regex: unclosed bracket
         let input = json!({
             "pattern": "[unclosed",
@@ -910,7 +910,7 @@ fn tool_grep_invalid_regex() {
 fn tool_ls_nonexistent_path() {
     asupersync::test_utils::run_test(|| async {
         let h = TestHarness::new("ls_nonexistent");
-        let tool = pi::tools::LsTool::new(h.temp_dir());
+        let tool = skaffen::tools::LsTool::new(h.temp_dir());
         let input = json!({ "path": "/nonexistent/path/that/does/not/exist" });
         let result = exec_tool(&tool, "ls-bad-1", input).await;
         assert!(result.is_error, "ls on nonexistent path should error");
@@ -922,7 +922,7 @@ fn tool_ls_nonexistent_path() {
 fn tool_find_nonexistent_path() {
     asupersync::test_utils::run_test(|| async {
         let h = TestHarness::new("find_nonexistent");
-        let tool = pi::tools::FindTool::new(h.temp_dir());
+        let tool = skaffen::tools::FindTool::new(h.temp_dir());
         let input = json!({
             "pattern": "*.rs",
             "path": "/nonexistent/path/that/does/not/exist"
@@ -974,8 +974,8 @@ impl Tool for FailingTool {
         _tool_call_id: &str,
         _input: serde_json::Value,
         _on_update: Option<Box<dyn Fn(ToolUpdate) + Send + Sync>>,
-    ) -> std::result::Result<ToolOutput, pi::error::Error> {
-        Err(pi::error::Error::tool(
+    ) -> std::result::Result<ToolOutput, skaffen::error::Error> {
+        Err(skaffen::error::Error::tool(
             "failing_tool",
             "deliberate test failure",
         ))
@@ -1210,8 +1210,8 @@ fn agent_queue_follow_up_only_at_idle() {
         let mut agent = Agent::new(provider, tools, config);
 
         // Queue a follow-up before running
-        agent.queue_follow_up(Message::User(pi::model::UserMessage {
-            content: pi::model::UserContent::Blocks(vec![ContentBlock::Text(TextContent::new(
+        agent.queue_follow_up(Message::User(skaffen::model::UserMessage {
+            content: skaffen::model::UserContent::Blocks(vec![ContentBlock::Text(TextContent::new(
                 "follow-up message",
             ))]),
             timestamp: 0,
@@ -1477,7 +1477,7 @@ fn agent_event_lifecycle_with_tools() {
 fn tool_bash_exit_code_capture() {
     asupersync::test_utils::run_test(|| async {
         let _h = TestHarness::new("bash_exit_code");
-        let tool = pi::tools::BashTool::new(std::path::Path::new("/tmp"));
+        let tool = skaffen::tools::BashTool::new(std::path::Path::new("/tmp"));
         let input = json!({ "command": "exit 42" });
         let result = exec_tool(&tool, "bash-exit-1", input).await;
 
@@ -1496,7 +1496,7 @@ fn tool_bash_exit_code_capture() {
 fn tool_bash_stdout_stderr_capture() {
     asupersync::test_utils::run_test(|| async {
         let _h = TestHarness::new("bash_stderr");
-        let tool = pi::tools::BashTool::new(std::path::Path::new("/tmp"));
+        let tool = skaffen::tools::BashTool::new(std::path::Path::new("/tmp"));
         let input = json!({ "command": "echo 'out_msg' && echo 'err_msg' >&2" });
         let result = exec_tool(&tool, "bash-stderr-1", input).await;
 

@@ -243,7 +243,7 @@ fn test_ext_conformance_pinned_sample_compat_ledger_snapshot() {
         .collect::<Vec<_>>();
     ids.sort();
 
-    let mut ledgers: BTreeMap<String, pi::extensions::CompatLedger> = BTreeMap::new();
+    let mut ledgers: BTreeMap<String, skaffen::extensions::CompatLedger> = BTreeMap::new();
     for id in ids {
         let artifact_dir = repo_root.join("tests/ext_conformance/artifacts").join(&id);
         assert!(

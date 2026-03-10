@@ -36,3 +36,133 @@ NEW: version = "=0.2.7", default-features = false, features = ["tls-native-roots
 --- 2026-03-10T16:30:42Z | Cargo.toml | CONTEXT:unknown ---
 OLD: version = "=0.2.5", default-features = false, features = ["test-internals"]
 NEW: version = "=0.2.7", default-features = false, features = ["test-internals"]
+
+--- 2026-03-10T17:13:59Z | src/auth.rs | CONTEXT:unknown ---
+OLD:         let (tx, rx) = oneshot::channel();
+        let handle = std::thread::spawn(move || {
+NEW:         let (tx, mut rx) = oneshot::channel();
+        let handle = std::thread::spawn(move || {
+
+--- 2026-03-10T17:14:10Z | src/auth.rs | CONTEXT:unknown ---
+OLD:         let (tx, rx) = oneshot::channel();
+        let path = self.path.clone();
+NEW:         let (tx, mut rx) = oneshot::channel();
+        let path = self.path.clone();
+
+--- 2026-03-10T17:14:26Z | src/extension_dispatcher.rs | CONTEXT:unknown ---
+OLD:         let (tx, rx) = oneshot::channel();
+        let call_id_for_error = call_id.to_string();
+NEW:         let (tx, mut rx) = oneshot::channel();
+        let call_id_for_error = call_id.to_string();
+
+--- 2026-03-10T17:14:37Z | src/extensions.rs | CONTEXT:unknown ---
+OLD:         let (tx, rx) = mpsc::channel(32);
+        let (init_tx, init_rx) = oneshot::channel();
+        let (exit_tx, exit_rx) = oneshot::channel();
+NEW:         let (tx, mut rx) = mpsc::channel(32);
+        let (init_tx, mut init_rx) = oneshot::channel();
+        let (exit_tx, exit_rx) = oneshot::channel();
+
+--- 2026-03-10T17:14:48Z | src/extensions.rs | CONTEXT:unknown ---
+OLD:         let Some(rx) = exit_rx else {
+NEW:         let Some(mut rx) = exit_rx else {
+
+--- 2026-03-10T17:15:10Z | src/extensions.rs | CONTEXT:unknown ---
+OLD: let (reply_tx, reply_rx) = oneshot::channel();
+NEW: let (reply_tx, mut reply_rx) = oneshot::channel();
+
+--- 2026-03-10T17:15:50Z | src/session.rs | CONTEXT:unknown ---
+OLD: let (tx, rx) = oneshot::channel();
+NEW: let (tx, mut rx) = oneshot::channel();
+
+--- 2026-03-10T17:15:56Z | src/session.rs | CONTEXT:unknown ---
+OLD: let (tx, rx) = oneshot::channel::<Result<()>>();
+NEW: let (tx, mut rx) = oneshot::channel::<Result<()>>();
+
+--- 2026-03-10T17:16:29Z | src/interactive.rs | CONTEXT:unknown ---
+OLD:     let (event_tx, event_rx) = mpsc::channel::<PiMsg>(1024);
+NEW:     let (event_tx, mut event_rx) = mpsc::channel::<PiMsg>(1024);
+
+--- 2026-03-10T17:16:31Z | src/interactive.rs | CONTEXT:unknown ---
+OLD:         let (extension_ui_tx, extension_ui_rx) = mpsc::channel::<ExtensionUiRequest>(64);
+NEW:         let (extension_ui_tx, mut extension_ui_rx) = mpsc::channel::<ExtensionUiRequest>(64);
+
+--- 2026-03-10T17:16:37Z | src/package_manager.rs | CONTEXT:unknown ---
+OLD: let (tx, rx) = oneshot::channel();
+NEW: let (tx, mut rx) = oneshot::channel();
+
+--- 2026-03-10T17:16:43Z | src/rpc.rs | CONTEXT:unknown ---
+OLD:     let (in_tx, in_rx) = mpsc::channel::<String>(1024);
+NEW:     let (in_tx, mut in_rx) = mpsc::channel::<String>(1024);
+
+--- 2026-03-10T17:16:59Z | src/rpc.rs | CONTEXT:unknown ---
+OLD:         let (extension_ui_tx, extension_ui_rx) =
+            asupersync::channel::mpsc::channel::<ExtensionUiRequest>(64);
+NEW:         let (extension_ui_tx, mut extension_ui_rx) =
+            asupersync::channel::mpsc::channel::<ExtensionUiRequest>(64);
+
+--- 2026-03-10T17:17:31Z | src/rpc.rs | CONTEXT:unknown ---
+OLD:     in_rx: mpsc::Receiver<String>,
+NEW:     mut in_rx: mpsc::Receiver<String>,
+
+--- 2026-03-10T17:17:46Z | src/rpc.rs | CONTEXT:unknown ---
+OLD:             let (in_tx, in_rx) = asupersync::channel::mpsc::channel::<String>(16);
+NEW:             let (in_tx, mut in_rx) = asupersync::channel::mpsc::channel::<String>(16);
+
+--- 2026-03-10T17:18:14Z | src/extensions.rs | CONTEXT:unknown ---
+OLD:                             let (tx, rx) = oneshot::channel::<u32>();
+                            tx.send(&cx, i).expect("send");
+                            let val = rx.recv(&cx).await.expect("recv");
+NEW:                             let (tx, mut rx) = oneshot::channel::<u32>();
+                            tx.send(&cx, i).expect("send");
+                            let val = rx.recv(&cx).await.expect("recv");
+
+--- 2026-03-10T17:18:19Z | src/extensions.rs | CONTEXT:unknown ---
+OLD:                 let (_tx, rx) = oneshot::channel::<()>();
+                let cx = cx_with_deadline(50); // 50ms deadline
+NEW:                 let (_tx, mut rx) = oneshot::channel::<()>();
+                let cx = cx_with_deadline(50); // 50ms deadline
+
+--- 2026-03-10T17:19:14Z | src/rpc.rs | CONTEXT:unknown ---
+OLD:     abort_rx: oneshot::Receiver<()>,
+NEW:     mut abort_rx: oneshot::Receiver<()>,
+
+--- 2026-03-10T17:19:20Z | src/rpc.rs | CONTEXT:unknown ---
+OLD:     let (in_tx, mut in_rx) = mpsc::channel::<String>(1024);
+    let (out_tx, out_rx) = std::sync::mpsc::channel::<String>();
+NEW:     let (in_tx, in_rx) = mpsc::channel::<String>(1024);
+    let (out_tx, out_rx) = std::sync::mpsc::channel::<String>();
+
+--- 2026-03-10T17:20:13Z | src/extensions.rs | CONTEXT:unknown ---
+OLD:     let cmd = cmd.to_string();
+    let (tx, rx) = oneshot::channel();
+NEW:     let cmd = cmd.to_string();
+    let (tx, mut rx) = oneshot::channel();
+
+--- 2026-03-10T17:20:18Z | src/extensions.rs | CONTEXT:unknown ---
+OLD:         let (tx, rx) = oneshot::channel();
+NEW:         let (tx, mut rx) = oneshot::channel();
+
+--- 2026-03-10T17:22:30Z | src/extensions.rs | CONTEXT:unknown ---
+OLD:     use self::skaffen::extension::host;
+NEW:     use skaffen::extension::host;
+
+--- 2026-03-10T17:22:56Z | src/extensions.rs | CONTEXT:unknown ---
+OLD:     use skaffen::extension::host;
+NEW:     use crate::extension::host;
+
+--- 2026-03-10T17:23:23Z | src/extensions.rs | CONTEXT:unknown ---
+OLD:     use crate::extension::host;
+NEW:     use self::pi::extension::host;
+
+--- 2026-03-10T17:30:07Z | src/lib.rs | CONTEXT:unknown ---
+OLD: extern crate self as pi;
+NEW: extern crate self as skaffen;
+
+--- 2026-03-10T17:38:25Z | src/interactive/agent.rs | CONTEXT:unknown ---
+OLD:         let (mut app, event_rx) = build_test_app_with_provider(provider);
+NEW:         let (mut app, mut event_rx) = build_test_app_with_provider(provider);
+
+--- 2026-03-10T18:13:34Z | src/cli.rs | CONTEXT:unknown ---
+OLD:                 assert_eq!(result.0, vec!["pi"]);
+NEW:                 assert_eq!(result.0, vec!["skaffen"]);

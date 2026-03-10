@@ -744,7 +744,7 @@ mod tests {
             .expect("runtime build");
 
         runtime.block_on(async {
-            let (actions, event_rx, session, agent) = build_host_actions();
+            let (actions, mut event_rx, session, agent) = build_host_actions();
 
             actions
                 .send_message(ExtensionSendMessage {
@@ -799,7 +799,7 @@ mod tests {
             .expect("runtime build");
 
         runtime.block_on(async {
-            let (actions, event_rx, _session, _agent) = build_host_actions();
+            let (actions, mut event_rx, _session, _agent) = build_host_actions();
 
             actions
                 .send_message(ExtensionSendMessage {

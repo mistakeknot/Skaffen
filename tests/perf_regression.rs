@@ -150,7 +150,7 @@ fn build_pi_binary_candidates(
 
 fn pi_binary_candidates() -> Vec<PathBuf> {
     let target_dir = target_dir();
-    let cargo_bin_override = std::env::var_os("CARGO_BIN_EXE_pi").map(PathBuf::from);
+    let cargo_bin_override = std::env::var_os("CARGO_BIN_EXE_skaffen").map(PathBuf::from);
     let detected_profile = perf_build::detect_build_profile();
     build_pi_binary_candidates(&target_dir, cargo_bin_override, &detected_profile)
 }

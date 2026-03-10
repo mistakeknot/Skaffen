@@ -94,14 +94,14 @@ fn setup_rpc(
 ) -> (
     asupersync::channel::mpsc::Sender<String>,
     Arc<Mutex<Receiver<String>>>,
-    asupersync::runtime::JoinHandle<pi::error::Result<()>>,
+    asupersync::runtime::JoinHandle<skaffen::error::Result<()>>,
 ) {
     let session = Arc::new(asupersync::sync::Mutex::new(session));
     let agent_session = AgentSession::new(
         dummy_agent(),
         session,
         false,
-        pi::compaction::ResolvedCompactionSettings::default(),
+        skaffen::compaction::ResolvedCompactionSettings::default(),
     );
 
     let auth_dir = tempfile::tempdir().unwrap();

@@ -74,7 +74,7 @@ fn make_tool_call(name: &str, args: Value) -> ToolCall {
 
 fn make_tool_output(text: &str) -> ToolOutput {
     ToolOutput {
-        content: vec![pi::model::ContentBlock::Text(pi::model::TextContent {
+        content: vec![skaffen::model::ContentBlock::Text(skaffen::model::TextContent {
             text: text.to_string(),
             text_signature: None,
         })],
@@ -632,7 +632,7 @@ fn event_ordering_startup_then_tool_call_then_agent_end() {
                 .expect("dispatch tool_call");
 
             let output = ToolOutput {
-                content: vec![pi::model::ContentBlock::Text(pi::model::TextContent {
+                content: vec![skaffen::model::ContentBlock::Text(skaffen::model::TextContent {
                     text: "ok".to_string(),
                     text_signature: None,
                 })],

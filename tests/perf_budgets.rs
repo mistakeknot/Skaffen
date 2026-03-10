@@ -364,7 +364,7 @@ fn build_binary_size_candidate_paths(
 
 fn binary_size_candidate_paths(root: &Path) -> Vec<PathBuf> {
     let target_dir = root.join("target");
-    let detected_profile = pi::perf_build::detect_build_profile();
+    let detected_profile = skaffen::perf_build::detect_build_profile();
     let release_binary_override = binary_size_release_override();
     build_binary_size_candidate_paths(&target_dir, release_binary_override, &detected_profile)
 }

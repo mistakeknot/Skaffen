@@ -145,7 +145,7 @@ fn options_with_key(key: &str) -> StreamOptions {
 
 /// Drive a provider stream to Done and collect all events.
 fn collect_stream_events(
-    provider: Arc<dyn pi::provider::Provider>,
+    provider: Arc<dyn skaffen::provider::Provider>,
     context: Context<'static>,
     options: StreamOptions,
 ) -> Vec<StreamEvent> {
@@ -2532,14 +2532,14 @@ mod failure_taxonomy {
         for (expected_cat, output) in &cases {
             let result = classify_failure(output);
             match result {
-                pi::flake_classifier::FlakeClassification::Transient { category, .. } => {
+                skaffen::flake_classifier::FlakeClassification::Transient { category, .. } => {
                     assert_eq!(
                         &category, expected_cat,
                         "Expected {expected_cat:?} for output: {output}"
                     );
                     covered.insert(category);
                 }
-                pi::flake_classifier::FlakeClassification::Deterministic => {
+                skaffen::flake_classifier::FlakeClassification::Deterministic => {
                     panic!(
                         "Expected Transient({expected_cat:?}) but got Deterministic for: {output}"
                     );

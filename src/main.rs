@@ -122,15 +122,15 @@ async fn resolve_selection_with_auth(
     models_path: &Path,
     allow_setup_prompt: bool,
     extra_entries: &[ModelEntry],
-) -> Result<Option<(pi::app::ModelSelection, Option<String>)>> {
+) -> Result<Option<(skaffen::app::ModelSelection, Option<String>)>> {
     loop {
         let scoped_models = if scoped_patterns.is_empty() {
             Vec::new()
         } else {
-            pi::app::resolve_model_scope(scoped_patterns, model_registry, cli.api_key.is_some())
+            skaffen::app::resolve_model_scope(scoped_patterns, model_registry, cli.api_key.is_some())
         };
 
-        let selection = match pi::app::select_model_and_thinking(
+        let selection = match skaffen::app::select_model_and_thinking(
             cli,
             config,
             session,
@@ -157,16 +157,16 @@ async fn resolve_selection_with_auth(
             }
         };
 
-        match pi::app::resolve_api_key(auth, cli, &selection.model_entry) {
+        match skaffen::app::resolve_api_key(auth, cli, &selection.model_entry) {
             Ok(key) => return Ok(Some((selection, key))),
             Err(err) => {
                 if let Some(startup) = err.downcast_ref::<StartupError>() {
                     if let StartupError::MissingApiKey { provider } = startup {
                         let canonical_provider =
-                            pi::provider_metadata::canonical_provider_id(provider)
+                            skaffen::provider_metadata::canonical_provider_id(provider)
                                 .unwrap_or(provider.as_str());
                         if canonical_provider == "sap-ai-core" {
-                            if let Some(token) = pi::auth::exchange_sap_access_token(auth).await? {
+                            if let Some(token) = skaffen::auth::exchange_sap_access_token(auth).await? {
                                 return Ok(Some((selection, Some(token))));
                             }
                         }
@@ -207,8 +207,8 @@ fn build_extension_bootstrap_selection(
     config: &Config,
     model_registry: &ModelRegistry,
     models_path: &Path,
-) -> Result<pi::app::ModelSelection> {
-    let model_entry = pi::app::bootstrap_model_entry(model_registry).ok_or_else(|| {
+) -> Result<skaffen::app::ModelSelection> {
+    let model_entry = skaffen::app::bootstrap_model_entry(model_registry).ok_or_else(|| {
         anyhow::Error::new(StartupError::NoModelsAvailable {
             models_path: models_path.to_path_buf(),
         })
@@ -218,7 +218,7 @@ fn build_extension_bootstrap_selection(
         .as_deref()
         .and_then(|value| value.parse::<ThinkingLevel>().ok());
 
-    Ok(pi::app::ModelSelection {
+    Ok(skaffen::app::ModelSelection {
         thinking_level: model_entry
             .clamp_thinking_level(thinking_level.unwrap_or(ThinkingLevel::XHigh)),
         model_entry,
@@ -440,8 +440,8 @@ fn main_impl() -> Result<()> {
 
 fn print_error_with_hints(err: &anyhow::Error) {
     for cause in err.chain() {
-        if let Some(pi_error) = cause.downcast_ref::<pi::error::Error>() {
-            eprint!("{}", pi::error_hints::format_error_with_hints(pi_error));
+        if let Some(pi_error) = cause.downcast_ref::<skaffen::error::Error>() {
+            eprint!("{}", skaffen::error_hints::format_error_with_hints(pi_error));
             return;
         }
     }
@@ -467,8 +467,8 @@ fn is_usage_error(err: &anyhow::Error) -> bool {
 
     if err.chain().any(|cause| {
         cause
-            .downcast_ref::<pi::error::Error>()
-            .is_some_and(|pi_error| matches!(pi_error, pi::error::Error::Validation(_)))
+            .downcast_ref::<skaffen::error::Error>()
+            .is_some_and(|pi_error| matches!(pi_error, skaffen::error::Error::Validation(_)))
     }) {
         return true;
     }
@@ -481,8 +481,8 @@ fn is_usage_error(err: &anyhow::Error) -> bool {
 
 fn validate_theme_path_spec(theme_spec: Option<&str>, cwd: &Path) -> Result<()> {
     if let Some(theme_spec) = theme_spec {
-        if pi::theme::looks_like_theme_path(theme_spec) {
-            pi::theme::Theme::resolve_spec(theme_spec, cwd).map_err(anyhow::Error::new)?;
+        if skaffen::theme::looks_like_theme_path(theme_spec) {
+            skaffen::theme::Theme::resolve_spec(theme_spec, cwd).map_err(anyhow::Error::new)?;
         }
     }
     Ok(())
@@ -492,7 +492,7 @@ fn parse_bool_flag_value(flag_name: &str, raw: &str) -> Result<bool> {
     match raw.trim().to_ascii_lowercase().as_str() {
         "1" | "true" | "yes" | "on" => Ok(true),
         "0" | "false" | "no" | "off" => Ok(false),
-        _ => Err(pi::error::Error::validation(format!(
+        _ => Err(skaffen::error::Error::validation(format!(
             "Invalid boolean value for extension flag --{flag_name}: \"{raw}\". Use one of: true,false,1,0,yes,no,on,off."
         ))
         .into()),
@@ -513,7 +513,7 @@ fn coerce_extension_flag_value(
         }
         "number" | "int" | "integer" | "float" => {
             let Some(raw) = flag.value.as_deref() else {
-                return Err(pi::error::Error::validation(format!(
+                return Err(skaffen::error::Error::validation(format!(
                     "Extension flag --{} requires a numeric value.",
                     flag.name
                 ))
@@ -523,13 +523,13 @@ fn coerce_extension_flag_value(
                 return Ok(Value::Number(parsed.into()));
             }
             let parsed = raw.parse::<f64>().map_err(|_| {
-                pi::error::Error::validation(format!(
+                skaffen::error::Error::validation(format!(
                     "Invalid numeric value for extension flag --{}: \"{}\"",
                     flag.name, raw
                 ))
             })?;
             let Some(number) = serde_json::Number::from_f64(parsed) else {
-                return Err(pi::error::Error::validation(format!(
+                return Err(skaffen::error::Error::validation(format!(
                     "Numeric value for extension flag --{} is not finite: \"{}\"",
                     flag.name, raw
                 ))
@@ -539,7 +539,7 @@ fn coerce_extension_flag_value(
         }
         _ => {
             let Some(raw) = flag.value.as_deref() else {
-                return Err(pi::error::Error::validation(format!(
+                return Err(skaffen::error::Error::validation(format!(
                     "Extension flag --{} requires a value.",
                     flag.name
                 ))
@@ -551,7 +551,7 @@ fn coerce_extension_flag_value(
 }
 
 async fn apply_extension_cli_flags(
-    manager: &pi::extensions::ExtensionManager,
+    manager: &skaffen::extensions::ExtensionManager,
     extension_flags: &[cli::ExtensionCliFlag],
 ) -> Result<()> {
     if extension_flags.is_empty() {
@@ -585,7 +585,7 @@ async fn apply_extension_cli_flags(
                     .collect::<Vec<_>>()
                     .join(", ")
             };
-            return Err(pi::error::Error::validation(format!(
+            return Err(skaffen::error::Error::validation(format!(
                 "Unknown extension flag --{}. Registered extension flags: {known}",
                 cli_flag.name
             ))
@@ -594,21 +594,21 @@ async fn apply_extension_cli_flags(
 
         for spec in matches {
             let Some(extension_id) = spec.get("extension_id").and_then(Value::as_str) else {
-                return Err(pi::error::Error::validation(format!(
+                return Err(skaffen::error::Error::validation(format!(
                     "Extension flag --{} cannot be set because extension metadata is missing extension_id.",
                     cli_flag.name
                 ))
                 .into());
             };
             if extension_id.trim().is_empty() {
-                return Err(pi::error::Error::validation(format!(
+                return Err(skaffen::error::Error::validation(format!(
                     "Extension flag --{} cannot be set because extension_id is empty.",
                     cli_flag.name
                 ))
                 .into());
             }
             let registered_name = spec.get("name").and_then(Value::as_str).ok_or_else(|| {
-                pi::error::Error::validation(format!(
+                skaffen::error::Error::validation(format!(
                     "Extension flag --{} is missing name metadata.",
                     cli_flag.name
                 ))
@@ -643,7 +643,7 @@ fn policy_default_toggle_example(default_permissive: bool) -> serde_json::Value 
 }
 
 fn extension_policy_migration_guardrails(
-    resolved: &pi::config::ResolvedExtensionPolicy,
+    resolved: &skaffen::config::ResolvedExtensionPolicy,
 ) -> serde_json::Value {
     serde_json::json!({
         "default_profile": "permissive",
@@ -669,7 +669,7 @@ fn extension_policy_migration_guardrails(
 }
 
 const fn maybe_print_extension_policy_migration_notice(
-    _resolved: &pi::config::ResolvedExtensionPolicy,
+    _resolved: &skaffen::config::ResolvedExtensionPolicy,
 ) {
 }
 
@@ -774,7 +774,7 @@ fn capability_remediation(capability: Capability, decision: PolicyDecision) -> s
     })
 }
 
-fn print_resolved_extension_policy(resolved: &pi::config::ResolvedExtensionPolicy) -> Result<()> {
+fn print_resolved_extension_policy(resolved: &skaffen::config::ResolvedExtensionPolicy) -> Result<()> {
     let capability_decisions = ALL_CAPABILITIES
         .iter()
         .map(|capability| {
@@ -850,7 +850,7 @@ fn print_resolved_extension_policy(resolved: &pi::config::ResolvedExtensionPolic
     Ok(())
 }
 
-fn print_resolved_repair_policy(resolved: &pi::config::ResolvedRepairPolicy) -> Result<()> {
+fn print_resolved_repair_policy(resolved: &skaffen::config::ResolvedRepairPolicy) -> Result<()> {
     let payload = serde_json::json!({
         "requested_mode": resolved.requested_mode,
         "effective_mode": resolved.effective_mode,
@@ -883,7 +883,7 @@ async fn run(
     }
 
     if !cli.no_migrations {
-        let migration_report = pi::migrations::run_startup_migrations(&cwd);
+        let migration_report = skaffen::migrations::run_startup_migrations(&cwd);
         for message in migration_report.messages() {
             eprintln!("{message}");
         }
@@ -935,7 +935,7 @@ async fn run(
             .map(cli::ExtensionCliFlag::display_name)
             .collect::<Vec<_>>()
             .join(", ");
-        return Err(pi::error::Error::validation(format!(
+        return Err(skaffen::error::Error::validation(format!(
             "Extension flags were provided ({rendered}), but no extensions are loaded. \
              Add extensions via --extension or remove the flags."
         ))
@@ -957,7 +957,7 @@ async fn run(
     }
 
     if has_js_extensions && has_native_extensions {
-        return Err(pi::error::Error::validation(
+        return Err(skaffen::error::Error::validation(
             "Mixed extension runtimes are not supported in one session yet. Use either JS/TS extensions (QuickJS) or native-rust descriptors (*.native.json), but not both at once."
                 .to_string(),
         )
@@ -969,7 +969,7 @@ async fn run(
         .policy;
     let prewarm_repair = config.resolve_repair_policy_with_metadata(cli.repair_policy.as_deref());
     let prewarm_repair_mode = if prewarm_repair.source == "default" {
-        pi::extensions::RepairPolicyMode::AutoStrict
+        skaffen::extensions::RepairPolicyMode::AutoStrict
     } else {
         prewarm_repair.effective_mode
     };
@@ -983,7 +983,7 @@ async fn run(
             None
         } else {
             let pre_enabled_tools = cli.enabled_tools();
-            let pre_mgr = pi::extensions::ExtensionManager::new();
+            let pre_mgr = skaffen::extensions::ExtensionManager::new();
             pre_mgr.set_cwd(cwd.display().to_string());
 
             let pre_tools = Arc::new(ToolRegistry::new(&pre_enabled_tools, &cwd, Some(&config)));
@@ -1031,7 +1031,7 @@ async fn run(
         }
     } else {
         let pre_enabled_tools = cli.enabled_tools();
-        let pre_mgr = pi::extensions::ExtensionManager::new();
+        let pre_mgr = skaffen::extensions::ExtensionManager::new();
         pre_mgr.set_cwd(cwd.display().to_string());
         let pre_tools = Arc::new(ToolRegistry::new(&pre_enabled_tools, &cwd, Some(&config)));
 
@@ -1087,7 +1087,7 @@ async fn run(
 
     if cli.mode.as_deref() != Some("rpc") {
         let stdin_content = read_piped_stdin()?;
-        pi::app::apply_piped_stdin(&mut cli, stdin_content);
+        skaffen::app::apply_piped_stdin(&mut cli, stdin_content);
     }
 
     // Auto-detect print mode: if the user passed positional message args (e.g. `pi "hello"`)
@@ -1096,7 +1096,7 @@ async fn run(
         cli.print = true;
     }
 
-    pi::app::normalize_cli(&mut cli);
+    skaffen::app::normalize_cli(&mut cli);
 
     if let Some(export_path) = cli.export.clone() {
         let output = cli.message_args().first().map(ToString::to_string);
@@ -1105,11 +1105,11 @@ async fn run(
         return Ok(());
     }
 
-    pi::app::validate_rpc_args(&cli)?;
+    skaffen::app::validate_rpc_args(&cli)?;
 
     let mut messages: Vec<String> = cli.message_args().iter().map(ToString::to_string).collect();
     let file_args: Vec<String> = cli.file_args().iter().map(ToString::to_string).collect();
-    let initial = pi::app::prepare_initial_message(
+    let initial = skaffen::app::prepare_initial_message(
         &cwd,
         &file_args,
         &mut messages,
@@ -1134,14 +1134,14 @@ async fn run(
     }
 
     let scoped_patterns = if let Some(models_arg) = &cli.models {
-        pi::app::parse_models_arg(models_arg)
+        skaffen::app::parse_models_arg(models_arg)
     } else {
         config.enabled_models.clone().unwrap_or_default()
     };
     let scoped_models = if scoped_patterns.is_empty() {
         Vec::new()
     } else {
-        pi::app::resolve_model_scope(&scoped_patterns, &model_registry, cli.api_key.is_some())
+        skaffen::app::resolve_model_scope(&scoped_patterns, &model_registry, cli.api_key.is_some())
     };
 
     if cli.api_key.is_some()
@@ -1191,7 +1191,7 @@ async fn run(
         String::new()
     };
     let test_mode = std::env::var_os("PI_TEST_MODE").is_some();
-    let system_prompt = pi::app::build_system_prompt(
+    let system_prompt = skaffen::app::build_system_prompt(
         &cli,
         &cwd,
         &enabled_tools,
@@ -1208,7 +1208,7 @@ async fn run(
     let provider =
         providers::create_provider(&selection.model_entry, None).map_err(anyhow::Error::new)?;
     let stream_options =
-        pi::app::build_stream_options(&config, resolved_key.clone(), &selection, &session);
+        skaffen::app::build_stream_options(&config, resolved_key.clone(), &selection, &session);
     let agent_config = AgentConfig {
         system_prompt: Some(system_prompt),
         max_tool_iterations: 50,
@@ -1270,7 +1270,7 @@ async fn run(
             // Compatibility-first default for extension-heavy workloads:
             // if the user did not choose a repair policy explicitly, prefer
             // aggressive deterministic repairs while capability policy stays enforced.
-            pi::extensions::RepairPolicyMode::AutoStrict
+            skaffen::extensions::RepairPolicyMode::AutoStrict
         } else {
             resolved_repair_policy.effective_mode
         };
@@ -1299,7 +1299,7 @@ async fn run(
             if let Some(region) = &agent_session.extensions {
                 apply_extension_cli_flags(region.manager(), &extension_flags).await?;
             } else {
-                return Err(pi::error::Error::validation(
+                return Err(skaffen::error::Error::validation(
                     "Extension flags were provided, but extensions are not active in this session.",
                 )
                 .into());
@@ -1311,7 +1311,7 @@ async fn run(
             extension_model_entries = region.manager().extension_model_entries();
             if !extension_model_entries.is_empty() {
                 // Build OAuth configs map from model entries before merging.
-                let ext_oauth_configs: std::collections::HashMap<String, pi::models::OAuthConfig> =
+                let ext_oauth_configs: std::collections::HashMap<String, skaffen::models::OAuthConfig> =
                     extension_model_entries
                         .iter()
                         .filter_map(|entry| {
@@ -1326,7 +1326,7 @@ async fn run(
 
                 // Refresh expired OAuth tokens for extension-registered providers.
                 if !ext_oauth_configs.is_empty() {
-                    let client = pi::http::client::Client::new();
+                    let client = skaffen::http::client::Client::new();
                     if let Err(e) = auth
                         .refresh_expired_extension_oauth_tokens(&client, &ext_oauth_configs)
                         .await
@@ -1343,10 +1343,10 @@ async fn run(
     } else if !extension_flags.is_empty() {
         let rendered = extension_flags
             .iter()
-            .map(pi::cli::ExtensionCliFlag::display_name)
+            .map(skaffen::cli::ExtensionCliFlag::display_name)
             .collect::<Vec<_>>()
             .join(", ");
-        return Err(pi::error::Error::validation(format!(
+        return Err(skaffen::error::Error::validation(format!(
             "Extension flags were provided ({rendered}), but no extensions are loaded. Add extensions via --extension or remove the flags."
         ))
         .into());
@@ -1354,7 +1354,7 @@ async fn run(
 
     if has_extensions {
         let session_snapshot = {
-            let cx = pi::agent_cx::AgentCx::for_request();
+            let cx = skaffen::agent_cx::AgentCx::for_request();
             let session = agent_session
                 .session
                 .lock(cx.cx())
@@ -1404,13 +1404,13 @@ async fn run(
     }
 
     {
-        let cx = pi::agent_cx::AgentCx::for_request();
+        let cx = skaffen::agent_cx::AgentCx::for_request();
         let mut session = agent_session
             .session
             .lock(cx.cx())
             .await
             .map_err(|e| anyhow::anyhow!(e.to_string()))?;
-        pi::app::update_session_for_selection(&mut session, &selection);
+        skaffen::app::update_session_for_selection(&mut session, &selection);
     }
 
     if let Some(message) = &selection.fallback_message {
@@ -1421,7 +1421,7 @@ async fn run(
     agent_session.set_auth_storage(auth.clone());
 
     let history = {
-        let cx = pi::agent_cx::AgentCx::for_request();
+        let cx = skaffen::agent_cx::AgentCx::for_request();
         let session = agent_session
             .session
             .lock(cx.cx())
@@ -1441,7 +1441,7 @@ async fn run(
         let rpc_scoped_models = selection
             .scoped_models
             .iter()
-            .map(|sm| pi::rpc::RpcScopedModel {
+            .map(|sm| skaffen::rpc::RpcScopedModel {
                 model: sm.model.clone(),
                 thinking_level: sm.thinking_level,
             })
@@ -1502,7 +1502,7 @@ async fn run(
 
     // Best-effort autosave flush on shutdown.
     if !cli.no_session {
-        let cx = pi::agent_cx::AgentCx::for_request();
+        let cx = skaffen::agent_cx::AgentCx::for_request();
         if let Ok(mut guard) = session_handle.lock(cx.cx()).await {
             if let Err(e) = guard.flush_autosave_on_shutdown().await {
                 eprintln!("Warning: Failed to flush session autosave: {e}");
@@ -1577,7 +1577,7 @@ fn spawn_session_index_maintenance() {
     // Cleanup can be slow if there are many temp files, so we don't want to block main.
     std::thread::spawn(move || {
         // Clean up old bash tool logs in background
-        pi::tools::cleanup_temp_files();
+        skaffen::tools::cleanup_temp_files();
 
         if index.should_reindex(MAX_INDEX_AGE) {
             if let Err(err) = index.reindex_all() {
@@ -1741,7 +1741,7 @@ where
 
 async fn handle_update_index() -> Result<()> {
     let store = ExtensionIndexStore::default_store();
-    let client = pi::http::client::Client::new();
+    let client = skaffen::http::client::Client::new();
     let (_, stats) = store.refresh_best_effort(&client).await?;
 
     if !stats.refreshed {
@@ -1771,11 +1771,11 @@ async fn handle_search(query: &str, tag: Option<&str>, sort: &str, limit: usize)
     if has_cache
         && index.is_stale(
             chrono::Utc::now(),
-            pi::extension_index::DEFAULT_INDEX_MAX_AGE,
+            skaffen::extension_index::DEFAULT_INDEX_MAX_AGE,
         )
     {
         println!("Refreshing extension index...");
-        let client = pi::http::client::Client::new();
+        let client = skaffen::http::client::Client::new();
         match store.refresh_best_effort(&client).await {
             Ok((refreshed, _)) => index = refreshed,
             Err(_) => {
@@ -1805,7 +1805,7 @@ fn handle_search_blocking(
     if has_cache
         && index.is_stale(
             chrono::Utc::now(),
-            pi::extension_index::DEFAULT_INDEX_MAX_AGE,
+            skaffen::extension_index::DEFAULT_INDEX_MAX_AGE,
         )
     {
         return Ok(false);
@@ -1816,7 +1816,7 @@ fn handle_search_blocking(
 }
 
 fn render_search_results(
-    index: &pi::extension_index::ExtensionIndex,
+    index: &skaffen::extension_index::ExtensionIndex,
     query: &str,
     tag: Option<&str>,
     sort: &str,
@@ -1832,12 +1832,12 @@ fn render_search_results(
 }
 
 fn collect_search_hits(
-    index: &pi::extension_index::ExtensionIndex,
+    index: &skaffen::extension_index::ExtensionIndex,
     tag: Option<&str>,
     sort: &str,
     limit: usize,
     query: &str,
-) -> Vec<pi::extension_index::ExtensionSearchHit> {
+) -> Vec<skaffen::extension_index::ExtensionSearchHit> {
     let mut hits = index.search(query, limit);
 
     // Filter by tag if requested
@@ -1865,7 +1865,7 @@ fn collect_search_hits(
 }
 
 #[allow(clippy::uninlined_format_args)]
-fn print_search_results(hits: &[pi::extension_index::ExtensionSearchHit]) {
+fn print_search_results(hits: &[skaffen::extension_index::ExtensionSearchHit]) {
     // Column widths
     let name_w = hits
         .iter()
@@ -1917,9 +1917,9 @@ fn print_search_results(hits: &[pi::extension_index::ExtensionSearchHit]) {
             tags_joined
         };
         let source_label = match &hit.entry.source {
-            Some(pi::extension_index::ExtensionIndexSource::Npm { .. }) => "npm",
-            Some(pi::extension_index::ExtensionIndexSource::Git { .. }) => "git",
-            Some(pi::extension_index::ExtensionIndexSource::Url { .. }) => "url",
+            Some(skaffen::extension_index::ExtensionIndexSource::Npm { .. }) => "npm",
+            Some(skaffen::extension_index::ExtensionIndexSource::Git { .. }) => "git",
+            Some(skaffen::extension_index::ExtensionIndexSource::Url { .. }) => "url",
             None => "-",
         };
         println!(
@@ -1954,9 +1954,9 @@ fn handle_info_blocking(name: &str) -> Result<()> {
 }
 
 fn find_index_entry_by_name_or_id<'a>(
-    index: &'a pi::extension_index::ExtensionIndex,
+    index: &'a skaffen::extension_index::ExtensionIndex,
     name: &str,
-) -> Option<&'a pi::extension_index::ExtensionIndexEntry> {
+) -> Option<&'a skaffen::extension_index::ExtensionIndexEntry> {
     // Look up by exact id, name, or fuzzy match (top-1 search hit)
     index
         .entries
@@ -1974,7 +1974,7 @@ fn find_index_entry_by_name_or_id<'a>(
         })
 }
 
-fn print_extension_info(entry: &pi::extension_index::ExtensionIndexEntry) {
+fn print_extension_info(entry: &skaffen::extension_index::ExtensionIndexEntry) {
     let width = 60;
     let bar = "─".repeat(width);
 
@@ -2020,17 +2020,17 @@ fn print_extension_info(entry: &pi::extension_index::ExtensionIndexEntry) {
     // Source
     if let Some(source) = &entry.source {
         let source_line = match source {
-            pi::extension_index::ExtensionIndexSource::Npm {
+            skaffen::extension_index::ExtensionIndexSource::Npm {
                 package, version, ..
             } => {
                 let ver = version.as_deref().unwrap_or("latest");
                 format!("Source: npm:{package}@{ver}")
             }
-            pi::extension_index::ExtensionIndexSource::Git { repo, path, .. } => {
+            skaffen::extension_index::ExtensionIndexSource::Git { repo, path, .. } => {
                 let suffix = path.as_deref().map_or(String::new(), |p| format!(" ({p})"));
                 format!("Source: git:{repo}{suffix}")
             }
-            pi::extension_index::ExtensionIndexSource::Url { url } => {
+            skaffen::extension_index::ExtensionIndexSource::Url { url } => {
                 format!("Source: {url}")
             }
         };
@@ -2972,7 +2972,7 @@ fn handle_session_migrate(path: &str, dry_run: bool) -> Result<()> {
 
     for jsonl_path in &jsonl_files {
         if dry_run {
-            match pi::session::migrate_dry_run(jsonl_path) {
+            match skaffen::session::migrate_dry_run(jsonl_path) {
                 Ok(verification) => {
                     let status = if verification.entry_count_match
                         && verification.hash_chain_match
@@ -2999,7 +2999,7 @@ fn handle_session_migrate(path: &str, dry_run: bool) -> Result<()> {
             }
         } else {
             let correlation_id = uuid::Uuid::new_v4().to_string();
-            match pi::session::migrate_jsonl_to_v2(jsonl_path, &correlation_id) {
+            match skaffen::session::migrate_jsonl_to_v2(jsonl_path, &correlation_id) {
                 Ok(event) => {
                     println!(
                         "[migrated] {}: migration_id={}, entries_match={}, hash_match={}, index_ok={}",
@@ -3077,7 +3077,7 @@ fn handle_doctor(
         only: only_set,
     };
 
-    let report = pi::doctor::run_doctor(&opts)?;
+    let report = skaffen::doctor::run_doctor(&opts)?;
 
     match format {
         "json" => {
@@ -3092,7 +3092,7 @@ fn handle_doctor(
     }
 
     // Exit with code 1 if any failures (useful for CI)
-    if report.overall == pi::doctor::Severity::Fail {
+    if report.overall == skaffen::doctor::Severity::Fail {
         std::process::exit(1);
     }
 
@@ -3202,7 +3202,7 @@ fn append_file_fingerprint(hasher: &mut Sha256, path: &Path) {
 fn list_models_cache_path(models_path: &Path) -> Option<PathBuf> {
     let mut hasher = Sha256::new();
     hasher.update(env!("CARGO_PKG_VERSION").as_bytes());
-    hasher.update(pi::models::model_catalog_cache_fingerprint().to_le_bytes());
+    hasher.update(skaffen::models::model_catalog_cache_fingerprint().to_le_bytes());
     append_file_fingerprint(&mut hasher, &Config::auth_path());
     append_file_fingerprint(&mut hasher, models_path);
 
@@ -3592,10 +3592,10 @@ async fn run_first_time_setup(
         }
         SetupCredentialKind::OAuthPkce => {
             let start = match provider.provider {
-                "openai-codex" => pi::auth::start_openai_codex_oauth()?,
-                "anthropic" => pi::auth::start_anthropic_oauth()?,
-                "google-gemini-cli" => pi::auth::start_google_gemini_cli_oauth()?,
-                "google-antigravity" => pi::auth::start_google_antigravity_oauth()?,
+                "openai-codex" => skaffen::auth::start_openai_codex_oauth()?,
+                "anthropic" => skaffen::auth::start_anthropic_oauth()?,
+                "google-gemini-cli" => skaffen::auth::start_google_gemini_cli_oauth()?,
+                "google-antigravity" => skaffen::auth::start_google_antigravity_oauth()?,
                 _ => {
                     console.render_warning(&format!(
                         "OAuth login is not supported for {} in this setup flow. Start Pi and run /login {} instead.",
@@ -3618,8 +3618,8 @@ result in account suspension/ban. Prefer using an Anthropic API key (ANTHROPIC_A
             let callback_server = start
                 .redirect_uri
                 .as_deref()
-                .filter(|uri| pi::auth::redirect_uri_needs_callback_server(uri))
-                .and_then(|uri| match pi::auth::start_oauth_callback_server(uri) {
+                .filter(|uri| skaffen::auth::redirect_uri_needs_callback_server(uri))
+                .and_then(|uri| match skaffen::auth::start_oauth_callback_server(uri) {
                     Ok(server) => {
                         tracing::info!(port = server.port, "OAuth callback server listening");
                         Some(server)
@@ -3704,16 +3704,16 @@ result in account suspension/ban. Prefer using an Anthropic API key (ANTHROPIC_A
 
             match start.provider.as_str() {
                 "openai-codex" => {
-                    pi::auth::complete_openai_codex_oauth(code_input, &start.verifier).await?
+                    skaffen::auth::complete_openai_codex_oauth(code_input, &start.verifier).await?
                 }
                 "anthropic" => {
-                    pi::auth::complete_anthropic_oauth(code_input, &start.verifier).await?
+                    skaffen::auth::complete_anthropic_oauth(code_input, &start.verifier).await?
                 }
                 "google-gemini-cli" => {
-                    pi::auth::complete_google_gemini_cli_oauth(code_input, &start.verifier).await?
+                    skaffen::auth::complete_google_gemini_cli_oauth(code_input, &start.verifier).await?
                 }
                 "google-antigravity" => {
-                    pi::auth::complete_google_antigravity_oauth(code_input, &start.verifier).await?
+                    skaffen::auth::complete_google_antigravity_oauth(code_input, &start.verifier).await?
                 }
                 other => {
                     console.render_warning(&format!(
@@ -3732,7 +3732,7 @@ result in account suspension/ban. Prefer using an Anthropic API key (ANTHROPIC_A
                 return Ok(false);
             }
 
-            let device = pi::auth::start_kimi_code_device_flow().await?;
+            let device = skaffen::auth::start_kimi_code_device_flow().await?;
             let verification_url = device
                 .verification_uri_complete
                 .clone()
@@ -3763,23 +3763,23 @@ Code expires in {} seconds.\n",
                     return Ok(false);
                 }
 
-                match pi::auth::poll_kimi_code_device_flow(&device.device_code).await {
-                    pi::auth::DeviceFlowPollResult::Success(cred) => break cred,
-                    pi::auth::DeviceFlowPollResult::Pending => {
+                match skaffen::auth::poll_kimi_code_device_flow(&device.device_code).await {
+                    skaffen::auth::DeviceFlowPollResult::Success(cred) => break cred,
+                    skaffen::auth::DeviceFlowPollResult::Pending => {
                         console.render_info("Authorization still pending. Complete the browser step and poll again.");
                     }
-                    pi::auth::DeviceFlowPollResult::SlowDown => {
+                    skaffen::auth::DeviceFlowPollResult::SlowDown => {
                         console.render_info("Authorization server asked to slow down. Wait a few seconds and poll again.");
                     }
-                    pi::auth::DeviceFlowPollResult::Expired => {
+                    skaffen::auth::DeviceFlowPollResult::Expired => {
                         console.render_warning("Device code expired. Run setup again.");
                         return Ok(false);
                     }
-                    pi::auth::DeviceFlowPollResult::AccessDenied => {
+                    skaffen::auth::DeviceFlowPollResult::AccessDenied => {
                         console.render_warning("Access denied. Run setup again.");
                         return Ok(false);
                     }
-                    pi::auth::DeviceFlowPollResult::Error(err) => {
+                    skaffen::auth::DeviceFlowPollResult::Error(err) => {
                         console.render_warning(&format!("OAuth polling failed: {err}"));
                         return Ok(false);
                     }
@@ -4000,7 +4000,7 @@ async fn export_session(input_path: &str, output_path: Option<&str>) -> Result<P
     }
 
     let session = Session::open(input_path).await?;
-    let html = pi::app::render_session_html(&session);
+    let html = skaffen::app::render_session_html(&session);
     let output_path = output_path.map_or_else(|| default_export_path(input), PathBuf::from);
 
     if let Some(parent) = output_path.parent() {
@@ -4017,7 +4017,7 @@ async fn run_rpc_mode(
     resources: ResourceLoader,
     config: Config,
     available_models: Vec<ModelEntry>,
-    scoped_models: Vec<pi::rpc::RpcScopedModel>,
+    scoped_models: Vec<skaffen::rpc::RpcScopedModel>,
     auth: AuthStorage,
     runtime_handle: RuntimeHandle,
 ) -> Result<()> {
@@ -4030,9 +4030,9 @@ async fn run_rpc_mode(
     }) {
         eprintln!("Warning: Failed to install Ctrl+C handler for RPC mode: {err}");
     }
-    let rpc_task = pi::rpc::run_stdio(
+    let rpc_task = skaffen::rpc::run_stdio(
         session,
-        pi::rpc::RpcOptions {
+        skaffen::rpc::RpcOptions {
             config,
             resources,
             available_models,
@@ -4074,7 +4074,7 @@ async fn run_print_mode(
     }
 
     if mode == "json" {
-        let cx = pi::agent_cx::AgentCx::for_request();
+        let cx = skaffen::agent_cx::AgentCx::for_request();
         let session = session
             .session
             .lock(cx.cx())
@@ -4102,7 +4102,7 @@ async fn run_print_mode(
         let text_stream_state = Arc::clone(&text_stream_state_for_events);
         let coalescer = extensions
             .as_ref()
-            .map(|m| pi::extensions::EventCoalescer::new(m.clone()));
+            .map(|m| skaffen::extensions::EventCoalescer::new(m.clone()));
         move |event: AgentEvent| {
             if emit_json_events {
                 if let Ok(serialized) = serde_json::to_string(&event) {
@@ -4148,7 +4148,7 @@ async fn run_print_mode(
     let mut sent_prompts = 0usize;
 
     if let Some(initial) = initial {
-        let content = pi::app::build_initial_content(&initial);
+        let content = skaffen::app::build_initial_content(&initial);
         reset_print_text_stream_state(&text_stream_state);
         let message = run_print_prompt_with_retry(
             session,
@@ -4237,7 +4237,7 @@ impl PrintTextStreamState {
 fn streamed_text_delta(event: &AgentEvent) -> Option<&str> {
     match event {
         AgentEvent::MessageUpdate {
-            assistant_message_event: pi::model::AssistantMessageEvent::TextDelta { delta, .. },
+            assistant_message_event: skaffen::model::AssistantMessageEvent::TextDelta { delta, .. },
             ..
         } => Some(delta.as_str()),
         _ => None,
@@ -4308,7 +4308,7 @@ fn finish_print_text_response(
                 console.render_markdown(&markdown);
             }
         } else {
-            pi::app::output_final_text(message);
+            skaffen::app::output_final_text(message);
         }
         return Ok(());
     }
@@ -4346,7 +4346,7 @@ fn is_retryable_prompt_result(msg: &AssistantMessage) -> bool {
         return false;
     }
     let err_msg = msg.error_message.as_deref().unwrap_or("Request error");
-    pi::error::is_retryable_error(err_msg, Some(msg.usage.input), None)
+    skaffen::error::is_retryable_error(err_msg, Some(msg.usage.input), None)
 }
 
 /// Execute a single prompt with automatic retry and `AutoRetryStart`/`AutoRetryEnd`
@@ -4355,7 +4355,7 @@ fn is_retryable_prompt_result(msg: &AssistantMessage) -> bool {
 async fn run_print_prompt_with_retry<H, EH>(
     session: &mut AgentSession,
     config: &Config,
-    abort_signal: &pi::agent::AbortSignal,
+    abort_signal: &skaffen::agent::AbortSignal,
     make_event_handler: &H,
     retry_enabled: bool,
     max_retries: u32,
@@ -4480,7 +4480,7 @@ where
             Err(err) => {
                 let err_str = err.to_string();
                 if retry_count < max_retries
-                    && pi::error::is_retryable_error(&err_str, None, None)
+                    && skaffen::error::is_retryable_error(&err_str, None, None)
                     && snapshot_print_text_stream_state(text_stream_state).can_retry(is_json)
                 {
                     retry_count += 1;
@@ -4557,12 +4557,12 @@ async fn run_interactive_mode(
 ) -> Result<()> {
     let mut pending = Vec::new();
     if let Some(initial) = initial {
-        pending.push(pi::interactive::PendingInput::Content(
-            pi::app::build_initial_content(&initial),
+        pending.push(skaffen::interactive::PendingInput::Content(
+            skaffen::app::build_initial_content(&initial),
         ));
     }
     for message in messages {
-        pending.push(pi::interactive::PendingInput::Text(message));
+        pending.push(skaffen::interactive::PendingInput::Text(message));
     }
 
     let AgentSession {
@@ -4574,7 +4574,7 @@ async fn run_interactive_mode(
     // Extract manager for the interactive loop; the region stays alive to
     // handle shutdown when this scope exits.
     let extensions = region.as_ref().map(|r| r.manager().clone());
-    let interactive_result = pi::interactive::run_interactive(
+    let interactive_result = skaffen::interactive::run_interactive(
         agent,
         session,
         config,
@@ -4601,7 +4601,7 @@ async fn run_interactive_mode(
     Ok(())
 }
 
-type InitialMessage = pi::app::InitialMessage;
+type InitialMessage = skaffen::app::InitialMessage;
 
 fn read_piped_stdin() -> Result<Option<String>> {
     if io::stdin().is_terminal() {
@@ -4699,13 +4699,13 @@ mod tests {
         let usage_err = anyhow!("Unknown --only categories: nope");
         assert_eq!(exit_code_for_error(&usage_err), EXIT_CODE_USAGE);
 
-        let validation_err = anyhow::Error::new(pi::error::Error::validation("bad input"));
+        let validation_err = anyhow::Error::new(skaffen::error::Error::validation("bad input"));
         assert_eq!(exit_code_for_error(&validation_err), EXIT_CODE_USAGE);
     }
 
     #[test]
     fn exit_code_classifier_defaults_to_general_failure() {
-        let runtime_err = anyhow::Error::new(pi::error::Error::auth("missing key"));
+        let runtime_err = anyhow::Error::new(skaffen::error::Error::auth("missing key"));
         assert_eq!(exit_code_for_error(&runtime_err), EXIT_CODE_FAILURE);
     }
 
@@ -5181,7 +5181,7 @@ mod tests {
     #[test]
     fn print_mode_retry_delay_first_attempt_is_base() {
         let config = Config {
-            retry: Some(pi::config::RetrySettings {
+            retry: Some(skaffen::config::RetrySettings {
                 enabled: Some(true),
                 max_retries: Some(3),
                 base_delay_ms: Some(2000),
@@ -5195,7 +5195,7 @@ mod tests {
     #[test]
     fn print_mode_retry_delay_doubles_each_attempt() {
         let config = Config {
-            retry: Some(pi::config::RetrySettings {
+            retry: Some(skaffen::config::RetrySettings {
                 enabled: Some(true),
                 max_retries: Some(5),
                 base_delay_ms: Some(1000),
@@ -5210,7 +5210,7 @@ mod tests {
     #[test]
     fn print_mode_retry_delay_capped_at_max() {
         let config = Config {
-            retry: Some(pi::config::RetrySettings {
+            retry: Some(skaffen::config::RetrySettings {
                 enabled: Some(true),
                 max_retries: Some(10),
                 base_delay_ms: Some(2000),
@@ -5279,18 +5279,18 @@ mod tests {
     #[test]
     fn streamed_text_delta_only_matches_text_delta_updates() {
         let partial = Arc::new(AssistantMessage {
-            content: vec![ContentBlock::Text(pi::model::TextContent::new("hello"))],
+            content: vec![ContentBlock::Text(skaffen::model::TextContent::new("hello"))],
             api: "test-api".to_string(),
             provider: "test-provider".to_string(),
             model: "test-model".to_string(),
-            usage: pi::model::Usage::default(),
+            usage: skaffen::model::Usage::default(),
             stop_reason: StopReason::Stop,
             error_message: None,
             timestamp: 0,
         });
         let delta_event = AgentEvent::MessageUpdate {
-            message: pi::model::Message::Assistant(Arc::clone(&partial)),
-            assistant_message_event: pi::model::AssistantMessageEvent::TextDelta {
+            message: skaffen::model::Message::Assistant(Arc::clone(&partial)),
+            assistant_message_event: skaffen::model::AssistantMessageEvent::TextDelta {
                 content_index: 0,
                 delta: " world".to_string(),
                 partial,
@@ -5299,12 +5299,12 @@ mod tests {
         assert_eq!(streamed_text_delta(&delta_event), Some(" world"));
 
         let start_event = AgentEvent::MessageStart {
-            message: pi::model::Message::assistant(AssistantMessage {
+            message: skaffen::model::Message::assistant(AssistantMessage {
                 content: Vec::new(),
                 api: "test-api".to_string(),
                 provider: "test-provider".to_string(),
                 model: "test-model".to_string(),
-                usage: pi::model::Usage::default(),
+                usage: skaffen::model::Usage::default(),
                 stop_reason: StopReason::Stop,
                 error_message: None,
                 timestamp: 0,

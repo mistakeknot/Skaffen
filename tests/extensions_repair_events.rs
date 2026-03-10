@@ -177,14 +177,14 @@ fn repair_event_clone() {
 #[test]
 fn config_repair_mode_defaults_to_auto_safe() {
     let config = PiJsRuntimeConfig::default();
-    assert_eq!(config.repair_mode, pi::extensions_js::RepairMode::AutoSafe);
+    assert_eq!(config.repair_mode, skaffen::extensions_js::RepairMode::AutoSafe);
     assert!(config.auto_repair_enabled());
 }
 
 #[test]
 fn config_repair_mode_off_disables_repair() {
     let config = PiJsRuntimeConfig {
-        repair_mode: pi::extensions_js::RepairMode::Off,
+        repair_mode: skaffen::extensions_js::RepairMode::Off,
         ..Default::default()
     };
     assert!(!config.auto_repair_enabled());
@@ -193,7 +193,7 @@ fn config_repair_mode_off_disables_repair() {
 #[test]
 fn config_repair_mode_suggest_does_not_apply() {
     let config = PiJsRuntimeConfig {
-        repair_mode: pi::extensions_js::RepairMode::Suggest,
+        repair_mode: skaffen::extensions_js::RepairMode::Suggest,
         ..Default::default()
     };
     assert!(!config.auto_repair_enabled());
@@ -203,7 +203,7 @@ fn config_repair_mode_suggest_does_not_apply() {
 #[test]
 fn config_repair_mode_auto_strict_enables_aggressive() {
     let config = PiJsRuntimeConfig {
-        repair_mode: pi::extensions_js::RepairMode::AutoStrict,
+        repair_mode: skaffen::extensions_js::RepairMode::AutoStrict,
         ..Default::default()
     };
     assert!(config.auto_repair_enabled());

@@ -28,7 +28,7 @@ fn load_fixture_candidates() -> Vec<CandidateInput> {
 fn scoring_examples_match_rubric() {
     let as_of = fixed_as_of();
     let report = score_candidates(&load_fixture_candidates(), as_of, as_of, 10);
-    let by_id: HashMap<&str, &pi::extension_scoring::ScoredCandidate> = report
+    let by_id: HashMap<&str, &skaffen::extension_scoring::ScoredCandidate> = report
         .items
         .iter()
         .map(|item| (item.id.as_str(), item))

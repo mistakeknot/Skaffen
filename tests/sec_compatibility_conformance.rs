@@ -957,7 +957,7 @@ fn generate_sec_conformance_verdict() {
 
         // Default = Pending
         let default_ok =
-            manager.trust_state(ext_id) == pi::extensions::ExtensionTrustState::Pending;
+            manager.trust_state(ext_id) == skaffen::extensions::ExtensionTrustState::Pending;
         checks.push(ConformanceCheck {
             id: "trust_default_pending".to_string(),
             category: "trust_lifecycle".to_string(),
@@ -970,7 +970,7 @@ fn generate_sec_conformance_verdict() {
         // Accept → Acknowledged
         manager.record_trust_onboarding(ext_id, "low", true, "user:test");
         let ack_ok =
-            manager.trust_state(ext_id) == pi::extensions::ExtensionTrustState::Acknowledged;
+            manager.trust_state(ext_id) == skaffen::extensions::ExtensionTrustState::Acknowledged;
         checks.push(ConformanceCheck {
             id: "trust_accept_acknowledged".to_string(),
             category: "trust_lifecycle".to_string(),
@@ -983,7 +983,7 @@ fn generate_sec_conformance_verdict() {
         // Promote → Trusted
         manager.promote_trust(ext_id);
         let trusted_ok =
-            manager.trust_state(ext_id) == pi::extensions::ExtensionTrustState::Trusted;
+            manager.trust_state(ext_id) == skaffen::extensions::ExtensionTrustState::Trusted;
         checks.push(ConformanceCheck {
             id: "trust_promote_trusted".to_string(),
             category: "trust_lifecycle".to_string(),

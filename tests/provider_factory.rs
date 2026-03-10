@@ -118,7 +118,7 @@ fn request_header(headers: &[(String, String)], key: &str) -> Option<String> {
 }
 
 fn drive_provider_stream_to_done(
-    provider: Arc<dyn pi::provider::Provider>,
+    provider: Arc<dyn skaffen::provider::Provider>,
     context: Context<'static>,
     options: StreamOptions,
 ) {

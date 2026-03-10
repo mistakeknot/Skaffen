@@ -425,7 +425,7 @@ fn workflow_escalation_per_extension_override() {
     let mut per_ext = std::collections::HashMap::new();
     per_ext.insert(
         "trusted-ext".to_string(),
-        pi::extensions::ExtensionOverride {
+        skaffen::extensions::ExtensionOverride {
             mode: None,
             allow: vec!["exec".to_string(), "env".to_string()],
             deny: vec![],

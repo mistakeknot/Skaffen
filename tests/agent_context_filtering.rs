@@ -41,8 +41,8 @@ mod tests {
             &self,
             context: &Context<'_>,
             _options: &StreamOptions,
-        ) -> pi::error::Result<
-            Pin<Box<dyn Stream<Item = pi::error::Result<pi::model::StreamEvent>> + Send>>,
+        ) -> skaffen::error::Result<
+            Pin<Box<dyn Stream<Item = skaffen::error::Result<skaffen::model::StreamEvent>> + Send>>,
         > {
             let mut guard = self.context.lock().unwrap();
             *guard = Some(context.messages.to_vec());

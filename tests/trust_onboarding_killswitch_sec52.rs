@@ -263,7 +263,7 @@ fn re_onboarding_after_kill_switch_requires_fresh_ack() {
     assert!(
         matches!(
             err,
-            pi::extension_preflight::TrustTransitionError::OperatorAckRequired { .. }
+            skaffen::extension_preflight::TrustTransitionError::OperatorAckRequired { .. }
         ),
         "re-promotion without ack must be rejected"
     );

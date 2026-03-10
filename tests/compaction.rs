@@ -61,8 +61,8 @@ impl Provider for ScriptedProvider {
         &self,
         context: &Context<'_>,
         _options: &StreamOptions,
-    ) -> pi::error::Result<
-        Pin<Box<dyn futures::Stream<Item = pi::error::Result<pi::model::StreamEvent>> + Send>>,
+    ) -> skaffen::error::Result<
+        Pin<Box<dyn futures::Stream<Item = skaffen::error::Result<skaffen::model::StreamEvent>> + Send>>,
     > {
         let prompt_text = extract_prompt_text(context);
         self.prompts.lock().expect("lock prompts").push(prompt_text);
@@ -86,7 +86,7 @@ impl Provider for ScriptedProvider {
         };
 
         Ok(Box::pin(futures::stream::iter(vec![Ok(
-            pi::model::StreamEvent::Done {
+            skaffen::model::StreamEvent::Done {
                 reason: StopReason::Stop,
                 message,
             },
@@ -450,8 +450,8 @@ fn log_result(harness: &TestHarness, result: &CompactionResult) {
     });
 }
 
-const fn make_settings(keep_recent_tokens: u32) -> pi::compaction::ResolvedCompactionSettings {
-    pi::compaction::ResolvedCompactionSettings {
+const fn make_settings(keep_recent_tokens: u32) -> skaffen::compaction::ResolvedCompactionSettings {
+    skaffen::compaction::ResolvedCompactionSettings {
         enabled: true,
         // Use a tiny window so compaction triggers for the small test entries.
         // Tests focus on cut-point and formatting logic, not the threshold.
@@ -1088,7 +1088,7 @@ fn compaction_pipeline_save_and_open_round_trip_rehydrates_compaction_context() 
         ctx.push(("sha256".into(), summary_hash));
     });
 
-    let details = pi::compaction::compaction_details_to_value(&result.details).expect("details");
+    let details = skaffen::compaction::compaction_details_to_value(&result.details).expect("details");
     session.entries.push(compaction_entry(
         "c1",
         Some("u2"),
@@ -1172,7 +1172,7 @@ fn compaction_pipeline_second_pass_seeds_previous_details_and_updates_summary() 
     let result1 = run_async(async move { compact(prep1, provider1_dyn, "test-key", None).await })
         .expect("compact1");
 
-    let details1 = pi::compaction::compaction_details_to_value(&result1.details).expect("details1");
+    let details1 = skaffen::compaction::compaction_details_to_value(&result1.details).expect("details1");
 
     let mut entries2 = entries;
     entries2.push(compaction_entry(
@@ -1252,7 +1252,7 @@ fn compaction_pipeline_second_pass_seeds_previous_details_and_updates_summary() 
     session.header.cwd = "/data/projects/pi_agent_rust".to_string();
     session.entries = entries2;
 
-    let details2 = pi::compaction::compaction_details_to_value(&result2.details).expect("details2");
+    let details2 = skaffen::compaction::compaction_details_to_value(&result2.details).expect("details2");
     session.entries.push(compaction_entry(
         "c2",
         Some("u4"),
@@ -1354,8 +1354,8 @@ fn compact_returns_error_when_provider_stops_with_error() {
             &self,
             _context: &Context<'_>,
             _options: &StreamOptions,
-        ) -> pi::error::Result<
-            Pin<Box<dyn futures::Stream<Item = pi::error::Result<pi::model::StreamEvent>> + Send>>,
+        ) -> skaffen::error::Result<
+            Pin<Box<dyn futures::Stream<Item = skaffen::error::Result<skaffen::model::StreamEvent>> + Send>>,
         > {
             let message = AssistantMessage {
                 content: vec![ContentBlock::Text(TextContent::new("ignored"))],
@@ -1369,7 +1369,7 @@ fn compact_returns_error_when_provider_stops_with_error() {
             };
 
             Ok(Box::pin(futures::stream::iter(vec![Ok(
-                pi::model::StreamEvent::Done {
+                skaffen::model::StreamEvent::Done {
                     reason: StopReason::Error,
                     message,
                 },

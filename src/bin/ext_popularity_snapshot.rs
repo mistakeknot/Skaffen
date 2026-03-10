@@ -606,7 +606,7 @@ fn fetch_github_repo_metrics_via_gh(
 }
 
 fn apply_npm_signals(
-    target: &mut pi::extension_popularity::PopularityEvidence,
+    target: &mut skaffen::extension_popularity::PopularityEvidence,
     item: &CandidateItem,
     npm_map: &HashMap<String, NpmSnapshot>,
 ) -> bool {
@@ -635,7 +635,7 @@ fn apply_npm_signals(
 }
 
 fn apply_github_signals(
-    target: &mut pi::extension_popularity::PopularityEvidence,
+    target: &mut skaffen::extension_popularity::PopularityEvidence,
     item: &CandidateItem,
     npm_map: &HashMap<String, NpmSnapshot>,
     github_map: &HashMap<String, GitHubLookup>,
@@ -665,7 +665,7 @@ fn apply_github_signals(
     false
 }
 
-fn has_any_signal(evidence: &pi::extension_popularity::PopularityEvidence) -> bool {
+fn has_any_signal(evidence: &skaffen::extension_popularity::PopularityEvidence) -> bool {
     evidence.github_repo.is_some()
         || evidence.github_stars.is_some()
         || evidence.github_forks.is_some()

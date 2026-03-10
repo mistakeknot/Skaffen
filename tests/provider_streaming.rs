@@ -75,7 +75,7 @@ pub(crate) struct StreamOutcome {
 
 pub(crate) async fn collect_events<S>(mut stream: S) -> StreamOutcome
 where
-    S: Stream<Item = pi::PiResult<StreamEvent>> + Unpin,
+    S: Stream<Item = skaffen::PiResult<StreamEvent>> + Unpin,
 {
     let mut events = Vec::new();
     let mut stream_error = None;
@@ -482,7 +482,7 @@ pub(crate) fn tool_result_message(
     Message::ToolResult(std::sync::Arc::new(ToolResultMessage {
         tool_call_id: tool_call_id.to_string(),
         tool_name: tool_name.to_string(),
-        content: vec![ContentBlock::Text(pi::model::TextContent::new(
+        content: vec![ContentBlock::Text(skaffen::model::TextContent::new(
             content.to_string(),
         ))],
         details: None,

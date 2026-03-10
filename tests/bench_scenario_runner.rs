@@ -195,7 +195,7 @@ async fn new_runtime(js_cwd: &str) -> Result<PiJsRuntime> {
 }
 
 fn js_literal(value: &impl Serialize) -> Result<String> {
-    serde_json::to_string(value).map_err(|err| pi::error::Error::Json(Box::new(err)))
+    serde_json::to_string(value).map_err(|err| skaffen::error::Error::Json(Box::new(err)))
 }
 
 /// Run JS code and pump hostcall requests until a `__bench_report` tool call
@@ -272,7 +272,7 @@ async fn run_bench_js(
             let ok = r.get("ok").and_then(Value::as_bool).unwrap_or(false);
             if !ok {
                 let msg = r.get("error").and_then(Value::as_str).unwrap_or("unknown");
-                return Err(pi::error::Error::extension(format!(
+                return Err(skaffen::error::Error::extension(format!(
                     "js bench failed: {msg}"
                 )));
             }
@@ -284,7 +284,7 @@ async fn run_bench_js(
         }
     }
 
-    Err(pi::error::Error::extension(format!(
+    Err(skaffen::error::Error::extension(format!(
         "benchmark timed out after {}ms",
         budget.as_millis()
     )))
@@ -387,13 +387,13 @@ async fn resolve_extension_callable(
     let invoke_kind = report
         .get("invoke_kind")
         .and_then(Value::as_str)
-        .ok_or_else(|| pi::error::Error::extension("missing invoke_kind in callable report"))?;
+        .ok_or_else(|| skaffen::error::Error::extension("missing invoke_kind in callable report"))?;
     let invoke_name = report
         .get("invoke_name")
         .and_then(Value::as_str)
-        .ok_or_else(|| pi::error::Error::extension("missing invoke_name in callable report"))?;
+        .ok_or_else(|| skaffen::error::Error::extension("missing invoke_name in callable report"))?;
     if invoke_kind != "tool" && invoke_kind != "command" {
-        return Err(pi::error::Error::extension(format!(
+        return Err(skaffen::error::Error::extension(format!(
             "unsupported invoke_kind from callable report: {invoke_kind}"
         )));
     }

@@ -1,7 +1,7 @@
 //! Unit tests for `SlashCommand::parse()`, scoped model resolution, and related
 //! utility functions in `src/interactive/commands.rs`.
 //!
-//! These tests cover the public API surface re-exported from `pi::interactive`:
+//! These tests cover the public API surface re-exported from `skaffen::interactive`:
 //! - `SlashCommand::parse()` — slash command parsing with aliases
 //! - `strip_thinking_level_suffix()` — strip `:off`/`:medium` etc. from patterns
 //! - `parse_scoped_model_patterns()` — comma/whitespace-separated pattern splitting

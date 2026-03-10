@@ -62,7 +62,7 @@ fn artifact_single_file_entry(name: &str) -> PathBuf {
 struct BenchSession;
 
 #[async_trait::async_trait]
-impl pi::extensions::ExtensionSession for BenchSession {
+impl skaffen::extensions::ExtensionSession for BenchSession {
     async fn get_state(&self) -> Value {
         json!({
             "sessionFile": "bench-session.jsonl",
@@ -70,7 +70,7 @@ impl pi::extensions::ExtensionSession for BenchSession {
         })
     }
 
-    async fn get_messages(&self) -> Vec<pi::session::SessionMessage> {
+    async fn get_messages(&self) -> Vec<skaffen::session::SessionMessage> {
         Vec::new()
     }
 
@@ -82,11 +82,11 @@ impl pi::extensions::ExtensionSession for BenchSession {
         Vec::new()
     }
 
-    async fn set_name(&self, _name: String) -> pi::error::Result<()> {
+    async fn set_name(&self, _name: String) -> skaffen::error::Result<()> {
         Ok(())
     }
 
-    async fn append_message(&self, _message: pi::session::SessionMessage) -> pi::error::Result<()> {
+    async fn append_message(&self, _message: skaffen::session::SessionMessage) -> skaffen::error::Result<()> {
         Ok(())
     }
 
@@ -94,11 +94,11 @@ impl pi::extensions::ExtensionSession for BenchSession {
         &self,
         _custom_type: String,
         _data: Option<Value>,
-    ) -> pi::error::Result<()> {
+    ) -> skaffen::error::Result<()> {
         Ok(())
     }
 
-    async fn set_model(&self, _provider: String, _model_id: String) -> pi::error::Result<()> {
+    async fn set_model(&self, _provider: String, _model_id: String) -> skaffen::error::Result<()> {
         Ok(())
     }
 
@@ -106,7 +106,7 @@ impl pi::extensions::ExtensionSession for BenchSession {
         (None, None)
     }
 
-    async fn set_thinking_level(&self, _level: String) -> pi::error::Result<()> {
+    async fn set_thinking_level(&self, _level: String) -> skaffen::error::Result<()> {
         Ok(())
     }
 
@@ -114,7 +114,7 @@ impl pi::extensions::ExtensionSession for BenchSession {
         None
     }
 
-    async fn set_label(&self, _target_id: String, _label: Option<String>) -> pi::error::Result<()> {
+    async fn set_label(&self, _target_id: String, _label: Option<String>) -> skaffen::error::Result<()> {
         Ok(())
     }
 }
@@ -123,27 +123,27 @@ impl pi::extensions::ExtensionSession for BenchSession {
 struct BenchUiHandler;
 
 #[async_trait::async_trait]
-impl pi::extension_dispatcher::ExtensionUiHandler for BenchUiHandler {
+impl skaffen::extension_dispatcher::ExtensionUiHandler for BenchUiHandler {
     async fn request_ui(
         &self,
-        _request: pi::extensions::ExtensionUiRequest,
-    ) -> pi::error::Result<Option<pi::extensions::ExtensionUiResponse>> {
+        _request: skaffen::extensions::ExtensionUiRequest,
+    ) -> skaffen::error::Result<Option<skaffen::extensions::ExtensionUiResponse>> {
         Ok(None)
     }
 }
 
 fn bench_extension_policy(c: &mut Criterion) {
-    let prompt = pi::extensions::ExtensionPolicy::default();
-    let strict = pi::extensions::ExtensionPolicy {
-        mode: pi::extensions::ExtensionPolicyMode::Strict,
-        ..pi::extensions::ExtensionPolicy::default()
+    let prompt = skaffen::extensions::ExtensionPolicy::default();
+    let strict = skaffen::extensions::ExtensionPolicy {
+        mode: skaffen::extensions::ExtensionPolicyMode::Strict,
+        ..skaffen::extensions::ExtensionPolicy::default()
     };
-    let permissive = pi::extensions::ExtensionPolicy {
-        mode: pi::extensions::ExtensionPolicyMode::Permissive,
-        ..pi::extensions::ExtensionPolicy::default()
+    let permissive = skaffen::extensions::ExtensionPolicy {
+        mode: skaffen::extensions::ExtensionPolicyMode::Permissive,
+        ..skaffen::extensions::ExtensionPolicy::default()
     };
 
-    let cases: Vec<(&str, &pi::extensions::ExtensionPolicy, &str)> = vec![
+    let cases: Vec<(&str, &skaffen::extensions::ExtensionPolicy, &str)> = vec![
         ("prompt_allow", &prompt, "read"),
         ("prompt_prompt", &prompt, "session"),
         ("prompt_deny", &prompt, "exec"),
@@ -174,10 +174,10 @@ fn bench_required_capability_for_host_call(c: &mut Criterion) {
     };
     let empty = json!({});
 
-    let cases: Vec<(&str, pi::extensions::HostCallPayload)> = vec![
+    let cases: Vec<(&str, skaffen::extensions::HostCallPayload)> = vec![
         (
             "tool_read_small",
-            pi::extensions::HostCallPayload {
+            skaffen::extensions::HostCallPayload {
                 call_id: "call-1".to_string(),
                 capability: "read".to_string(),
                 method: "tool".to_string(),
@@ -189,7 +189,7 @@ fn bench_required_capability_for_host_call(c: &mut Criterion) {
         ),
         (
             "tool_read_large",
-            pi::extensions::HostCallPayload {
+            skaffen::extensions::HostCallPayload {
                 call_id: "call-1".to_string(),
                 capability: "read".to_string(),
                 method: "tool".to_string(),
@@ -201,7 +201,7 @@ fn bench_required_capability_for_host_call(c: &mut Criterion) {
         ),
         (
             "tool_bash",
-            pi::extensions::HostCallPayload {
+            skaffen::extensions::HostCallPayload {
                 call_id: "call-1".to_string(),
                 capability: "exec".to_string(),
                 method: "tool".to_string(),
@@ -213,7 +213,7 @@ fn bench_required_capability_for_host_call(c: &mut Criterion) {
         ),
         (
             "exec",
-            pi::extensions::HostCallPayload {
+            skaffen::extensions::HostCallPayload {
                 call_id: "call-1".to_string(),
                 capability: "exec".to_string(),
                 method: "exec".to_string(),
@@ -225,7 +225,7 @@ fn bench_required_capability_for_host_call(c: &mut Criterion) {
         ),
         (
             "http",
-            pi::extensions::HostCallPayload {
+            skaffen::extensions::HostCallPayload {
                 call_id: "call-1".to_string(),
                 capability: "http".to_string(),
                 method: "http".to_string(),
@@ -237,7 +237,7 @@ fn bench_required_capability_for_host_call(c: &mut Criterion) {
         ),
         (
             "unknown",
-            pi::extensions::HostCallPayload {
+            skaffen::extensions::HostCallPayload {
                 call_id: "call-1".to_string(),
                 capability: "unknown".to_string(),
                 method: "unknown".to_string(),
@@ -254,7 +254,7 @@ fn bench_required_capability_for_host_call(c: &mut Criterion) {
     for (case, call) in cases {
         group.bench_function(BenchmarkId::new("host_call", case), move |b| {
             b.iter(|| {
-                black_box(pi::extensions::required_capability_for_host_call(
+                black_box(skaffen::extensions::required_capability_for_host_call(
                     black_box(&call),
                 ))
             });
@@ -264,9 +264,9 @@ fn bench_required_capability_for_host_call(c: &mut Criterion) {
 }
 
 fn bench_dispatch_decision(c: &mut Criterion) {
-    let policy = pi::extensions::ExtensionPolicy::default();
+    let policy = skaffen::extensions::ExtensionPolicy::default();
 
-    let warm_call = pi::extensions::HostCallPayload {
+    let warm_call = skaffen::extensions::HostCallPayload {
         call_id: "call-1".to_string(),
         capability: "read".to_string(),
         method: "tool".to_string(),
@@ -279,7 +279,7 @@ fn bench_dispatch_decision(c: &mut Criterion) {
 
     group.bench_function("decision_warm", |b| {
         b.iter(|| {
-            let cap = pi::extensions::required_capability_for_host_call(black_box(&warm_call))
+            let cap = skaffen::extensions::required_capability_for_host_call(black_box(&warm_call))
                 .unwrap_or_else(|| "unknown".to_string());
             black_box(policy.evaluate(&cap))
         });
@@ -287,7 +287,7 @@ fn bench_dispatch_decision(c: &mut Criterion) {
 
     group.bench_function("decision_cold", |b| {
         b.iter_batched(
-            || pi::extensions::HostCallPayload {
+            || skaffen::extensions::HostCallPayload {
                 call_id: "call-1".to_string(),
                 capability: "read".to_string(),
                 method: "tool".to_string(),
@@ -297,7 +297,7 @@ fn bench_dispatch_decision(c: &mut Criterion) {
                 context: None,
             },
             |call| {
-                let cap = pi::extensions::required_capability_for_host_call(black_box(&call))
+                let cap = skaffen::extensions::required_capability_for_host_call(black_box(&call))
                     .unwrap_or_else(|| "unknown".to_string());
                 black_box(policy.evaluate(&cap))
             },
@@ -309,19 +309,19 @@ fn bench_dispatch_decision(c: &mut Criterion) {
 }
 
 fn bench_snapshot_lookup(c: &mut Criterion) {
-    let mut policy = pi::extensions::ExtensionPolicy::default();
+    let mut policy = skaffen::extensions::ExtensionPolicy::default();
     policy.default_caps.push("read".to_string());
     policy.default_caps.push("write".to_string());
     policy.default_caps.push("http".to_string());
     policy.deny_caps.push("exec".to_string());
 
-    let mut ext_overrides = pi::extensions::ExtensionOverride::default();
+    let mut ext_overrides = skaffen::extensions::ExtensionOverride::default();
     ext_overrides.allow.push("exec".to_string());
     policy
         .per_extension
         .insert("ext.special".to_string(), ext_overrides);
 
-    let snapshot = pi::extensions::PolicySnapshot::compile(&policy);
+    let snapshot = skaffen::extensions::PolicySnapshot::compile(&policy);
 
     let mut group = c.benchmark_group("ext_snapshot");
     group.throughput(Throughput::Elements(1));
@@ -348,7 +348,7 @@ fn bench_snapshot_lookup(c: &mut Criterion) {
     });
 
     group.bench_function("compile", |b| {
-        b.iter(|| black_box(pi::extensions::PolicySnapshot::compile(black_box(&policy))));
+        b.iter(|| black_box(skaffen::extensions::PolicySnapshot::compile(black_box(&policy))));
     });
 
     group.finish();
@@ -357,14 +357,14 @@ fn bench_snapshot_lookup(c: &mut Criterion) {
 fn bench_protocol_parse_and_validate(c: &mut Criterion) {
     let host_call_small = format!(
         r#"{{"id":"msg-1","version":"{}","type":"host_call","payload":{{"call_id":"call-1","capability":"read","method":"tool","params":{{"name":"read"}}}}}}"#,
-        pi::extensions::PROTOCOL_VERSION
+        skaffen::extensions::PROTOCOL_VERSION
     );
 
     let big_text = "x".repeat(16 * 1024);
     let log_big = format!(
         r#"{{"id":"msg-2","version":"{}","type":"log","payload":{{"schema":"{}","ts":"2026-02-03T00:00:00.000Z","level":"info","event":"bench","message":"{}","correlation":{{"extension_id":"ext","scenario_id":"scn"}},"source":{{"component":"runtime"}}}}}}"#,
-        pi::extensions::PROTOCOL_VERSION,
-        pi::extensions::LOG_SCHEMA_VERSION,
+        skaffen::extensions::PROTOCOL_VERSION,
+        skaffen::extensions::LOG_SCHEMA_VERSION,
         big_text
     );
 
@@ -376,7 +376,7 @@ fn bench_protocol_parse_and_validate(c: &mut Criterion) {
         group.throughput(Throughput::Bytes(payload.len() as u64));
         group.bench_function(BenchmarkId::new("parse_and_validate", name), |b| {
             b.iter(|| {
-                black_box(pi::extensions::ExtensionMessage::parse_and_validate(
+                black_box(skaffen::extensions::ExtensionMessage::parse_and_validate(
                     payload,
                 ))
             });
@@ -389,16 +389,16 @@ fn bench_protocol_dispatch(c: &mut Criterion) {
     let cwd = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let runtime = Rc::new(block_on(PiJsRuntime::new()).expect("create PiJsRuntime"));
     let tools = Arc::new(ToolRegistry::new(&[], &cwd, None));
-    let http_connector = Arc::new(pi::connectors::http::HttpConnector::new(
-        pi::connectors::http::HttpConnectorConfig::default(),
+    let http_connector = Arc::new(skaffen::connectors::http::HttpConnector::new(
+        skaffen::connectors::http::HttpConnectorConfig::default(),
     ));
-    let session: Arc<dyn pi::extensions::ExtensionSession + Send + Sync> = Arc::new(BenchSession);
-    let ui_handler: Arc<dyn pi::extension_dispatcher::ExtensionUiHandler + Send + Sync> =
+    let session: Arc<dyn skaffen::extensions::ExtensionSession + Send + Sync> = Arc::new(BenchSession);
+    let ui_handler: Arc<dyn skaffen::extension_dispatcher::ExtensionUiHandler + Send + Sync> =
         Arc::new(BenchUiHandler);
     let dispatcher =
-        pi::ExtensionDispatcher::new(runtime, tools, http_connector, session, ui_handler, cwd);
+        skaffen::ExtensionDispatcher::new(runtime, tools, http_connector, session, ui_handler, cwd);
 
-    let host_call = pi::extensions::HostCallPayload {
+    let host_call = skaffen::extensions::HostCallPayload {
         call_id: "bench-call-1".to_string(),
         capability: "session".to_string(),
         method: "session".to_string(),
@@ -407,10 +407,10 @@ fn bench_protocol_dispatch(c: &mut Criterion) {
         cancel_token: None,
         context: None,
     };
-    let message = pi::extensions::ExtensionMessage {
+    let message = skaffen::extensions::ExtensionMessage {
         id: "bench-msg-1".to_string(),
-        version: pi::extensions::PROTOCOL_VERSION.to_string(),
-        body: pi::extensions::ExtensionBody::HostCall(host_call),
+        version: skaffen::extensions::PROTOCOL_VERSION.to_string(),
+        body: skaffen::extensions::ExtensionBody::HostCall(host_call),
     };
 
     let mut group = c.benchmark_group("ext_protocol_dispatch");
@@ -881,7 +881,7 @@ fn bench_dispatch_shared_session(c: &mut Criterion) {
     let policy = ExtensionPolicy::default();
 
     let manager = ExtensionManager::new();
-    let session: Arc<dyn pi::extensions::ExtensionSession + Send + Sync> = Arc::new(BenchSession);
+    let session: Arc<dyn skaffen::extensions::ExtensionSession + Send + Sync> = Arc::new(BenchSession);
     manager.set_session(session);
 
     let calls: Vec<(&str, HostCallPayload)> = vec![
@@ -1186,7 +1186,7 @@ fn bench_dispatch_overhead_breakdown(c: &mut Criterion) {
 
     // With manager (full overhead: quota + risk eval)
     let manager = ExtensionManager::new();
-    let session: Arc<dyn pi::extensions::ExtensionSession + Send + Sync> = Arc::new(BenchSession);
+    let session: Arc<dyn skaffen::extensions::ExtensionSession + Send + Sync> = Arc::new(BenchSession);
     manager.set_session(session);
 
     for (policy_name, policy) in &policies {

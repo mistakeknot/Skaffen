@@ -250,7 +250,7 @@ impl AuthStorage {
 
     /// Load auth.json asynchronously (creates empty if missing).
     pub async fn load_async(path: PathBuf) -> Result<Self> {
-        let (tx, rx) = oneshot::channel();
+        let (tx, mut rx) = oneshot::channel();
         let handle = std::thread::spawn(move || {
             let res = Self::load(path);
             let cx = AgentCx::for_request();
@@ -275,7 +275,7 @@ impl AuthStorage {
         let data = serde_json::to_string_pretty(&AuthFileRef {
             entries: &self.entries,
         })?;
-        let (tx, rx) = oneshot::channel();
+        let (tx, mut rx) = oneshot::channel();
         let path = self.path.clone();
 
         let handle = std::thread::spawn(move || {

@@ -342,7 +342,7 @@ fn run_all(args: RunAllArgs) -> Result<()> {
     let counts_total = selected.len();
 
     let queue = Arc::new(Mutex::new(selected));
-    let (tx, rx) = mpsc::channel::<CandidateProbeResult>();
+    let (tx, mut rx) = mpsc::channel::<CandidateProbeResult>();
 
     let shared = SharedRunConfig {
         repo_root: repo_root.clone(),

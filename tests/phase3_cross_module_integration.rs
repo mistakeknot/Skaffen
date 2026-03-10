@@ -315,7 +315,7 @@ fn assert_close(a: f64, b: f64, tolerance: f64) {
 fn find_control<'a>(
     report: &'a MeanFieldControllerReport,
     shard_id: &str,
-) -> &'a pi::extension_scoring::MeanFieldShardControl {
+) -> &'a skaffen::extension_scoring::MeanFieldShardControl {
     report
         .controls
         .iter()

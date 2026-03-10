@@ -170,7 +170,7 @@ fn agent_loop_openai_vcr_basic() {
             agent,
             session,
             true,
-            pi::compaction::ResolvedCompactionSettings::default(),
+            skaffen::compaction::ResolvedCompactionSettings::default(),
         );
 
         let timeline: Arc<Mutex<Vec<serde_json::Value>>> = Arc::new(Mutex::new(Vec::new()));
@@ -351,7 +351,7 @@ fn agent_loop_anthropic_simple_text() {
             agent,
             session,
             true,
-            pi::compaction::ResolvedCompactionSettings::default(),
+            skaffen::compaction::ResolvedCompactionSettings::default(),
         );
 
         let timeline: Arc<Mutex<Vec<serde_json::Value>>> = Arc::new(Mutex::new(Vec::new()));
@@ -449,7 +449,7 @@ fn agent_loop_anthropic_error_stream() {
             agent,
             session,
             true,
-            pi::compaction::ResolvedCompactionSettings::default(),
+            skaffen::compaction::ResolvedCompactionSettings::default(),
         );
 
         let timeline: Arc<Mutex<Vec<serde_json::Value>>> = Arc::new(Mutex::new(Vec::new()));
@@ -530,7 +530,7 @@ fn agent_loop_anthropic_tool_call_stop() {
             agent,
             session,
             true,
-            pi::compaction::ResolvedCompactionSettings::default(),
+            skaffen::compaction::ResolvedCompactionSettings::default(),
         );
 
         let timeline: Arc<Mutex<Vec<serde_json::Value>>> = Arc::new(Mutex::new(Vec::new()));

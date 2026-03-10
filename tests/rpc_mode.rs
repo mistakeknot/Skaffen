@@ -175,7 +175,7 @@ fn rpc_get_state_and_prompt() {
             agent,
             session,
             false,
-            pi::compaction::ResolvedCompactionSettings::default(),
+            skaffen::compaction::ResolvedCompactionSettings::default(),
         );
 
         let auth_dir = tempfile::tempdir().unwrap();
@@ -442,7 +442,7 @@ fn rpc_session_stats_counts_tool_calls_and_results() {
         session.header.model_id = Some(model);
         session.header.thinking_level = Some("off".to_string());
         session.append_message(SessionMessage::User {
-            content: pi::model::UserContent::Text("hi".to_string()),
+            content: skaffen::model::UserContent::Text("hi".to_string()),
             timestamp: Some(now),
         });
         session.append_message(SessionMessage::Assistant {
@@ -481,7 +481,7 @@ fn rpc_session_stats_counts_tool_calls_and_results() {
             agent,
             session,
             false,
-            pi::compaction::ResolvedCompactionSettings::default(),
+            skaffen::compaction::ResolvedCompactionSettings::default(),
         );
 
         let auth_dir = tempfile::tempdir().unwrap();
