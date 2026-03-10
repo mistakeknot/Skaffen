@@ -2,7 +2,7 @@
 //!
 // Allow some clippy lints that are acceptable in benchmarks
 #![allow(clippy::cast_precision_loss)] // u64 -> f64 for size calculations is fine
-#![allow(clippy::cmp_owned)] // PathBuf comparison with "pi" requires owned
+#![allow(clippy::cmp_owned)] // PathBuf comparison with "skaffen" requires owned
 //!
 //! Run with:
 //! - `cargo bench --bench system`
@@ -100,11 +100,11 @@ fn target_roots_with(manifest_dir: &Path, cargo_target_dir: Option<&Path>) -> Ve
 const fn binary_file_names() -> &'static [&'static str] {
     #[cfg(windows)]
     {
-        &["pi.exe", "pi"]
+        &["skaffen.exe", "skaffen"]
     }
     #[cfg(not(windows))]
     {
-        &["pi"]
+        &["skaffen"]
     }
 }
 
@@ -125,13 +125,13 @@ fn run_resolution_regression_checks() {
     use std::path::{Path, PathBuf};
 
     // Binary kind inference
-    let path = Path::new("/tmp/target/release/pi");
+    let path = Path::new("/tmp/target/release/skaffen");
     assert_eq!(infer_binary_kind(path), BinaryKind::Release);
-    let path = Path::new("/tmp/target/debug/pi");
+    let path = Path::new("/tmp/target/debug/skaffen");
     assert_eq!(infer_binary_kind(path), BinaryKind::Debug);
-    let path = Path::new("/tmp/target/debug/release/pi");
+    let path = Path::new("/tmp/target/debug/release/skaffen");
     assert_eq!(infer_binary_kind(path), BinaryKind::Release);
-    let path = Path::new("/tmp/pi");
+    let path = Path::new("/tmp/skaffen");
     assert_eq!(infer_binary_kind(path), BinaryKind::Unknown);
 
     // Relative CARGO_TARGET_DIR is resolved from manifest dir.
@@ -155,18 +155,18 @@ fn run_resolution_regression_checks() {
     let names = binary_file_names();
     #[cfg(windows)]
     {
-        assert_eq!(names.first().copied(), Some("pi.exe"));
-        assert!(names.contains(&"pi"));
+        assert_eq!(names.first().copied(), Some("skaffen.exe"));
+        assert!(names.contains(&"skaffen"));
     }
     #[cfg(not(windows))]
     {
-        assert_eq!(names, &["pi"]);
+        assert_eq!(names, &["skaffen"]);
     }
 }
 
-fn resolve_pi_binary() -> ResolvedBinary {
+fn resolve_skaffen_binary() -> ResolvedBinary {
     // Check for explicit override
-    if let Ok(path) = env::var("PI_BENCH_BINARY") {
+    if let Ok(path) = env::var("SKAFFEN_BENCH_BINARY") {
         let path = PathBuf::from(path);
         return ResolvedBinary {
             kind: infer_binary_kind(&path),
@@ -199,7 +199,7 @@ fn resolve_pi_binary() -> ResolvedBinary {
 
     // Last resort: hope it's in PATH
     ResolvedBinary {
-        path: PathBuf::from("pi"),
+        path: PathBuf::from("skaffen"),
         kind: BinaryKind::Unknown,
     }
 }
@@ -212,11 +212,11 @@ fn binary_size_bytes(path: &Path) -> Option<u64> {
 // Startup Time Benchmarks
 // ============================================================================
 
-/// Measure startup time for `pi --version` (minimal startup path)
+/// Measure startup time for `skaffen --version` (minimal startup path)
 fn bench_startup_version(c: &mut Criterion) {
-    let binary = resolve_pi_binary();
+    let binary = resolve_skaffen_binary();
     // Pre-flight check: verify the binary is actually runnable (handles
-    // both missing file AND "pi" not in PATH).
+    // both missing file AND "skaffen" not in PATH).
     if Command::new(&binary.path)
         .arg("--version")
         .stdout(Stdio::null())
@@ -251,9 +251,9 @@ fn bench_startup_version(c: &mut Criterion) {
                     .stdout(Stdio::null())
                     .stderr(Stdio::null())
                     .status()
-                    .expect("failed to execute pi");
+                    .expect("failed to execute skaffen");
                 let elapsed = start.elapsed();
-                assert!(status.success(), "pi --version failed");
+                assert!(status.success(), "skaffen --version failed");
                 black_box(elapsed)
             });
         });
@@ -271,9 +271,9 @@ fn bench_startup_version(c: &mut Criterion) {
     }
 }
 
-/// Measure startup time for `pi --help` (loads more code paths)
+/// Measure startup time for `skaffen --help` (loads more code paths)
 fn bench_startup_help(c: &mut Criterion) {
-    let binary = resolve_pi_binary();
+    let binary = resolve_skaffen_binary();
     if Command::new(&binary.path)
         .arg("--version")
         .stdout(Stdio::null())
@@ -308,9 +308,9 @@ fn bench_startup_help(c: &mut Criterion) {
                     .stdout(Stdio::null())
                     .stderr(Stdio::null())
                     .status()
-                    .expect("failed to execute pi");
+                    .expect("failed to execute skaffen");
                 let elapsed = start.elapsed();
-                assert!(status.success(), "pi --help failed");
+                assert!(status.success(), "skaffen --help failed");
                 black_box(elapsed)
             });
         });
@@ -319,9 +319,9 @@ fn bench_startup_help(c: &mut Criterion) {
     }
 }
 
-/// Measure startup time for `pi --list-models` (exercises provider listing)
+/// Measure startup time for `skaffen --list-models` (exercises provider listing)
 fn bench_startup_list_models(c: &mut Criterion) {
-    let binary = resolve_pi_binary();
+    let binary = resolve_skaffen_binary();
     if Command::new(&binary.path)
         .arg("--version")
         .stdout(Stdio::null())
@@ -356,7 +356,7 @@ fn bench_startup_list_models(c: &mut Criterion) {
                     .stdout(Stdio::null())
                     .stderr(Stdio::null())
                     .status()
-                    .expect("failed to execute pi");
+                    .expect("failed to execute skaffen");
                 let elapsed = start.elapsed();
                 // list-models may fail without API key, just measure time
                 black_box((elapsed, status))
@@ -371,9 +371,9 @@ fn bench_startup_list_models(c: &mut Criterion) {
 // Memory Benchmarks
 // ============================================================================
 
-/// Measure RSS memory for `pi --version` (process exits immediately)
+/// Measure RSS memory for `skaffen --version` (process exits immediately)
 fn bench_memory_version(c: &mut Criterion) {
-    let binary = resolve_pi_binary();
+    let binary = resolve_skaffen_binary();
     if Command::new(&binary.path)
         .arg("--version")
         .stdout(Stdio::null())
@@ -398,7 +398,7 @@ fn bench_memory_version(c: &mut Criterion) {
                 .stdout(Stdio::null())
                 .stderr(Stdio::null())
                 .spawn()
-                .expect("failed to spawn pi");
+                .expect("failed to spawn skaffen");
 
             let pid = sysinfo::Pid::from_u32(child.id());
             let mut system = System::new_with_specifics(
@@ -429,7 +429,7 @@ fn bench_memory_version(c: &mut Criterion) {
 /// Report binary size (not a timing benchmark, just records the value)
 fn bench_binary_size(c: &mut Criterion) {
     let mut group = c.benchmark_group("binary");
-    let binary = resolve_pi_binary();
+    let binary = resolve_skaffen_binary();
 
     if let Some(size) = binary_size_bytes(&binary.path) {
         let size_mb = size as f64 / 1024.0 / 1024.0;
