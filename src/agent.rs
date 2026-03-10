@@ -740,6 +740,13 @@ impl Agent {
                     .await;
                 on_event(turn_start_event);
 
+                #[cfg(feature = "skaffen-oodarc")]
+                {
+                    use crate::oodarc::{NoopOodarcHook, OodarcHook};
+                    let hook = NoopOodarcHook;
+                    hook.on_observe();
+                }
+
                 for message in std::mem::take(&mut pending_messages) {
                     self.messages.push(message.clone());
                     on_event(AgentEvent::MessageStart {

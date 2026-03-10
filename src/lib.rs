@@ -98,6 +98,8 @@ pub mod migrations;
 pub mod model;
 pub mod model_selector;
 pub mod models;
+#[cfg(feature = "skaffen-oodarc")]
+pub mod oodarc;
 pub mod package_manager;
 pub mod perf_build;
 pub mod permissions;
