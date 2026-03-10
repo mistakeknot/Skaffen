@@ -4,7 +4,7 @@ use std::path::Path;
 use std::sync::Arc;
 use url::Url;
 
-use super::{AgentState, Cmd, PiApp, PiMsg};
+use super::{AgentState, Cmd, SkaffenApp, SkaffenMsg};
 
 #[cfg(feature = "clipboard")]
 use arboard::Clipboard as ArboardClipboard;
@@ -278,7 +278,7 @@ mod tests {
     }
 }
 
-impl PiApp {
+impl SkaffenApp {
     #[allow(clippy::too_many_lines)]
     pub(super) fn handle_slash_share(&mut self, args: &str) -> Option<Cmd> {
         if self.agent_state != AgentState::Idle {
@@ -317,7 +317,7 @@ impl PiApp {
                              Run `gh auth login` to authenticate, then retry `/share`.\n\n\
                              {details}"
                         );
-                        let _ = event_tx.try_send(PiMsg::AgentError(message));
+                        let _ = event_tx.try_send(SkaffenMsg::AgentError(message));
                         return;
                     }
                 }
@@ -325,15 +325,15 @@ impl PiApp {
                     let message = "GitHub CLI `gh` not found.\n\
                              Install it from https://cli.github.com, then run `gh auth login`."
                         .to_string();
-                    let _ = event_tx.try_send(PiMsg::AgentError(message));
+                    let _ = event_tx.try_send(SkaffenMsg::AgentError(message));
                     return;
                 }
                 Err(err) if err.kind() == std::io::ErrorKind::Interrupted => {
-                    let _ = event_tx.try_send(PiMsg::System("Share cancelled".to_string()));
+                    let _ = event_tx.try_send(SkaffenMsg::System("Share cancelled".to_string()));
                     return;
                 }
                 Err(err) => {
-                    let _ = event_tx.try_send(PiMsg::AgentError(format!(
+                    let _ = event_tx.try_send(SkaffenMsg::AgentError(format!(
                         "Failed to run `gh auth status`: {err}"
                     )));
                     return;
@@ -341,7 +341,7 @@ impl PiApp {
             }
 
             if abort_signal.is_aborted() {
-                let _ = event_tx.try_send(PiMsg::System("Share cancelled".to_string()));
+                let _ = event_tx.try_send(SkaffenMsg::System("Share cancelled".to_string()));
                 return;
             }
 
@@ -350,26 +350,26 @@ impl PiApp {
                 Ok(guard) => (guard.to_html(), guard.get_name()),
                 Err(err) => {
                     let _ = event_tx
-                        .try_send(PiMsg::AgentError(format!("Failed to lock session: {err}")));
+                        .try_send(SkaffenMsg::AgentError(format!("Failed to lock session: {err}")));
                     return;
                 }
             };
 
             if abort_signal.is_aborted() {
-                let _ = event_tx.try_send(PiMsg::System("Share cancelled".to_string()));
+                let _ = event_tx.try_send(SkaffenMsg::System("Share cancelled".to_string()));
                 return;
             }
 
             let gist_desc = share_gist_description(session_name.as_deref());
 
             let temp_file = match tempfile::Builder::new()
-                .prefix("pi-share-")
+                .prefix("skaffen-share-")
                 .suffix(".html")
                 .tempfile()
             {
                 Ok(file) => file,
                 Err(err) => {
-                    let _ = event_tx.try_send(PiMsg::AgentError(format!(
+                    let _ = event_tx.try_send(SkaffenMsg::AgentError(format!(
                         "Failed to create temp file: {err}"
                     )));
                     return;
@@ -377,7 +377,7 @@ impl PiApp {
             };
             let temp_path = temp_file.into_temp_path();
             if let Err(err) = std::fs::write(&temp_path, html.as_bytes()) {
-                let _ = event_tx.try_send(PiMsg::AgentError(format!(
+                let _ = event_tx.try_send(SkaffenMsg::AgentError(format!(
                     "Failed to write temp file: {err}"
                 )));
                 return;
@@ -397,15 +397,15 @@ impl PiApp {
                     let message = "GitHub CLI `gh` not found.\n\
                              Install it from https://cli.github.com, then run `gh auth login`."
                         .to_string();
-                    let _ = event_tx.try_send(PiMsg::AgentError(message));
+                    let _ = event_tx.try_send(SkaffenMsg::AgentError(message));
                     return;
                 }
                 Err(err) if err.kind() == std::io::ErrorKind::Interrupted => {
-                    let _ = event_tx.try_send(PiMsg::System("Share cancelled".to_string()));
+                    let _ = event_tx.try_send(SkaffenMsg::System("Share cancelled".to_string()));
                     return;
                 }
                 Err(err) => {
-                    let _ = event_tx.try_send(PiMsg::AgentError(format!(
+                    let _ = event_tx.try_send(SkaffenMsg::AgentError(format!(
                         "Failed to run `gh gist create`: {err}"
                     )));
                     return;
@@ -414,7 +414,7 @@ impl PiApp {
 
             if !output.status.success() {
                 let details = format_command_output(&output);
-                let _ = event_tx.try_send(PiMsg::AgentError(format!(
+                let _ = event_tx.try_send(SkaffenMsg::AgentError(format!(
                     "`gh gist create` failed.\n\n{details}"
                 )));
                 return;
@@ -423,7 +423,7 @@ impl PiApp {
             let stdout = String::from_utf8_lossy(&output.stdout).to_string();
             let Some((gist_url, gist_id)) = parse_gist_url_and_id(&stdout) else {
                 let details = format_command_output(&output);
-                let _ = event_tx.try_send(PiMsg::AgentError(format!(
+                let _ = event_tx.try_send(SkaffenMsg::AgentError(format!(
                     "Failed to parse gist URL from `gh gist create` output.\n\n{details}"
                 )));
                 return;
@@ -443,7 +443,7 @@ impl PiApp {
             let privacy = if is_public { "public" } else { "private" };
             let message =
                 format!("Created {privacy} gist\nShare URL: {share_url}\nGist: {gist_url}");
-            let _ = event_tx.try_send(PiMsg::System(message));
+            let _ = event_tx.try_send(SkaffenMsg::System(message));
         });
         None
     }

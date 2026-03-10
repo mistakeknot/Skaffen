@@ -1,4 +1,4 @@
-//! Comprehensive environment health checker for `pi doctor`.
+//! Comprehensive environment health checker for `skaffen doctor`.
 //!
 //! When invoked without a path, checks config, directories, auth, shell tools,
 //! and sessions. When invoked with a path, runs extension preflight analysis.
@@ -370,7 +370,7 @@ pub fn run_doctor(opts: &DoctorOptions<'_>) -> Result<DoctorReport> {
                 "Extensions check requires an extension path",
             )
             .with_remediation(
-                "Run `pi doctor <path-to-extension>` to evaluate extension compatibility",
+                "Run `skaffen doctor <path-to-extension>` to evaluate extension compatibility",
             ),
         );
     }
@@ -409,7 +409,7 @@ fn check_config(cwd: &Path, findings: &mut Vec<Finding>) {
         check_settings_file(
             cat,
             &project_path,
-            "Project settings (.pi/settings.json)",
+            "Project settings (.skaffen/settings.json)",
             findings,
         );
     } else {
@@ -625,7 +625,7 @@ fn check_auth(fix: bool, findings: &mut Vec<Finding>) {
         findings.push(
             Finding::info(cat, "auth.json: not present")
                 .with_detail("No credentials stored yet")
-                .with_remediation("Run `pi` and follow the login prompt, or set ANTHROPIC_API_KEY"),
+                .with_remediation("Run `skaffen` and follow the login prompt, or set ANTHROPIC_API_KEY"),
         );
         // Still check env vars
         check_auth_env_vars(cat, findings);
@@ -693,7 +693,7 @@ fn check_auth(fix: bool, findings: &mut Vec<Finding>) {
         if providers.is_empty() {
             findings.push(
                 Finding::info(cat, "No stored credentials")
-                    .with_remediation("Run `pi` to authenticate or set an API key env var"),
+                    .with_remediation("Run `skaffen` to authenticate or set an API key env var"),
             );
         } else {
             for provider in &providers {
@@ -711,7 +711,7 @@ fn check_auth(fix: bool, findings: &mut Vec<Finding>) {
                     CredentialStatus::OAuthExpired { .. } => {
                         findings.push(
                             Finding::warn(cat, format!("{provider}: OAuth token expired"))
-                                .with_remediation(format!("Run `pi /login {provider}` to refresh")),
+                                .with_remediation(format!("Run `skaffen /login {provider}` to refresh")),
                         );
                     }
                     CredentialStatus::BearerToken => {
@@ -763,7 +763,7 @@ fn check_auth_env_vars(cat: CheckCategory, findings: &mut Vec<Finding>) {
         } else {
             findings.push(
                 Finding::info(cat, format!("{provider}: no env var"))
-                    .with_detail(format!("Set {env_key} or run `pi /login {provider}`")),
+                    .with_detail(format!("Set {env_key} or run `skaffen /login {provider}`")),
             );
         }
     }
@@ -1143,7 +1143,7 @@ fn check_extension(
                 )
                 .with_detail(err.to_string())
                 .with_remediation(
-                    "Fix the malformed settings.json, point PI_CONFIG_PATH at a valid file, or rerun with `--policy <safe|balanced|permissive>` to inspect extension compatibility independently",
+                    "Fix the malformed settings.json, point SKAFFEN_CONFIG_PATH at a valid file, or rerun with `--policy <safe|balanced|permissive>` to inspect extension compatibility independently",
                 ),
             );
             let has_explicit_policy =
@@ -1189,7 +1189,7 @@ fn check_extension(
                         "{} error(s), {} warning(s)",
                         report.summary.errors, report.summary.warnings
                     ))
-                    .with_remediation(format!("Try: pi doctor {path} --policy permissive")),
+                    .with_remediation(format!("Try: skaffen doctor {path} --policy permissive")),
             );
         }
     }
@@ -1605,7 +1605,7 @@ mod tests {
     #[test]
     fn run_doctor_extension_path_uses_supplied_cwd_for_policy_resolution() {
         let project = tempfile::tempdir().expect("project dir");
-        let config_dir = project.path().join(".pi");
+        let config_dir = project.path().join(".skaffen");
         std::fs::create_dir_all(&config_dir).expect("create project config dir");
         std::fs::write(
             config_dir.join("settings.json"),
@@ -1640,7 +1640,7 @@ export default function(pi) {
     #[test]
     fn run_doctor_extension_path_reports_config_load_failure_without_aborting() {
         let project = tempfile::tempdir().expect("project dir");
-        let config_dir = project.path().join(".pi");
+        let config_dir = project.path().join(".skaffen");
         std::fs::create_dir_all(&config_dir).expect("create project config dir");
         std::fs::write(config_dir.join("settings.json"), r#"{ "extensionPolicy": "#)
             .expect("write malformed project settings");
@@ -1682,7 +1682,7 @@ import net from "node:net";
     #[test]
     fn run_doctor_extension_path_config_load_failure_falls_back_to_safe_policy() {
         let project = tempfile::tempdir().expect("project dir");
-        let config_dir = project.path().join(".pi");
+        let config_dir = project.path().join(".skaffen");
         std::fs::create_dir_all(&config_dir).expect("create project config dir");
         std::fs::write(config_dir.join("settings.json"), r#"{ "extensionPolicy": "#)
             .expect("write malformed project settings");
@@ -1720,7 +1720,7 @@ export default function(pi) {
     #[test]
     fn run_doctor_extension_path_config_load_failure_honors_cli_policy_override() {
         let project = tempfile::tempdir().expect("project dir");
-        let config_dir = project.path().join(".pi");
+        let config_dir = project.path().join(".skaffen");
         std::fs::create_dir_all(&config_dir).expect("create project config dir");
         std::fs::write(config_dir.join("settings.json"), r#"{ "extensionPolicy": "#)
             .expect("write malformed project settings");

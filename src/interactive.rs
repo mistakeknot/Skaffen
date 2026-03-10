@@ -396,7 +396,7 @@ fn overlay_max_visible(term_height: usize) -> usize {
 // Slash Commands
 // ============================================================================
 
-impl PiApp {
+impl SkaffenApp {
     /// Returns true when the viewport is currently anchored to the tail of the
     /// conversation content (i.e. the user has not scrolled away from the bottom).
     fn is_at_bottom(&self) -> bool {
@@ -1013,16 +1013,16 @@ impl PiApp {
                 .file_stem()
                 .and_then(|s| s.to_str())
                 .unwrap_or("session");
-            return self.cwd.join(format!("pi-session-{stem}.html"));
+            return self.cwd.join(format!("skaffen-session-{stem}.html"));
         }
         let id = crate::session_picker::truncate_session_id(&session.header.id, 8);
-        self.cwd.join(format!("pi-session-unsaved-{id}.html"))
+        self.cwd.join(format!("skaffen-session-unsaved-{id}.html"))
     }
 
     fn resolve_output_path(&self, raw: &str) -> PathBuf {
         let raw = raw.trim();
         if raw.is_empty() {
-            return self.cwd.join("pi-session.html");
+            return self.cwd.join("skaffen-session.html");
         }
         let path = PathBuf::from(raw);
         if path.is_absolute() {
@@ -1047,14 +1047,14 @@ impl PiApp {
                 Ok(guard) => guard,
                 Err(err) => {
                     let _ = event_tx
-                        .try_send(PiMsg::AgentError(format!("Failed to lock session: {err}")));
+                        .try_send(SkaffenMsg::AgentError(format!("Failed to lock session: {err}")));
                     return;
                 }
             };
 
             if let Err(err) = session_guard.save().await {
                 let _ =
-                    event_tx.try_send(PiMsg::AgentError(format!("Failed to save session: {err}")));
+                    event_tx.try_send(SkaffenMsg::AgentError(format!("Failed to save session: {err}")));
             }
         });
     }
@@ -1433,7 +1433,7 @@ impl PiApp {
                     .await
                     .unwrap_or(false);
                 if cancelled {
-                    let _ = event_tx.try_send(PiMsg::System(
+                    let _ = event_tx.try_send(SkaffenMsg::System(
                         "Session switch cancelled by extension".to_string(),
                     ));
                     return;
@@ -1444,7 +1444,7 @@ impl PiApp {
                 Ok(session) => session,
                 Err(err) => {
                     let _ = event_tx
-                        .try_send(PiMsg::AgentError(format!("Failed to open session: {err}")));
+                        .try_send(SkaffenMsg::AgentError(format!("Failed to open session: {err}")));
                     return;
                 }
             };
@@ -1459,7 +1459,7 @@ impl PiApp {
                     Ok(guard) => guard,
                     Err(err) => {
                         let _ = event_tx
-                            .try_send(PiMsg::AgentError(format!("Failed to lock session: {err}")));
+                            .try_send(SkaffenMsg::AgentError(format!("Failed to lock session: {err}")));
                         return;
                     }
                 };
@@ -1472,7 +1472,7 @@ impl PiApp {
                     Ok(guard) => guard,
                     Err(err) => {
                         let _ = event_tx
-                            .try_send(PiMsg::AgentError(format!("Failed to lock agent: {err}")));
+                            .try_send(SkaffenMsg::AgentError(format!("Failed to lock agent: {err}")));
                         return;
                     }
                 };
@@ -1484,14 +1484,14 @@ impl PiApp {
                     Ok(guard) => guard,
                     Err(err) => {
                         let _ = event_tx
-                            .try_send(PiMsg::AgentError(format!("Failed to lock session: {err}")));
+                            .try_send(SkaffenMsg::AgentError(format!("Failed to lock session: {err}")));
                         return;
                     }
                 };
                 conversation_from_session(&session_guard)
             };
 
-            let _ = event_tx.try_send(PiMsg::ConversationReset {
+            let _ = event_tx.try_send(SkaffenMsg::ConversationReset {
                 messages,
                 usage,
                 status: Some("Session resumed".to_string()),
@@ -1550,13 +1550,13 @@ pub async fn run_interactive(
         let _ = crossterm::execute!(stdout, cursor::Hide);
     }
 
-    let (event_tx, mut event_rx) = mpsc::channel::<PiMsg>(1024);
+    let (event_tx, mut event_rx) = mpsc::channel::<SkaffenMsg>(1024);
     let (ui_tx, ui_rx) = std::sync::mpsc::channel::<Message>();
 
     runtime_handle.spawn(async move {
         let cx = Cx::for_request();
         while let Ok(msg) = event_rx.recv(&cx).await {
-            if matches!(msg, PiMsg::UiShutdown) {
+            if matches!(msg, SkaffenMsg::UiShutdown) {
                 break;
             }
             let _ = ui_tx.send(Message::new(msg));
@@ -1573,7 +1573,7 @@ pub async fn run_interactive(
         runtime_handle.spawn(async move {
             let cx = Cx::for_request();
             while let Ok(request) = extension_ui_rx.recv(&cx).await {
-                let _ = extension_event_tx.try_send(PiMsg::ExtensionUiRequest(request));
+                let _ = extension_event_tx.try_send(SkaffenMsg::ExtensionUiRequest(request));
             }
         });
     }
@@ -1587,7 +1587,7 @@ pub async fn run_interactive(
         conversation_from_session(&guard)
     };
 
-    Program::new(PiApp::new(
+    Program::new(SkaffenApp::new(
         agent,
         session,
         config,
@@ -1618,7 +1618,7 @@ pub async fn run_interactive(
 
 /// Custom message types for async agent events.
 #[derive(Debug, Clone)]
-pub enum PiMsg {
+pub enum SkaffenMsg {
     /// Agent started processing.
     AgentStart,
     /// Trigger processing of the next queued input (CLI startup messages).
@@ -1776,7 +1776,7 @@ fn build_startup_welcome_message(config: &Config) -> String {
 /// The main interactive TUI application model.
 #[allow(clippy::struct_excessive_bools)]
 #[derive(bubbletea::Model)]
-pub struct PiApp {
+pub struct SkaffenApp {
     // Input state
     input: TextArea,
     history: HistoryList,
@@ -1831,7 +1831,7 @@ pub struct PiApp {
     total_usage: Usage,
 
     // Async channel for agent events
-    event_tx: mpsc::Sender<PiMsg>,
+    event_tx: mpsc::Sender<SkaffenMsg>,
     runtime_handle: RuntimeHandle,
 
     // Extension session state
@@ -1906,7 +1906,7 @@ pub struct PiApp {
     tmux_wheel_guard: Option<TmuxWheelGuard>,
 }
 
-impl PiApp {
+impl SkaffenApp {
     fn initial_window_size_cmd() -> Cmd {
         Cmd::new(|| {
             let (width, height) = terminal::size().unwrap_or((80, 24));
@@ -1933,7 +1933,7 @@ impl PiApp {
         model_scope: Vec<ModelEntry>,
         available_models: Vec<ModelEntry>,
         pending_inputs: Vec<PendingInput>,
-        event_tx: mpsc::Sender<PiMsg>,
+        event_tx: mpsc::Sender<SkaffenMsg>,
         runtime_handle: RuntimeHandle,
         save_enabled: bool,
         extensions: Option<ExtensionManager>,
@@ -2261,7 +2261,7 @@ impl PiApp {
         let pending_cmd = if self.pending_inputs.is_empty() {
             None
         } else {
-            Some(Cmd::new(|| Message::new(PiMsg::RunPending)))
+            Some(Cmd::new(|| Message::new(SkaffenMsg::RunPending)))
         };
         // Ensure the initial window-size refresh lands before any queued startup work.
         Self::startup_init_cmd(input_cmd, pending_cmd)
@@ -2308,8 +2308,8 @@ impl PiApp {
         self.run_memory_pressure_actions();
 
         // Handle our custom Pi messages (take ownership to avoid per-token clone).
-        if msg.downcast_ref::<PiMsg>().is_some() {
-            let pi_msg = msg.downcast::<PiMsg>().unwrap();
+        if msg.downcast_ref::<SkaffenMsg>().is_some() {
+            let pi_msg = msg.downcast::<SkaffenMsg>().unwrap();
             return self.handle_pi_message(pi_msg);
         }
 

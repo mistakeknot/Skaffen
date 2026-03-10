@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use serde_json::json;
 
-use super::{AgentState, Cmd, EXTENSION_EVENT_TIMEOUT_MS, PiApp, PiMsg, conversation_from_session};
+use super::{AgentState, Cmd, EXTENSION_EVENT_TIMEOUT_MS, SkaffenApp, SkaffenMsg, conversation_from_session};
 
 /// Safely convert `Duration::as_micros()` (u128) to u64 with saturation.
 #[inline]
@@ -388,7 +388,7 @@ impl MemoryMonitor {
     }
 }
 
-impl PiApp {
+impl SkaffenApp {
     #[allow(clippy::too_many_lines)]
     pub(super) fn handle_slash_compact(&mut self, args: &str) -> Option<Cmd> {
         if self.agent_state != AgentState::Idle {
@@ -438,7 +438,7 @@ impl PiApp {
                     Err(err) => {
                         is_compacting.store(false, std::sync::atomic::Ordering::SeqCst);
                         let _ = event_tx
-                            .try_send(PiMsg::AgentError(format!("Failed to lock session: {err}")));
+                            .try_send(SkaffenMsg::AgentError(format!("Failed to lock session: {err}")));
                         return;
                     }
                 };
@@ -466,7 +466,7 @@ impl PiApp {
                     .unwrap_or(false);
                 if cancelled {
                     is_compacting.store(false, std::sync::atomic::Ordering::SeqCst);
-                    let _ = event_tx.try_send(PiMsg::System(
+                    let _ = event_tx.try_send(SkaffenMsg::System(
                         "Compaction cancelled by extension".to_string(),
                     ));
                     return;
@@ -481,7 +481,7 @@ impl PiApp {
             };
             let Some(prep) = crate::compaction::prepare_compaction(&path_entries, settings) else {
                 is_compacting.store(false, std::sync::atomic::Ordering::SeqCst);
-                let _ = event_tx.try_send(PiMsg::System(
+                let _ = event_tx.try_send(SkaffenMsg::System(
                     "Nothing to compact (already compacted or too little history)".to_string(),
                 ));
                 return;
@@ -499,7 +499,7 @@ impl PiApp {
                 Err(err) => {
                     is_compacting.store(false, std::sync::atomic::Ordering::SeqCst);
                     let _ =
-                        event_tx.try_send(PiMsg::AgentError(format!("Compaction failed: {err}")));
+                        event_tx.try_send(SkaffenMsg::AgentError(format!("Compaction failed: {err}")));
                     return;
                 }
             };
@@ -512,7 +512,7 @@ impl PiApp {
                     Err(err) => {
                         is_compacting.store(false, std::sync::atomic::Ordering::SeqCst);
                         let _ = event_tx
-                            .try_send(PiMsg::AgentError(format!("Failed to lock session: {err}")));
+                            .try_send(SkaffenMsg::AgentError(format!("Failed to lock session: {err}")));
                         return;
                     }
                 };
@@ -534,7 +534,7 @@ impl PiApp {
                     Err(err) => {
                         is_compacting.store(false, std::sync::atomic::Ordering::SeqCst);
                         let _ = event_tx
-                            .try_send(PiMsg::AgentError(format!("Failed to lock agent: {err}")));
+                            .try_send(SkaffenMsg::AgentError(format!("Failed to lock agent: {err}")));
                         return;
                     }
                 };
@@ -547,7 +547,7 @@ impl PiApp {
                     Err(err) => {
                         is_compacting.store(false, std::sync::atomic::Ordering::SeqCst);
                         let _ = event_tx
-                            .try_send(PiMsg::AgentError(format!("Failed to lock session: {err}")));
+                            .try_send(SkaffenMsg::AgentError(format!("Failed to lock session: {err}")));
                         return;
                     }
                 };
@@ -555,7 +555,7 @@ impl PiApp {
             };
 
             is_compacting.store(false, std::sync::atomic::Ordering::SeqCst);
-            let _ = event_tx.try_send(PiMsg::ConversationReset {
+            let _ = event_tx.try_send(SkaffenMsg::ConversationReset {
                 messages,
                 usage,
                 status: Some("Compaction complete".to_string()),

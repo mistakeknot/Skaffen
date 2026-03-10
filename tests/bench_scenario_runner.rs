@@ -419,7 +419,7 @@ async fn scenario_cold_start(
     let stats = compute_stats(&timings);
     Ok(json!({
         "schema": "pi.ext.rust_bench.v1",
-        "runtime": "pi_agent_rust",
+        "runtime": "skaffen",
         "scenario": "cold_start",
         "extension": spec.extension_id,
         "runs": runs,
@@ -450,7 +450,7 @@ async fn scenario_warm_start(
     let stats = compute_stats(&timings);
     Ok(json!({
         "schema": "pi.ext.rust_bench.v1",
-        "runtime": "pi_agent_rust",
+        "runtime": "skaffen",
         "scenario": "warm_start",
         "extension": spec.extension_id,
         "runs": runs,
@@ -527,7 +527,7 @@ async fn scenario_tool_call(
 
     Ok(json!({
         "schema": "pi.ext.rust_bench.v1",
-        "runtime": "pi_agent_rust",
+        "runtime": "skaffen",
         "scenario": "tool_call",
         "extension": spec.extension_id,
         "iterations": iterations,
@@ -581,7 +581,7 @@ async fn scenario_event_dispatch(
 
     Ok(json!({
         "schema": "pi.ext.rust_bench.v1",
-        "runtime": "pi_agent_rust",
+        "runtime": "skaffen",
         "scenario": "event_dispatch",
         "extension": spec.extension_id,
         "iterations": iterations,
@@ -616,7 +616,7 @@ fn phase1_matrix_seed_rows() -> Vec<Value> {
             let scenario_id = format!("{partition}/session_{session_messages}");
             rows.push(json!({
                 "schema": "pi.ext.rust_bench.v1",
-                "runtime": "pi_agent_rust",
+                "runtime": "skaffen",
                 "scenario": MATRIX_SCENARIO_SESSION_WORKLOAD,
                 "extension": "core",
                 "partition": partition,

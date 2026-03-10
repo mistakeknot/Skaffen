@@ -200,7 +200,7 @@ fn run() -> Result<()> {
 
     if !pi_bin.exists() {
         bail!(
-            "pi release binary not found at {}. Build first: cargo build --release --bin pi",
+            "skaffen release binary not found at {}. Build first: cargo build --release --bin skaffen",
             pi_bin.display()
         );
     }
@@ -591,8 +591,8 @@ fn execute_case_command(
     }
     command.env("HOME", &home_dir);
     command.env("PI_CODING_AGENT_DIR", env_root.join("agent"));
-    command.env("PI_CONFIG_PATH", isolated_settings_path(env_root));
-    command.env("PI_SESSIONS_DIR", env_root.join("sessions"));
+    command.env("SKAFFEN_CONFIG_PATH", isolated_settings_path(env_root));
+    command.env("SKAFFEN_SESSIONS_DIR", env_root.join("sessions"));
     command.env("PI_PACKAGE_DIR", env_root.join("packages"));
     command.env("PI_TEST_MODE", "1");
     if args.allow_dangerous {

@@ -65,8 +65,8 @@ enum StreamDeltaKind {
 }
 
 struct UiStreamDeltaBatcher {
-    sender: mpsc::Sender<PiMsg>,
-    pending: std::collections::VecDeque<PiMsg>,
+    sender: mpsc::Sender<SkaffenMsg>,
+    pending: std::collections::VecDeque<SkaffenMsg>,
     pending_bytes: usize,
     flush_interval: std::time::Duration,
     max_pending_bytes: usize,
@@ -74,7 +74,7 @@ struct UiStreamDeltaBatcher {
 }
 
 impl UiStreamDeltaBatcher {
-    fn new(sender: mpsc::Sender<PiMsg>) -> Self {
+    fn new(sender: mpsc::Sender<SkaffenMsg>) -> Self {
         let now = std::time::Instant::now();
         let flush_interval = UI_STREAM_DELTA_FLUSH_INTERVAL;
         Self {
@@ -94,8 +94,8 @@ impl UiStreamDeltaBatcher {
         }
         if let Some(last) = self.pending.back_mut() {
             match (kind, last) {
-                (StreamDeltaKind::Text, PiMsg::TextDelta(text))
-                | (StreamDeltaKind::Thinking, PiMsg::ThinkingDelta(text)) => {
+                (StreamDeltaKind::Text, SkaffenMsg::TextDelta(text))
+                | (StreamDeltaKind::Thinking, SkaffenMsg::ThinkingDelta(text)) => {
                     text.push_str(delta);
                     self.pending_bytes += delta.len();
                     self.flush(false);
@@ -106,22 +106,22 @@ impl UiStreamDeltaBatcher {
         }
 
         let msg = match kind {
-            StreamDeltaKind::Text => PiMsg::TextDelta(delta.to_string()),
-            StreamDeltaKind::Thinking => PiMsg::ThinkingDelta(delta.to_string()),
+            StreamDeltaKind::Text => SkaffenMsg::TextDelta(delta.to_string()),
+            StreamDeltaKind::Thinking => SkaffenMsg::ThinkingDelta(delta.to_string()),
         };
         self.pending.push_back(msg);
         self.pending_bytes += delta.len();
         self.flush(false);
     }
 
-    fn send_immediate(&mut self, msg: PiMsg) {
+    fn send_immediate(&mut self, msg: SkaffenMsg) {
         self.pending.push_back(msg);
         self.flush(true);
     }
 
-    fn delta_bytes_for_msg(msg: &PiMsg) -> usize {
+    fn delta_bytes_for_msg(msg: &SkaffenMsg) -> usize {
         match msg {
-            PiMsg::TextDelta(text) | PiMsg::ThinkingDelta(text) => text.len(),
+            SkaffenMsg::TextDelta(text) | SkaffenMsg::ThinkingDelta(text) => text.len(),
             _ => 0,
         }
     }
@@ -168,7 +168,7 @@ impl UiStreamDeltaBatcher {
     }
 }
 
-fn build_agent_done_pi_msg(messages: &[ModelMessage]) -> PiMsg {
+fn build_agent_done_pi_msg(messages: &[ModelMessage]) -> SkaffenMsg {
     let last = last_assistant_message(messages);
     let mut usage = Usage::default();
     for message in messages {
@@ -176,7 +176,7 @@ fn build_agent_done_pi_msg(messages: &[ModelMessage]) -> PiMsg {
             add_usage(&mut usage, &assistant.usage);
         }
     }
-    PiMsg::AgentDone {
+    SkaffenMsg::AgentDone {
         usage: Some(usage),
         stop_reason: last
             .as_ref()
@@ -200,14 +200,14 @@ fn dispatch_agent_event_to_ui(event: &AgentEvent, batcher: &mut UiStreamDeltaBat
             _ => {}
         },
         AgentEvent::AgentStart { .. } => {
-            batcher.send_immediate(PiMsg::AgentStart);
+            batcher.send_immediate(SkaffenMsg::AgentStart);
         }
         AgentEvent::ToolExecutionStart {
             tool_name,
             tool_call_id,
             ..
         } => {
-            batcher.send_immediate(PiMsg::ToolStart {
+            batcher.send_immediate(SkaffenMsg::ToolStart {
                 name: tool_name.clone(),
                 tool_id: tool_call_id.clone(),
             });
@@ -218,7 +218,7 @@ fn dispatch_agent_event_to_ui(event: &AgentEvent, batcher: &mut UiStreamDeltaBat
             partial_result,
             ..
         } => {
-            batcher.send_immediate(PiMsg::ToolUpdate {
+            batcher.send_immediate(SkaffenMsg::ToolUpdate {
                 name: tool_name.clone(),
                 tool_id: tool_call_id.clone(),
                 content: partial_result.content.clone(),
@@ -231,7 +231,7 @@ fn dispatch_agent_event_to_ui(event: &AgentEvent, batcher: &mut UiStreamDeltaBat
             is_error,
             ..
         } => {
-            batcher.send_immediate(PiMsg::ToolEnd {
+            batcher.send_immediate(SkaffenMsg::ToolEnd {
                 name: tool_name.clone(),
                 tool_id: tool_call_id.clone(),
                 is_error: *is_error,
@@ -269,31 +269,31 @@ async fn flush_ui_stream_batcher_with_backpressure(batcher: &StdMutex<UiStreamDe
     }
 }
 
-impl PiApp {
+impl SkaffenApp {
     /// Handle custom Pi messages from the agent.
     #[allow(clippy::too_many_lines)]
-    pub(super) fn handle_pi_message(&mut self, msg: PiMsg) -> Option<Cmd> {
+    pub(super) fn handle_pi_message(&mut self, msg: SkaffenMsg) -> Option<Cmd> {
         match msg {
-            PiMsg::AgentStart => {
+            SkaffenMsg::AgentStart => {
                 self.agent_state = AgentState::Processing;
                 self.current_response.clear();
                 self.current_thinking.clear();
                 self.extension_streaming.store(true, Ordering::SeqCst);
             }
-            PiMsg::RunPending => {
+            SkaffenMsg::RunPending => {
                 return self.run_next_pending();
             }
-            PiMsg::EnqueuePendingInput(input) => {
+            SkaffenMsg::EnqueuePendingInput(input) => {
                 self.pending_inputs.push_back(input);
                 if self.agent_state == AgentState::Idle {
                     return self.run_next_pending();
                 }
             }
-            PiMsg::UiShutdown => {
+            SkaffenMsg::UiShutdown => {
                 // Internal signal for shutting down the async→UI bridge; should not normally reach
                 // the UI event loop, but handle it defensively.
             }
-            PiMsg::TextDelta(text) => {
+            SkaffenMsg::TextDelta(text) => {
                 self.current_response.push_str(&text);
                 // While tail-following, `view()` computes the bottom slice
                 // directly, so we can skip full viewport rebuilds on every
@@ -302,19 +302,19 @@ impl PiApp {
                     self.refresh_conversation_viewport(false);
                 }
             }
-            PiMsg::ThinkingDelta(text) => {
+            SkaffenMsg::ThinkingDelta(text) => {
                 self.current_thinking.push_str(&text);
                 if !self.follow_stream_tail {
                     self.refresh_conversation_viewport(false);
                 }
             }
-            PiMsg::ToolStart { name, .. } => {
+            SkaffenMsg::ToolStart { name, .. } => {
                 self.agent_state = AgentState::ToolRunning;
                 self.current_tool = Some(name);
                 self.tool_progress = Some(ToolProgress::new());
                 self.pending_tool_output = None;
             }
-            PiMsg::ToolUpdate {
+            SkaffenMsg::ToolUpdate {
                 name,
                 content,
                 details,
@@ -336,7 +336,7 @@ impl PiApp {
                     self.pending_tool_output = Some(format!("Tool {name} output:\n{output}"));
                 }
             }
-            PiMsg::ToolEnd { .. } => {
+            SkaffenMsg::ToolEnd { .. } => {
                 self.agent_state = AgentState::Processing;
                 self.current_tool = None;
                 self.tool_progress = None;
@@ -345,7 +345,7 @@ impl PiApp {
                     self.scroll_to_bottom();
                 }
             }
-            PiMsg::AgentDone {
+            SkaffenMsg::AgentDone {
                 usage,
                 stop_reason,
                 error_message,
@@ -419,10 +419,10 @@ impl PiApp {
                 self.refresh_conversation_viewport(follow_tail);
 
                 if !self.pending_inputs.is_empty() {
-                    return Some(Cmd::new(|| Message::new(PiMsg::RunPending)));
+                    return Some(Cmd::new(|| Message::new(SkaffenMsg::RunPending)));
                 }
             }
-            PiMsg::AgentError(error) => {
+            SkaffenMsg::AgentError(error) => {
                 self.current_response.clear();
                 self.current_thinking.clear();
                 let content = if error.contains('\n') || error.starts_with("Error:") {
@@ -445,13 +445,13 @@ impl PiApp {
                 self.refresh_conversation_viewport(true);
 
                 if !self.pending_inputs.is_empty() {
-                    return Some(Cmd::new(|| Message::new(PiMsg::RunPending)));
+                    return Some(Cmd::new(|| Message::new(SkaffenMsg::RunPending)));
                 }
             }
-            PiMsg::CredentialUpdated { provider } => {
+            SkaffenMsg::CredentialUpdated { provider } => {
                 self.sync_active_provider_credentials(&provider);
             }
-            PiMsg::UpdateLastUserMessage(content) => {
+            SkaffenMsg::UpdateLastUserMessage(content) => {
                 if let Some(message) = self
                     .messages
                     .iter_mut()
@@ -462,7 +462,7 @@ impl PiApp {
                 }
                 self.scroll_to_bottom();
             }
-            PiMsg::System(message) => {
+            SkaffenMsg::System(message) => {
                 self.messages.push(ConversationMessage {
                     role: MessageRole::System,
                     content: message,
@@ -477,10 +477,10 @@ impl PiApp {
                 self.input.focus();
 
                 if !self.pending_inputs.is_empty() {
-                    return Some(Cmd::new(|| Message::new(PiMsg::RunPending)));
+                    return Some(Cmd::new(|| Message::new(SkaffenMsg::RunPending)));
                 }
             }
-            PiMsg::SystemNote(message) => {
+            SkaffenMsg::SystemNote(message) => {
                 self.messages.push(ConversationMessage {
                     role: MessageRole::System,
                     content: message,
@@ -489,7 +489,7 @@ impl PiApp {
                 });
                 self.scroll_to_bottom();
             }
-            PiMsg::BashResult {
+            SkaffenMsg::BashResult {
                 display,
                 content_for_agent,
             } => {
@@ -512,10 +512,10 @@ impl PiApp {
                 self.input.focus();
 
                 if !self.pending_inputs.is_empty() {
-                    return Some(Cmd::new(|| Message::new(PiMsg::RunPending)));
+                    return Some(Cmd::new(|| Message::new(SkaffenMsg::RunPending)));
                 }
             }
-            PiMsg::ConversationReset {
+            SkaffenMsg::ConversationReset {
                 messages,
                 usage,
                 status,
@@ -535,11 +535,11 @@ impl PiApp {
                 self.scroll_to_bottom();
                 self.input.focus();
             }
-            PiMsg::SetEditorText(text) => {
+            SkaffenMsg::SetEditorText(text) => {
                 self.input.set_value(&text);
                 self.input.focus();
             }
-            PiMsg::ResourcesReloaded {
+            SkaffenMsg::ResourcesReloaded {
                 resources,
                 status,
                 diagnostics,
@@ -568,10 +568,10 @@ impl PiApp {
                 }
                 self.input.focus();
             }
-            PiMsg::ExtensionUiRequest(request) => {
+            SkaffenMsg::ExtensionUiRequest(request) => {
                 return self.handle_extension_ui_request(request);
             }
-            PiMsg::ExtensionCommandDone {
+            SkaffenMsg::ExtensionCommandDone {
                 command: _,
                 display,
                 is_error: _,
@@ -592,10 +592,10 @@ impl PiApp {
                 self.input.focus();
 
                 if !self.pending_inputs.is_empty() {
-                    return Some(Cmd::new(|| Message::new(PiMsg::RunPending)));
+                    return Some(Cmd::new(|| Message::new(SkaffenMsg::RunPending)));
                 }
             }
-            PiMsg::OAuthCallbackReceived(callback_url) => {
+            SkaffenMsg::OAuthCallbackReceived(callback_url) => {
                 // Auto-submit the OAuth code received from the local callback server.
                 if let Some(pending) = self.pending_oauth.take() {
                     self.messages.push(ConversationMessage {
@@ -999,14 +999,14 @@ impl PiApp {
                     } else {
                         format!("/{cmd_for_msg} completed: {value}")
                     };
-                    let _ = event_tx.try_send(PiMsg::ExtensionCommandDone {
+                    let _ = event_tx.try_send(SkaffenMsg::ExtensionCommandDone {
                         command: cmd_for_msg,
                         display,
                         is_error: false,
                     });
                 }
                 Err(err) => {
-                    let _ = event_tx.try_send(PiMsg::ExtensionCommandDone {
+                    let _ = event_tx.try_send(SkaffenMsg::ExtensionCommandDone {
                         command: cmd_for_msg,
                         display: format!("Extension command error: {err}"),
                         is_error: true,
@@ -1056,14 +1056,14 @@ impl PiApp {
             match result {
                 Ok(_) => {
                     let display = format!("Shortcut [{key_for_msg}] executed.");
-                    let _ = event_tx.try_send(PiMsg::ExtensionCommandDone {
+                    let _ = event_tx.try_send(SkaffenMsg::ExtensionCommandDone {
                         command: key_for_msg,
                         display,
                         is_error: false,
                     });
                 }
                 Err(err) => {
-                    let _ = event_tx.try_send(PiMsg::ExtensionCommandDone {
+                    let _ = event_tx.try_send(SkaffenMsg::ExtensionCommandDone {
                         command: key_for_msg,
                         display: format!("Shortcut error: {err}"),
                         is_error: true,
@@ -1211,7 +1211,7 @@ impl PiApp {
                     Ok(guard) => guard,
                     Err(err) => {
                         let _ = event_tx
-                            .try_send(PiMsg::AgentError(format!("Failed to lock agent: {err}")));
+                            .try_send(SkaffenMsg::AgentError(format!("Failed to lock agent: {err}")));
                         return;
                     }
                 };
@@ -1253,7 +1253,7 @@ impl PiApp {
                     Ok(guard) => guard,
                     Err(err) => {
                         let _ = event_tx
-                            .try_send(PiMsg::AgentError(format!("Failed to lock session: {err}")));
+                            .try_send(SkaffenMsg::AgentError(format!("Failed to lock session: {err}")));
                         return;
                     }
                 };
@@ -1270,12 +1270,12 @@ impl PiApp {
             drop(session_guard);
 
             if let Some(err) = save_error {
-                let _ = event_tx.try_send(PiMsg::AgentError(err));
+                let _ = event_tx.try_send(SkaffenMsg::AgentError(err));
             }
 
             if let Err(err) = result {
                 let formatted = crate::error_hints::format_error_with_hints(&err);
-                let _ = event_tx.try_send(PiMsg::AgentError(formatted));
+                let _ = event_tx.try_send(SkaffenMsg::AgentError(formatted));
             }
         });
 
@@ -1344,18 +1344,18 @@ impl PiApp {
                         content_for_agent = build_content_blocks_for_input(&text, &images);
                         let updated = content_blocks_to_text(&content_for_agent);
                         if updated != display_owned {
-                            let _ = event_tx.try_send(PiMsg::UpdateLastUserMessage(updated));
+                            let _ = event_tx.try_send(SkaffenMsg::UpdateLastUserMessage(updated));
                         }
                     }
                     Ok(InputEventOutcome::Block { reason }) => {
                         let _ = event_tx
-                            .try_send(PiMsg::UpdateLastUserMessage("[input blocked]".to_string()));
+                            .try_send(SkaffenMsg::UpdateLastUserMessage("[input blocked]".to_string()));
                         let message = reason.unwrap_or_else(|| "Input blocked".to_string());
-                        let _ = event_tx.try_send(PiMsg::AgentError(message));
+                        let _ = event_tx.try_send(SkaffenMsg::AgentError(message));
                         return;
                     }
                     Err(err) => {
-                        let _ = event_tx.try_send(PiMsg::AgentError(err.to_string()));
+                        let _ = event_tx.try_send(SkaffenMsg::AgentError(err.to_string()));
                         return;
                     }
                 }
@@ -1370,7 +1370,7 @@ impl PiApp {
                     Ok(guard) => guard,
                     Err(err) => {
                         let _ = event_tx
-                            .try_send(PiMsg::AgentError(format!("Failed to lock agent: {err}")));
+                            .try_send(SkaffenMsg::AgentError(format!("Failed to lock agent: {err}")));
                         return;
                     }
                 };
@@ -1412,7 +1412,7 @@ impl PiApp {
                     Ok(guard) => guard,
                     Err(err) => {
                         let _ = event_tx
-                            .try_send(PiMsg::AgentError(format!("Failed to lock session: {err}")));
+                            .try_send(SkaffenMsg::AgentError(format!("Failed to lock session: {err}")));
                         return;
                     }
                 };
@@ -1429,12 +1429,12 @@ impl PiApp {
             drop(session_guard);
 
             if let Some(err) = save_error {
-                let _ = event_tx.try_send(PiMsg::AgentError(err));
+                let _ = event_tx.try_send(SkaffenMsg::AgentError(err));
             }
 
             if let Err(err) = result {
                 let formatted = crate::error_hints::format_error_with_hints(&err);
-                let _ = event_tx.try_send(PiMsg::AgentError(formatted));
+                let _ = event_tx.try_send(SkaffenMsg::AgentError(formatted));
             }
         });
 
@@ -1578,18 +1578,18 @@ impl PiApp {
                         input_images = images;
                         if message_for_agent != displayed_message {
                             let _ = event_tx
-                                .try_send(PiMsg::UpdateLastUserMessage(message_for_agent.clone()));
+                                .try_send(SkaffenMsg::UpdateLastUserMessage(message_for_agent.clone()));
                         }
                     }
                     Ok(InputEventOutcome::Block { reason }) => {
                         let _ = event_tx
-                            .try_send(PiMsg::UpdateLastUserMessage("[input blocked]".to_string()));
+                            .try_send(SkaffenMsg::UpdateLastUserMessage("[input blocked]".to_string()));
                         let message = reason.unwrap_or_else(|| "Input blocked".to_string());
-                        let _ = event_tx.try_send(PiMsg::AgentError(message));
+                        let _ = event_tx.try_send(SkaffenMsg::AgentError(message));
                         return;
                     }
                     Err(err) => {
-                        let _ = event_tx.try_send(PiMsg::AgentError(err.to_string()));
+                        let _ = event_tx.try_send(SkaffenMsg::AgentError(err.to_string()));
                         return;
                     }
                 }
@@ -1604,7 +1604,7 @@ impl PiApp {
                     Ok(guard) => guard,
                     Err(err) => {
                         let _ = event_tx
-                            .try_send(PiMsg::AgentError(format!("Failed to lock agent: {err}")));
+                            .try_send(SkaffenMsg::AgentError(format!("Failed to lock agent: {err}")));
                         return;
                     }
                 };
@@ -1670,7 +1670,7 @@ impl PiApp {
                     Ok(guard) => guard,
                     Err(err) => {
                         let _ = event_tx
-                            .try_send(PiMsg::AgentError(format!("Failed to lock session: {err}")));
+                            .try_send(SkaffenMsg::AgentError(format!("Failed to lock session: {err}")));
                         return;
                     }
                 };
@@ -1687,11 +1687,11 @@ impl PiApp {
             drop(session_guard);
 
             if let Some(err) = save_error {
-                let _ = event_tx.try_send(PiMsg::AgentError(err));
+                let _ = event_tx.try_send(SkaffenMsg::AgentError(err));
             }
 
             if let Err(err) = result {
-                let _ = event_tx.try_send(PiMsg::AgentError(err.to_string()));
+                let _ = event_tx.try_send(SkaffenMsg::AgentError(err.to_string()));
             }
         });
 
@@ -1789,7 +1789,7 @@ mod stream_delta_batcher_tests {
         }
     }
 
-    fn build_test_app_with_provider(provider: Arc<dyn Provider>) -> (PiApp, mpsc::Receiver<PiMsg>) {
+    fn build_test_app_with_provider(provider: Arc<dyn Provider>) -> (SkaffenApp, mpsc::Receiver<SkaffenMsg>) {
         let current = model_entry("openai", "gpt-4o-mini");
         let agent = Agent::new(
             provider,
@@ -1810,7 +1810,7 @@ mod stream_delta_batcher_tests {
         };
         let (event_tx, event_rx) = asupersync::channel::mpsc::channel(64);
         (
-            PiApp::new(
+            SkaffenApp::new(
                 agent,
                 session,
                 Config::default(),
@@ -1833,7 +1833,7 @@ mod stream_delta_batcher_tests {
         )
     }
 
-    fn build_test_app() -> PiApp {
+    fn build_test_app() -> SkaffenApp {
         let (app, _event_rx) = build_test_app_with_provider(Arc::new(DummyProvider));
         app
     }
@@ -1929,7 +1929,7 @@ mod stream_delta_batcher_tests {
 
         batcher.flush(true);
         let msg = rx.try_recv().expect("expected coalesced text delta");
-        assert!(matches!(msg, PiMsg::TextDelta(text) if text == "Hello"));
+        assert!(matches!(msg, SkaffenMsg::TextDelta(text) if text == "Hello"));
         assert!(rx.try_recv().is_err());
     }
 
@@ -1941,16 +1941,16 @@ mod stream_delta_batcher_tests {
         batcher.last_flush = std::time::Instant::now();
 
         batcher.push_delta(StreamDeltaKind::Text, "partial");
-        batcher.send_immediate(PiMsg::ToolStart {
+        batcher.send_immediate(SkaffenMsg::ToolStart {
             name: "bash".to_string(),
             tool_id: "t1".to_string(),
         });
 
         let first = rx.try_recv().expect("expected flushed text delta first");
         let second = rx.try_recv().expect("expected immediate tool start second");
-        assert!(matches!(first, PiMsg::TextDelta(text) if text == "partial"));
+        assert!(matches!(first, SkaffenMsg::TextDelta(text) if text == "partial"));
         assert!(
-            matches!(second, PiMsg::ToolStart { name, tool_id } if name == "bash" && tool_id == "t1")
+            matches!(second, SkaffenMsg::ToolStart { name, tool_id } if name == "bash" && tool_id == "t1")
         );
     }
 
@@ -1961,7 +1961,7 @@ mod stream_delta_batcher_tests {
         batcher.flush_interval = std::time::Duration::from_secs(60);
         batcher.last_flush = std::time::Instant::now();
 
-        batcher.send_immediate(PiMsg::System("occupy".to_string()));
+        batcher.send_immediate(SkaffenMsg::System("occupy".to_string()));
         batcher.push_delta(StreamDeltaKind::Text, "later");
         batcher.flush(true);
         assert_eq!(batcher.pending_bytes, "later".len());
@@ -1970,7 +1970,7 @@ mod stream_delta_batcher_tests {
         batcher.flush(true);
 
         let msg = rx.try_recv().expect("expected retained text delta");
-        assert!(matches!(msg, PiMsg::TextDelta(text) if text == "later"));
+        assert!(matches!(msg, SkaffenMsg::TextDelta(text) if text == "later"));
         assert_eq!(batcher.pending_bytes, 0);
     }
 
@@ -1982,11 +1982,11 @@ mod stream_delta_batcher_tests {
         batcher.last_flush = std::time::Instant::now();
 
         // Occupy the single slot.
-        batcher.send_immediate(PiMsg::System("occupy".to_string()));
+        batcher.send_immediate(SkaffenMsg::System("occupy".to_string()));
 
         // Queue a delta and a control event while the channel is full.
         batcher.push_delta(StreamDeltaKind::Text, "before-done");
-        batcher.send_immediate(PiMsg::AgentDone {
+        batcher.send_immediate(SkaffenMsg::AgentDone {
             usage: None,
             stop_reason: StopReason::Stop,
             error_message: None,
@@ -2000,11 +2000,11 @@ mod stream_delta_batcher_tests {
         let _ = rx.try_recv().expect("expected occupied slot message");
         batcher.flush(true);
         let first = rx.try_recv().expect("expected retained text delta");
-        assert!(matches!(first, PiMsg::TextDelta(text) if text == "before-done"));
+        assert!(matches!(first, SkaffenMsg::TextDelta(text) if text == "before-done"));
 
         batcher.flush(true);
         let second = rx.try_recv().expect("expected retained agent_done event");
-        assert!(matches!(second, PiMsg::AgentDone { .. }));
+        assert!(matches!(second, SkaffenMsg::AgentDone { .. }));
     }
 
     #[test]
@@ -2029,13 +2029,13 @@ mod stream_delta_batcher_tests {
             }));
         });
 
-        let _ = app.handle_pi_message(PiMsg::EnqueuePendingInput(PendingInput::Continue));
+        let _ = app.handle_pi_message(SkaffenMsg::EnqueuePendingInput(PendingInput::Continue));
 
         let deadline = std::time::Instant::now() + std::time::Duration::from_secs(1);
         let mut saw_done = false;
         while std::time::Instant::now() < deadline {
             match event_rx.try_recv() {
-                Ok(PiMsg::AgentDone { .. }) => {
+                Ok(SkaffenMsg::AgentDone { .. }) => {
                     saw_done = true;
                     break;
                 }
@@ -2074,7 +2074,7 @@ mod stream_delta_batcher_tests {
             session_guard.header.thinking_level = Some("high".to_string());
         });
 
-        let _ = app.handle_pi_message(PiMsg::ConversationReset {
+        let _ = app.handle_pi_message(SkaffenMsg::ConversationReset {
             messages: Vec::new(),
             usage: Usage::default(),
             status: Some("Session resumed".to_string()),

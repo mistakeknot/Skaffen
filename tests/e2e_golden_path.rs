@@ -55,11 +55,11 @@ impl GoldenPathHarness {
             env_root.join("agent").display().to_string(),
         );
         env.insert(
-            "PI_CONFIG_PATH".into(),
+            "SKAFFEN_CONFIG_PATH".into(),
             env_root.join("settings.json").display().to_string(),
         );
         env.insert(
-            "PI_SESSIONS_DIR".into(),
+            "SKAFFEN_SESSIONS_DIR".into(),
             env_root.join("sessions").display().to_string(),
         );
         env.insert(

@@ -1057,7 +1057,7 @@ fn config_parse_latency() {
             "disabled": []
         },
         "extensions": {
-            "paths": ["/home/user/.pi/extensions"]
+            "paths": ["/home/user/.skaffen/extensions"]
         }
     });
     let config_str = serde_json::to_string(&config).unwrap();

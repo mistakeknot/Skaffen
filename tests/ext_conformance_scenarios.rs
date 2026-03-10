@@ -3447,7 +3447,7 @@ fn ts_oracle_timeout() -> Duration {
 
 fn ts_oracle_node_path() -> PathBuf {
     let base = PathBuf::from(format!(
-        "/tmp/pi_agent_rust_ts_parity_node_path-{}",
+        "/tmp/skaffen_ts_parity_node_path-{}",
         std::process::id()
     ));
     let scope_dir = base.join("@mariozechner");

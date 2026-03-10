@@ -70,11 +70,11 @@ impl CliTestHarness {
             env_root.join("agent").display().to_string(),
         );
         env.insert(
-            "PI_CONFIG_PATH".to_string(),
+            "SKAFFEN_CONFIG_PATH".to_string(),
             env_root.join("settings.json").display().to_string(),
         );
         env.insert(
-            "PI_SESSIONS_DIR".to_string(),
+            "SKAFFEN_SESSIONS_DIR".to_string(),
             env_root.join("sessions").display().to_string(),
         );
         env.insert(
@@ -112,14 +112,14 @@ impl CliTestHarness {
     #[cfg(unix)]
     fn global_settings_path(&self) -> PathBuf {
         self.env
-            .get("PI_CONFIG_PATH")
+            .get("SKAFFEN_CONFIG_PATH")
             .map(PathBuf::from)
-            .expect("PI_CONFIG_PATH set by CliTestHarness::new")
+            .expect("SKAFFEN_CONFIG_PATH set by CliTestHarness::new")
     }
 
     #[cfg(unix)]
     fn project_settings_path(&self) -> PathBuf {
-        self.harness.temp_dir().join(".pi").join("settings.json")
+        self.harness.temp_dir().join(".skaffen").join("settings.json")
     }
 
     #[cfg(unix)]
@@ -353,7 +353,7 @@ fn resolve_roots_for_cli_harness(harness: &CliTestHarness) -> ResolveRoots {
         global_settings_path: harness.global_settings_path(),
         project_settings_path: harness.project_settings_path(),
         global_base_dir,
-        project_base_dir: harness.harness.temp_dir().join(".pi"),
+        project_base_dir: harness.harness.temp_dir().join(".skaffen"),
     }
 }
 
@@ -1087,7 +1087,7 @@ fn e2e_cli_config_show_lists_discovered_package_resources() {
         .harness
         .record_artifact("config-ui-pkg.dir", &package_root);
 
-    let project_settings = harness.harness.temp_dir().join(".pi").join("settings.json");
+    let project_settings = harness.harness.temp_dir().join(".skaffen").join("settings.json");
     fs::create_dir_all(
         project_settings
             .parent()
@@ -1195,8 +1195,8 @@ fn e2e_cli_print_mode_with_stdin_does_not_create_session_files() {
     let sessions_dir = PathBuf::from(
         harness
             .env
-            .get("PI_SESSIONS_DIR")
-            .expect("PI_SESSIONS_DIR")
+            .get("SKAFFEN_SESSIONS_DIR")
+            .expect("SKAFFEN_SESSIONS_DIR")
             .clone(),
     );
 
@@ -1248,11 +1248,11 @@ fn e2e_cli_config_paths_honor_env_overrides() {
         agent_dir.display().to_string(),
     );
     harness.env.insert(
-        "PI_CONFIG_PATH".to_string(),
+        "SKAFFEN_CONFIG_PATH".to_string(),
         config_path.display().to_string(),
     );
     harness.env.insert(
-        "PI_SESSIONS_DIR".to_string(),
+        "SKAFFEN_SESSIONS_DIR".to_string(),
         sessions_dir.display().to_string(),
     );
     harness.env.insert(
@@ -1270,7 +1270,7 @@ fn e2e_cli_config_paths_honor_env_overrides() {
     );
     // On macOS, temp_dir() is a symlink; on Windows, strip \\?\ prefix.
     let canonical_temp = canon(harness.harness.temp_dir());
-    let project_path = canonical_temp.join(".pi").join("settings.json");
+    let project_path = canonical_temp.join(".skaffen").join("settings.json");
     assert_contains(
         &harness.harness,
         &result.stdout,
@@ -1307,8 +1307,8 @@ fn e2e_cli_config_paths_fallback_to_agent_dir() {
         "PI_CODING_AGENT_DIR".to_string(),
         agent_dir.display().to_string(),
     );
-    harness.env.remove("PI_CONFIG_PATH");
-    harness.env.remove("PI_SESSIONS_DIR");
+    harness.env.remove("SKAFFEN_CONFIG_PATH");
+    harness.env.remove("SKAFFEN_SESSIONS_DIR");
     harness.env.remove("PI_PACKAGE_DIR");
 
     let result = harness.run(&["config"]);
@@ -1322,7 +1322,7 @@ fn e2e_cli_config_paths_fallback_to_agent_dir() {
     // On macOS, temp_dir() is a symlink; canonicalize to match binary output.
     // On Windows, strip \\?\ prefix.
     let canonical_temp = canon(harness.harness.temp_dir());
-    let project_path = canonical_temp.join(".pi").join("settings.json");
+    let project_path = canonical_temp.join(".skaffen").join("settings.json");
     assert_contains(
         &harness.harness,
         &result.stdout,
@@ -1420,7 +1420,7 @@ fn e2e_cli_packages_install_list_remove_offline() {
     let npm_install_path = harness
         .harness
         .temp_dir()
-        .join(".pi")
+        .join(".skaffen")
         .join("npm")
         .join("node_modules")
         .join("demo-pkg");
@@ -1572,7 +1572,7 @@ fn e2e_cli_packages_update_respects_pinning_offline() {
     assert_eq!(
         settings.get("packages"),
         settings_after.get("packages"),
-        "update should not rewrite .pi/settings.json"
+        "update should not rewrite .skaffen/settings.json"
     );
 
     write_jsonl_artifacts(
@@ -1691,7 +1691,7 @@ fn e2e_cli_extensions_install_update_manifest_resolution_offline() {
     let remote_pkg_root = harness
         .harness
         .temp_dir()
-        .join(".pi")
+        .join(".skaffen")
         .join("npm")
         .join("node_modules")
         .join(remote_extension_id);
@@ -2314,7 +2314,7 @@ fn split_ascii_chunks(chunks: &[String], fragment_sizes: &[usize]) -> Vec<String
 /// Create a VCR cassette file and configure the harness for VCR playback.
 ///
 /// Writes a cassette JSON to a temp directory, then sets the `VCR_MODE`,
-/// `VCR_CASSETTE_DIR`, `PI_VCR_TEST_NAME`, `ANTHROPIC_API_KEY`, and
+/// `VCR_CASSETTE_DIR`, `SKAFFEN_VCR_TEST_NAME`, `ANTHROPIC_API_KEY`, and
 /// `PI_TEST_MODE` env vars on the harness so the child binary will use
 /// VCR playback instead of real HTTP.
 fn setup_vcr_anthropic(
@@ -2378,7 +2378,7 @@ fn setup_vcr_anthropic_with_chunks(
     );
     harness
         .env
-        .insert("PI_VCR_TEST_NAME".to_string(), cassette_name.to_string());
+        .insert("SKAFFEN_VCR_TEST_NAME".to_string(), cassette_name.to_string());
     harness
         .env
         .insert("ANTHROPIC_API_KEY".to_string(), "test-vcr-key".to_string());
@@ -2453,7 +2453,7 @@ fn log_tool_scenario_setup(
         .unwrap_or_else(|| "unset".to_string());
     let cassette_name = harness
         .env
-        .get("PI_VCR_TEST_NAME")
+        .get("SKAFFEN_VCR_TEST_NAME")
         .cloned()
         .unwrap_or_else(|| "unset".to_string());
     let cassette_path = harness.env.get("VCR_CASSETTE_DIR").map_or_else(
@@ -2527,7 +2527,7 @@ fn e2e_cli_print_mode_vcr_roundtrip() {
     assert_contains(&harness.harness, &result.stdout, "pong");
 
     // Verify no session files created in print mode (even on success).
-    let sessions_dir = PathBuf::from(harness.env.get("PI_SESSIONS_DIR").expect("PI_SESSIONS_DIR"));
+    let sessions_dir = PathBuf::from(harness.env.get("SKAFFEN_SESSIONS_DIR").expect("SKAFFEN_SESSIONS_DIR"));
     let jsonl_count = count_jsonl_files(&sessions_dir);
     harness
         .harness
@@ -2578,7 +2578,7 @@ fn e2e_cli_print_mode_stdin_sends_to_provider() {
     assert_contains(&harness.harness, &result.stdout, "Received your stdin.");
 
     // Verify no session files created.
-    let sessions_dir = PathBuf::from(harness.env.get("PI_SESSIONS_DIR").expect("PI_SESSIONS_DIR"));
+    let sessions_dir = PathBuf::from(harness.env.get("SKAFFEN_SESSIONS_DIR").expect("SKAFFEN_SESSIONS_DIR"));
     let jsonl_count = count_jsonl_files(&sessions_dir);
     harness
         .harness
@@ -3495,7 +3495,7 @@ fn e2e_cli_auth_failure_error() {
         cassette_dir.display().to_string(),
     );
     harness.env.insert(
-        "PI_VCR_TEST_NAME".to_string(),
+        "SKAFFEN_VCR_TEST_NAME".to_string(),
         "e2e_auth_failure".to_string(),
     );
     harness
@@ -3731,14 +3731,14 @@ fn e2e_cli_export_multi_entry_session_integrity() {
     assert_contains(&harness.harness, &html, "high");
 }
 
-/// Test 2: `PI_SESSIONS_DIR` env override appears in `config` output.
+/// Test 2: `SKAFFEN_SESSIONS_DIR` env override appears in `config` output.
 #[test]
 fn e2e_cli_session_dir_override_via_env() {
     let mut harness = CliTestHarness::new("e2e_cli_session_dir_override_via_env");
 
     let custom_sessions = harness.harness.temp_path("my-custom-sessions");
     harness.env.insert(
-        "PI_SESSIONS_DIR".to_string(),
+        "SKAFFEN_SESSIONS_DIR".to_string(),
         custom_sessions.display().to_string(),
     );
 
@@ -3790,8 +3790,8 @@ fn e2e_cli_no_session_flag_prevents_session_files() {
     let sessions_dir = PathBuf::from(
         harness
             .env
-            .get("PI_SESSIONS_DIR")
-            .expect("PI_SESSIONS_DIR")
+            .get("SKAFFEN_SESSIONS_DIR")
+            .expect("SKAFFEN_SESSIONS_DIR")
             .clone(),
     );
 
@@ -3862,8 +3862,8 @@ fn e2e_interactive_session_creates_valid_jsonl_tmux() {
     let sessions_dir = PathBuf::from(
         harness
             .env
-            .get("PI_SESSIONS_DIR")
-            .expect("PI_SESSIONS_DIR")
+            .get("SKAFFEN_SESSIONS_DIR")
+            .expect("SKAFFEN_SESSIONS_DIR")
             .clone(),
     );
 
@@ -4042,8 +4042,8 @@ fn e2e_interactive_session_continue_loads_previous_tmux() {
     let sessions_dir = PathBuf::from(
         harness
             .env
-            .get("PI_SESSIONS_DIR")
-            .expect("PI_SESSIONS_DIR")
+            .get("SKAFFEN_SESSIONS_DIR")
+            .expect("SKAFFEN_SESSIONS_DIR")
             .clone(),
     );
 
@@ -4123,7 +4123,7 @@ fn e2e_interactive_session_continue_loads_previous_tmux() {
         cassette_dir.display().to_string(),
     );
     harness.env.insert(
-        "PI_VCR_TEST_NAME".to_string(),
+        "SKAFFEN_VCR_TEST_NAME".to_string(),
         "e2e_session_continue".to_string(),
     );
     harness

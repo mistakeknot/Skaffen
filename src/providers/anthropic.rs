@@ -185,7 +185,7 @@ fn kimi_device_id_paths() -> Option<(std::path::PathBuf, std::path::PathBuf)> {
     let primary = kimi_share_dir()?.join("device_id");
     let legacy = home_dir().map_or_else(
         || primary.clone(),
-        |home| home.join(".pi").join("agent").join("kimi-device-id"),
+        |home| home.join(".skaffen").join("agent").join("kimi-device-id"),
     );
     Some((primary, legacy))
 }
@@ -468,7 +468,7 @@ impl Provider for AnthropicProvider {
                 .header(
                     "user-agent",
                     format!(
-                        "pi_agent_rust/{} (external, cli)",
+                        "skaffen/{} (external, cli)",
                         env!("CARGO_PKG_VERSION")
                     ),
                 );
@@ -476,7 +476,7 @@ impl Provider for AnthropicProvider {
             request = request.header(
                 "user-agent",
                 format!(
-                    "pi_agent_rust/{} (kimi-oauth, cli)",
+                    "skaffen/{} (kimi-oauth, cli)",
                     env!("CARGO_PKG_VERSION")
                 ),
             );
@@ -1821,7 +1821,7 @@ mod tests {
             captured
                 .headers
                 .get("user-agent")
-                .is_some_and(|value| value.contains("pi_agent_rust/"))
+                .is_some_and(|value| value.contains("skaffen/"))
         );
     }
 

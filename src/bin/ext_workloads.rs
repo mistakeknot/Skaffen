@@ -1398,7 +1398,7 @@ async fn scenario_load_init_cold(
 
     Ok(json!({
         "schema": BENCH_SCHEMA,
-        "runtime": "pi_agent_rust",
+        "runtime": "skaffen",
         "scenario": "ext_load_init/load_init_cold",
         "extension": spec.extension_id,
         "runs": runs,
@@ -1450,7 +1450,7 @@ async fn scenario_tool_call(
 
     Ok(json!({
         "schema": BENCH_SCHEMA,
-        "runtime": "pi_agent_rust",
+        "runtime": "skaffen",
         "scenario": "ext_tool_call/hello",
         "extension": spec.extension_id,
         "iterations": iterations,
@@ -1504,7 +1504,7 @@ async fn scenario_event_hook(
 
     Ok(json!({
         "schema": BENCH_SCHEMA,
-        "runtime": "pi_agent_rust",
+        "runtime": "skaffen",
         "scenario": "ext_event_hook/before_agent_start",
         "extension": spec.extension_id,
         "iterations": iterations,
@@ -1571,7 +1571,7 @@ async fn scenario_long_session_real_corpus(
 
     Ok(json!({
         "schema": BENCH_SCHEMA,
-        "runtime": "pi_agent_rust",
+        "runtime": "skaffen",
         "scenario": "ext_hostcall_bridge/long_session_real_corpus",
         "extension": format!("real_corpus_{}ext", loaded_extension_ids.len()),
         "iterations": iterations,

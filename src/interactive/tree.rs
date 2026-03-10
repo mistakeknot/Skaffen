@@ -9,7 +9,7 @@ use serde_json::json;
 
 use super::conversation::{assistant_content_to_text, user_content_to_text};
 use super::{
-    AgentState, Cmd, ConversationMessage, EXTENSION_EVENT_TIMEOUT_MS, MessageRole, PiApp, PiMsg,
+    AgentState, Cmd, ConversationMessage, EXTENSION_EVENT_TIMEOUT_MS, MessageRole, SkaffenApp, SkaffenMsg,
     conversation_from_session,
 };
 
@@ -272,7 +272,7 @@ fn fork_candidates(session: &Session) -> Vec<ForkCandidate> {
     out
 }
 
-impl PiApp {
+impl SkaffenApp {
     #[allow(clippy::too_many_lines)]
     pub(super) fn handle_slash_fork(&mut self, args: &str) -> Option<Cmd> {
         if self.agent_state != AgentState::Idle {
@@ -372,7 +372,7 @@ impl PiApp {
                     .unwrap_or(false);
                 if cancelled {
                     let _ =
-                        event_tx.try_send(PiMsg::System("Fork cancelled by extension".to_string()));
+                        event_tx.try_send(SkaffenMsg::System("Fork cancelled by extension".to_string()));
                     return;
                 }
             }
@@ -382,7 +382,7 @@ impl PiApp {
                     Ok(guard) => guard,
                     Err(err) => {
                         let _ = event_tx
-                            .try_send(PiMsg::AgentError(format!("Failed to lock session: {err}")));
+                            .try_send(SkaffenMsg::AgentError(format!("Failed to lock session: {err}")));
                         return;
                     }
                 };
@@ -390,7 +390,7 @@ impl PiApp {
                     Ok(plan) => plan,
                     Err(err) => {
                         let _ = event_tx
-                            .try_send(PiMsg::AgentError(format!("Failed to build fork: {err}")));
+                            .try_send(SkaffenMsg::AgentError(format!("Failed to build fork: {err}")));
                         return;
                     }
                 };
@@ -413,7 +413,7 @@ impl PiApp {
             let new_session_id = new_session.header.id.clone();
 
             if let Err(err) = new_session.save().await {
-                let _ = event_tx.try_send(PiMsg::AgentError(format!("Failed to save fork: {err}")));
+                let _ = event_tx.try_send(SkaffenMsg::AgentError(format!("Failed to save fork: {err}")));
                 return;
             }
 
@@ -423,7 +423,7 @@ impl PiApp {
                     Ok(guard) => guard,
                     Err(err) => {
                         let _ = event_tx
-                            .try_send(PiMsg::AgentError(format!("Failed to lock agent: {err}")));
+                            .try_send(SkaffenMsg::AgentError(format!("Failed to lock agent: {err}")));
                         return;
                     }
                 };
@@ -435,7 +435,7 @@ impl PiApp {
                     Ok(guard) => guard,
                     Err(err) => {
                         let _ = event_tx
-                            .try_send(PiMsg::AgentError(format!("Failed to lock session: {err}")));
+                            .try_send(SkaffenMsg::AgentError(format!("Failed to lock session: {err}")));
                         return;
                     }
                 };
@@ -447,20 +447,20 @@ impl PiApp {
                     Ok(guard) => guard,
                     Err(err) => {
                         let _ = event_tx
-                            .try_send(PiMsg::AgentError(format!("Failed to lock session: {err}")));
+                            .try_send(SkaffenMsg::AgentError(format!("Failed to lock session: {err}")));
                         return;
                     }
                 };
                 conversation_from_session(&guard)
             };
 
-            let _ = event_tx.try_send(PiMsg::ConversationReset {
+            let _ = event_tx.try_send(SkaffenMsg::ConversationReset {
                 messages,
                 usage,
                 status: Some(format!("Forked new session from {}", selection.summary)),
             });
 
-            let _ = event_tx.try_send(PiMsg::SetEditorText(selected_text));
+            let _ = event_tx.try_send(SkaffenMsg::SetEditorText(selected_text));
 
             if let Some(manager) = extensions {
                 let _ = manager

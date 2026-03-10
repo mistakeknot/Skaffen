@@ -245,7 +245,7 @@ fn parse_input_types(input: &[String]) -> Vec<InputType> {
 fn legacy_generated_models_cache_path() -> Option<PathBuf> {
     let checksum = crc32c::crc32c(LEGACY_MODELS_GENERATED_TS.as_bytes());
     dirs::cache_dir().map(|dir| {
-        dir.join("pi")
+        dir.join("skaffen")
             .join("models-cache")
             .join(format!("legacy-generated-models-{checksum:08x}.json"))
     })
@@ -3267,8 +3267,8 @@ mod tests {
 
     #[test]
     fn default_models_path_joins_correctly() {
-        let path = default_models_path(Path::new("/home/user/.pi"));
-        assert_eq!(path, PathBuf::from("/home/user/.pi/models.json"));
+        let path = default_models_path(Path::new("/home/user/.skaffen"));
+        assert_eq!(path, PathBuf::from("/home/user/.skaffen/models.json"));
     }
 
     // ─── ModelsConfig deserialization ────────────────────────────────

@@ -72,7 +72,7 @@ fn vcr_client_if_enabled() -> Result<Option<Client>> {
         return Ok(None);
     }
 
-    let test_name = env::var("PI_VCR_TEST_NAME").unwrap_or_else(|_| "pi_runtime".to_string());
+    let test_name = env::var("SKAFFEN_VCR_TEST_NAME").unwrap_or_else(|_| "pi_runtime".to_string());
     let recorder = VcrRecorder::new(&test_name)?;
     Ok(Some(Client::new().with_vcr(recorder)))
 }

@@ -67,7 +67,7 @@ fn tool_progress_update_from_no_details() {
 
 #[test]
 fn initial_window_size_cmd_emits_window_size_message() {
-    let msg = PiApp::initial_window_size_cmd()
+    let msg = SkaffenApp::initial_window_size_cmd()
         .execute()
         .expect("window size message");
     let size = msg
@@ -80,7 +80,7 @@ fn initial_window_size_cmd_emits_window_size_message() {
 
 #[test]
 fn startup_init_cmd_sequences_window_size_before_pending() {
-    let msg = PiApp::startup_init_cmd(None, Some(Cmd::new(|| Message::new(PiMsg::RunPending))))
+    let msg = SkaffenApp::startup_init_cmd(None, Some(Cmd::new(|| Message::new(SkaffenMsg::RunPending))))
         .expect("startup init command")
         .execute()
         .expect("startup init message");
@@ -106,8 +106,8 @@ fn startup_init_cmd_sequences_window_size_before_pending() {
         .expect("pending message");
     assert!(
         second
-            .downcast_ref::<PiMsg>()
-            .is_some_and(|msg| matches!(msg, PiMsg::RunPending)),
+            .downcast_ref::<SkaffenMsg>()
+            .is_some_and(|msg| matches!(msg, SkaffenMsg::RunPending)),
         "second startup command should run pending work"
     );
 }
@@ -263,7 +263,7 @@ fn paste_image_from_clipboard_writes_temp_png() {
         return;
     }
 
-    let Some(path) = PiApp::paste_image_from_clipboard() else {
+    let Some(path) = SkaffenApp::paste_image_from_clipboard() else {
         return;
     };
 

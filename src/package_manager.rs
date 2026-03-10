@@ -4,7 +4,7 @@
 //! - Sources: `npm:pkg`, `git:host/owner/repo[@ref]`, local paths
 //! - Scopes: user (global) and project (local)
 //! - Global npm installs use `npm install -g` (npm-managed global root)
-//! - Git installs are under Pi's agent/project directories (`~/.pi/agent/git`, `./.pi/git`)
+//! - Git installs are under Pi's agent/project directories (`~/.skaffen/agent/git`, `./.pi/git`)
 
 use crate::agent_cx::AgentCx;
 use crate::config::Config;
@@ -999,7 +999,7 @@ impl PackageManager {
                             "Missing package.json version for installed npm package at {}",
                             installed_path.display()
                         ),
-                        "Reinstall the package (`pi remove <source>` then `pi install <source>`) and retry.",
+                        "Reinstall the package (`skaffen remove <source>` then `skaffen install <source>`) and retry.",
                     )
                 })?;
 
@@ -3311,7 +3311,7 @@ pub fn evaluate_lock_transition(
                 candidate.source_kind
             ),
             remediation: format!(
-                "Review the source change, then run `pi remove {}` and `pi install {}` to re-establish trust.",
+                "Review the source change, then run `skaffen remove {}` and `skaffen install {}` to re-establish trust.",
                 candidate.source, candidate.source
             ),
         });
@@ -3325,7 +3325,7 @@ pub fn evaluate_lock_transition(
                 candidate.identity
             ),
             remediation: format!(
-                "Use `pi update {}` for unpinned sources, or reinstall after intentional provenance changes.",
+                "Use `skaffen update {}` for unpinned sources, or reinstall after intentional provenance changes.",
                 candidate.source
             ),
         });
@@ -3339,7 +3339,7 @@ pub fn evaluate_lock_transition(
                 candidate.identity, existing.digest_sha256, candidate.digest_sha256
             ),
             remediation: format!(
-                "Inspect upstream changes. If expected, run `pi remove {}` then `pi install {}` to trust the new digest.",
+                "Inspect upstream changes. If expected, run `skaffen remove {}` then `skaffen install {}` to trust the new digest.",
                 candidate.source, candidate.source
             ),
         });
@@ -3863,10 +3863,10 @@ mod tests {
     #[test]
     fn parse_source_prefers_existing_local_paths_over_index_aliases() {
         let dir = tempfile::tempdir().expect("tempdir");
-        let local = dir.path().join("checkpoint-pi");
+        let local = dir.path().join("checkpoint-skaffen");
         fs::create_dir_all(&local).expect("create local path");
 
-        match parse_source("checkpoint-pi", dir.path()) {
+        match parse_source("checkpoint-skaffen", dir.path()) {
             ParsedSource::Local { path } => assert_eq!(path, local),
             other => panic!("Unexpected parsed source: {:?}", other),
         }
@@ -3976,7 +3976,7 @@ mod tests {
         run_async(async {
             let temp_dir = tempfile::tempdir().expect("tempdir");
             let project_root = temp_dir.path().join("project");
-            fs::create_dir_all(project_root.join(".pi")).expect("create project settings dir");
+            fs::create_dir_all(project_root.join(".skaffen")).expect("create project settings dir");
 
             let package_root = temp_dir.path().join("pkg");
             fs::create_dir_all(package_root.join("extensions")).expect("create extensions dir");
@@ -3986,7 +3986,7 @@ mod tests {
                 .expect("write b.native.json");
 
             let global_settings_path = temp_dir.path().join("global-settings.json");
-            let project_settings_path = project_root.join(".pi/settings.json");
+            let project_settings_path = project_root.join(".skaffen/settings.json");
 
             let global_settings = json!({
                 "packages": [{
@@ -4017,7 +4017,7 @@ mod tests {
                 global_settings_path: global_settings_path.clone(),
                 project_settings_path: project_settings_path.clone(),
                 global_base_dir: temp_dir.path().join("global-base"),
-                project_base_dir: project_root.join(".pi"),
+                project_base_dir: project_root.join(".skaffen"),
                 project_settings_enabled: true,
             };
             fs::create_dir_all(&roots.global_base_dir).expect("create global base dir");
@@ -4054,10 +4054,10 @@ mod tests {
     fn test_list_packages_with_override_roots_ignores_project_settings() {
         let temp_dir = tempfile::tempdir().expect("tempdir");
         let project_root = temp_dir.path().join("project");
-        fs::create_dir_all(project_root.join(".pi")).expect("create project settings dir");
+        fs::create_dir_all(project_root.join(".skaffen")).expect("create project settings dir");
 
         let override_settings_path = temp_dir.path().join("override-settings.json");
-        let project_settings_path = project_root.join(".pi/settings.json");
+        let project_settings_path = project_root.join(".skaffen/settings.json");
 
         fs::write(
             &override_settings_path,
@@ -4094,7 +4094,7 @@ mod tests {
         run_async(async {
             let temp_dir = tempfile::tempdir().expect("tempdir");
             let project_root = temp_dir.path().join("project");
-            fs::create_dir_all(project_root.join(".pi")).expect("create project settings dir");
+            fs::create_dir_all(project_root.join(".skaffen")).expect("create project settings dir");
             fs::create_dir_all(project_root.join(".pi/extensions"))
                 .expect("create project extension dir");
 
@@ -4115,7 +4115,7 @@ mod tests {
             fs::write(&project_auto_extension, "{}").expect("write project auto extension");
 
             let override_settings_path = temp_dir.path().join("override-settings.json");
-            let project_settings_path = project_root.join(".pi/settings.json");
+            let project_settings_path = project_root.join(".skaffen/settings.json");
 
             let override_settings = json!({
                 "packages": [{
@@ -4148,7 +4148,7 @@ mod tests {
                 global_settings_path: override_settings_path.clone(),
                 project_settings_path: project_settings_path.clone(),
                 global_base_dir: temp_dir.path().join("global-base"),
-                project_base_dir: project_root.join(".pi"),
+                project_base_dir: project_root.join(".skaffen"),
                 project_settings_enabled: false,
             };
             fs::create_dir_all(&roots.global_base_dir).expect("create global base dir");
@@ -5843,7 +5843,7 @@ mod tests {
 
     #[test]
     fn auto_dirs_constructs_correct_paths() {
-        let base = Path::new("/home/user/.pi/agent");
+        let base = Path::new("/home/user/.skaffen/agent");
         let dirs = AutoDirs::new(base);
         assert_eq!(dirs.extensions, base.join("extensions"));
         assert_eq!(dirs.skills, base.join("skills"));
@@ -6059,7 +6059,7 @@ mod tests {
             )
             .expect("first lock verification");
 
-        let lockfile_path = cwd.join(".pi").join("packages.lock.json");
+        let lockfile_path = cwd.join(".skaffen").join("packages.lock.json");
         let first = fs::read_to_string(&lockfile_path).expect("read first lockfile");
 
         manager

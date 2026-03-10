@@ -50,8 +50,8 @@ fn write_policy_settings(root: &Path, profile: &str) {
             "profile": profile
         }
     });
-    let settings_dir = root.join(".pi");
-    fs::create_dir_all(&settings_dir).expect("mkdir .pi/");
+    let settings_dir = root.join(".skaffen");
+    fs::create_dir_all(&settings_dir).expect("mkdir .skaffen/");
     fs::write(
         settings_dir.join("settings.json"),
         serde_json::to_string_pretty(&settings).unwrap(),

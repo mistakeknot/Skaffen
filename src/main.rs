@@ -651,10 +651,10 @@ fn extension_policy_migration_guardrails(
         "profile_source": resolved.profile_source,
         "permissive_by_default_reason": "Fresh installs favor extension compatibility and custom UI out of the box.",
         "override_cli": {
-            "safe_strict_mode": "pi --extension-policy safe <your command>",
-            "balanced_prompt_mode": "pi --extension-policy balanced <your command>",
+            "safe_strict_mode": "skaffen --extension-policy safe <your command>",
+            "balanced_prompt_mode": "skaffen --extension-policy balanced <your command>",
             "balanced_with_dangerous_caps": "PI_EXTENSION_ALLOW_DANGEROUS=1 pi --extension-policy balanced <your command>",
-            "explicit_permissive": "pi --extension-policy permissive <your command>",
+            "explicit_permissive": "skaffen --extension-policy permissive <your command>",
         },
         "settings_examples": {
             "default_permissive": policy_default_toggle_example(true),
@@ -664,7 +664,7 @@ fn extension_policy_migration_guardrails(
             "balanced_with_dangerous_caps": policy_config_example("balanced", true),
             "explicit_permissive": policy_config_example("permissive", false),
         },
-        "revert_to_safe_cli": "pi --extension-policy safe <your command>",
+        "revert_to_safe_cli": "skaffen --extension-policy safe <your command>",
     })
 }
 
@@ -694,7 +694,7 @@ fn capability_remediation(capability: Capability, decision: PolicyDecision) -> s
         (true, PolicyDecision::Deny) => (
             vec![
                 "PI_EXTENSION_ALLOW_DANGEROUS=1 pi --extension-policy balanced <your command>",
-                "pi --extension-policy permissive <your command>",
+                "skaffen --extension-policy permissive <your command>",
             ],
             vec![
                 policy_config_example("balanced", true),
@@ -705,7 +705,7 @@ fn capability_remediation(capability: Capability, decision: PolicyDecision) -> s
         (true, PolicyDecision::Prompt) => (
             vec![
                 "Approve the runtime capability prompt (Allow once/always).",
-                "pi --extension-policy permissive <your command>",
+                "skaffen --extension-policy permissive <your command>",
             ],
             vec![
                 policy_config_example("balanced", true),
@@ -720,8 +720,8 @@ fn capability_remediation(capability: Capability, decision: PolicyDecision) -> s
         ),
         (false, PolicyDecision::Deny) => (
             vec![
-                "pi --extension-policy balanced <your command>",
-                "pi --extension-policy permissive <your command>",
+                "skaffen --extension-policy balanced <your command>",
+                "skaffen --extension-policy permissive <your command>",
             ],
             vec![
                 policy_config_example("balanced", false),
@@ -732,7 +732,7 @@ fn capability_remediation(capability: Capability, decision: PolicyDecision) -> s
         (false, PolicyDecision::Prompt) => (
             vec![
                 "Approve the runtime capability prompt (Allow once/always).",
-                "pi --extension-policy permissive <your command>",
+                "skaffen --extension-policy permissive <your command>",
             ],
             vec![
                 policy_config_example("balanced", false),
@@ -749,11 +749,11 @@ fn capability_remediation(capability: Capability, decision: PolicyDecision) -> s
 
     let to_restrict_cli = if is_dangerous {
         vec![
-            "pi --extension-policy balanced <your command>",
-            "pi --extension-policy safe <your command>",
+            "skaffen --extension-policy balanced <your command>",
+            "skaffen --extension-policy safe <your command>",
         ]
     } else {
-        vec!["pi --extension-policy safe <your command>"]
+        vec!["skaffen --extension-policy safe <your command>"]
     };
     let to_restrict_config = if is_dangerous {
         vec![
@@ -807,19 +807,19 @@ fn print_resolved_extension_policy(resolved: &skaffen::config::ResolvedExtension
         {
             "profile": "safe",
             "summary": "Strict deny-by-default profile.",
-            "cli": "pi --extension-policy safe <your command>",
+            "cli": "skaffen --extension-policy safe <your command>",
             "config_example": policy_config_example("safe", false),
         },
         {
             "profile": "balanced",
             "summary": "Prompt-based profile (legacy alias: standard).",
-            "cli": "pi --extension-policy balanced <your command>",
+            "cli": "skaffen --extension-policy balanced <your command>",
             "config_example": policy_config_example("balanced", false),
         },
         {
             "profile": "permissive",
             "summary": "Allow-most profile for compatibility-first workflows.",
-            "cli": "pi --extension-policy permissive <your command>",
+            "cli": "skaffen --extension-policy permissive <your command>",
             "config_example": policy_config_example("permissive", false),
         },
     ]);
@@ -861,7 +861,7 @@ fn print_resolved_repair_policy(resolved: &skaffen::config::ResolvedRepairPolicy
             "auto-safe": "Automatically apply safe fixes (e.g., config updates).",
             "auto-strict": "Automatically apply all fixes including code changes.",
         },
-        "cli_override": "pi --repair-policy <mode> <your command>",
+        "cli_override": "skaffen --repair-policy <mode> <your command>",
         "env_var": "PI_REPAIR_POLICY=<mode>",
     });
 
@@ -2909,7 +2909,7 @@ async fn handle_config(
     json_output: bool,
 ) -> Result<()> {
     if json_output && (show || paths) {
-        bail!("`pi config --json` cannot be combined with --show/--paths");
+        bail!("`skaffen config --json` cannot be combined with --show/--paths");
     }
 
     let interactive_requested = !show && !paths;
@@ -3219,7 +3219,7 @@ fn list_models_cache_path(models_path: &Path) -> Option<PathBuf> {
 
     let key = format!("{:x}", hasher.finalize());
     dirs::cache_dir().map(|dir| {
-        dir.join("pi")
+        dir.join("skaffen")
             .join("list-models-cache")
             .join(format!("{key}.json"))
     })
@@ -4678,7 +4678,7 @@ fn default_export_path(input: &Path) -> PathBuf {
         .file_stem()
         .and_then(|s| s.to_str())
         .unwrap_or("session");
-    PathBuf::from(format!("pi-session-{basename}.html"))
+    PathBuf::from(format!("skaffen-session-{basename}.html"))
 }
 
 #[cfg(test)]
@@ -5056,7 +5056,7 @@ mod tests {
         let global_dir = temp.path().join("global");
         std::fs::create_dir_all(&cwd).expect("create cwd");
         std::fs::create_dir_all(&global_dir).expect("create global dir");
-        std::fs::create_dir_all(cwd.join(".pi")).expect("create project .pi");
+        std::fs::create_dir_all(cwd.join(".skaffen")).expect("create project .skaffen");
 
         std::fs::write(
             global_dir.join("settings.json"),
@@ -5068,7 +5068,7 @@ mod tests {
         .expect("write global settings");
 
         std::fs::write(
-            cwd.join(".pi").join("settings.json"),
+            cwd.join(".skaffen").join("settings.json"),
             serde_json::to_string_pretty(&json!({
                 "packages": [
                     {
@@ -5141,7 +5141,7 @@ mod tests {
         );
 
         let project_value: serde_json::Value = serde_json::from_str(
-            &std::fs::read_to_string(cwd.join(".pi").join("settings.json")).expect("read project"),
+            &std::fs::read_to_string(cwd.join(".skaffen").join("settings.json")).expect("read project"),
         )
         .expect("parse project json");
         let project_pkg = project_value["packages"]

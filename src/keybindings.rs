@@ -1092,7 +1092,7 @@ impl KeyBindings {
         Ok(Self { bindings, reverse })
     }
 
-    /// Get the default user keybindings path: `~/.pi/agent/keybindings.json`
+    /// Get the default user keybindings path: `~/.skaffen/agent/keybindings.json`
     #[must_use]
     pub fn user_config_path() -> std::path::PathBuf {
         crate::config::Config::global_dir().join("keybindings.json")

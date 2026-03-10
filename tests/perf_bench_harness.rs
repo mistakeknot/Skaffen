@@ -629,7 +629,7 @@ fn bench_extension_scenarios() {
 
             records.push(BenchRecord {
                 schema: "pi.ext.rust_bench.v1".to_string(),
-                runtime: "pi_agent_rust".to_string(),
+                runtime: "skaffen".to_string(),
                 scenario: "cold_start".to_string(),
                 extension: ext_name.clone(),
                 runs: summary.count,
@@ -663,7 +663,7 @@ fn bench_extension_scenarios() {
 
             records.push(BenchRecord {
                 schema: "pi.ext.rust_bench.v1".to_string(),
-                runtime: "pi_agent_rust".to_string(),
+                runtime: "skaffen".to_string(),
                 scenario: "warm_start".to_string(),
                 extension: ext_name.clone(),
                 runs: summary.count,
@@ -697,7 +697,7 @@ fn bench_extension_scenarios() {
 
             records.push(BenchRecord {
                 schema: "pi.ext.rust_bench.v1".to_string(),
-                runtime: "pi_agent_rust".to_string(),
+                runtime: "skaffen".to_string(),
                 scenario: "tool_call".to_string(),
                 extension: ext_name.clone(),
                 runs: summary.count,
@@ -731,7 +731,7 @@ fn bench_extension_scenarios() {
 
             records.push(BenchRecord {
                 schema: "pi.ext.rust_bench.v1".to_string(),
-                runtime: "pi_agent_rust".to_string(),
+                runtime: "skaffen".to_string(),
                 scenario: "event_hook".to_string(),
                 extension: ext_name.clone(),
                 runs: summary.count,
@@ -880,7 +880,7 @@ fn bench_jsonl_schema_valid() {
         );
         assert_eq!(
             record.get("runtime").and_then(Value::as_str),
-            Some("pi_agent_rust"),
+            Some("skaffen"),
             "line {i}: wrong runtime"
         );
 

@@ -658,7 +658,7 @@ fn build_reload_diagnostics(
     }
 }
 
-impl PiApp {
+impl SkaffenApp {
     pub(super) fn sync_active_provider_credentials(&mut self, changed_provider: &str) {
         let changed_canonical = normalize_auth_provider_input(changed_provider);
         let auth = match crate::auth::AuthStorage::load(crate::config::Config::auth_path()) {
@@ -884,7 +884,7 @@ impl PiApp {
             let mut auth = match crate::auth::AuthStorage::load_async(auth_path).await {
                 Ok(a) => a,
                 Err(e) => {
-                    let _ = event_tx.try_send(PiMsg::AgentError(e.to_string()));
+                    let _ = event_tx.try_send(SkaffenMsg::AgentError(e.to_string()));
                     return;
                 }
             };
@@ -1009,17 +1009,17 @@ impl PiApp {
             let credential = match credential {
                 Ok(c) => c,
                 Err(e) => {
-                    let _ = event_tx.try_send(PiMsg::AgentError(e.to_string()));
+                    let _ = event_tx.try_send(SkaffenMsg::AgentError(e.to_string()));
                     return;
                 }
             };
 
             save_provider_credential(&mut auth, &provider, credential);
             if let Err(e) = auth.save_async().await {
-                let _ = event_tx.try_send(PiMsg::AgentError(e.to_string()));
+                let _ = event_tx.try_send(SkaffenMsg::AgentError(e.to_string()));
                 return;
             }
-            let _ = event_tx.try_send(PiMsg::CredentialUpdated {
+            let _ = event_tx.try_send(SkaffenMsg::CredentialUpdated {
                 provider: provider.clone(),
             });
 
@@ -1033,7 +1033,7 @@ impl PiApp {
                     )
                 }
             };
-            let _ = event_tx.try_send(PiMsg::System(status));
+            let _ = event_tx.try_send(SkaffenMsg::System(status));
         });
 
         None
@@ -1108,21 +1108,21 @@ impl PiApp {
 
                         let mut display = display;
                         display.push_str("\n\n[Output excluded from model context]");
-                        let _ = event_tx.try_send(PiMsg::BashResult {
+                        let _ = event_tx.try_send(SkaffenMsg::BashResult {
                             display,
                             content_for_agent: None,
                         });
                     } else {
                         let content_for_agent =
                             vec![ContentBlock::Text(TextContent::new(display.clone()))];
-                        let _ = event_tx.try_send(PiMsg::BashResult {
+                        let _ = event_tx.try_send(SkaffenMsg::BashResult {
                             display,
                             content_for_agent: Some(content_for_agent),
                         });
                     }
                 }
                 Err(err) => {
-                    let _ = event_tx.try_send(PiMsg::BashResult {
+                    let _ = event_tx.try_send(SkaffenMsg::BashResult {
                         display: format!("Bash command failed: {err}"),
                         content_for_agent: None,
                     });
@@ -1531,7 +1531,7 @@ impl PiApp {
                         .await
                         .unwrap_or(false);
                     if cancelled {
-                        let _ = event_tx.try_send(PiMsg::System(
+                        let _ = event_tx.try_send(SkaffenMsg::System(
                             "Session switch cancelled by extension".to_string(),
                         ));
                         return;
@@ -1541,7 +1541,7 @@ impl PiApp {
                         let mut guard = match session.lock(&cx).await {
                             Ok(guard) => guard,
                             Err(err) => {
-                                let _ = event_tx.try_send(PiMsg::AgentError(format!(
+                                let _ = event_tx.try_send(SkaffenMsg::AgentError(format!(
                                     "Failed to lock session: {err}"
                                 )));
                                 return;
@@ -1561,7 +1561,7 @@ impl PiApp {
                         let mut agent_guard = match agent.lock(&cx).await {
                             Ok(guard) => guard,
                             Err(err) => {
-                                let _ = event_tx.try_send(PiMsg::AgentError(format!(
+                                let _ = event_tx.try_send(SkaffenMsg::AgentError(format!(
                                     "Failed to lock agent: {err}"
                                 )));
                                 return;
@@ -1571,7 +1571,7 @@ impl PiApp {
                         agent_guard.stream_options_mut().thinking_level = Some(ThinkingLevel::Off);
                     }
 
-                    let _ = event_tx.try_send(PiMsg::ConversationReset {
+                    let _ = event_tx.try_send(SkaffenMsg::ConversationReset {
                         messages: Vec::new(),
                         usage: Usage::default(),
                         status: Some(format!(
@@ -1614,7 +1614,7 @@ impl PiApp {
                 let write_fallback = |text: &str| -> std::io::Result<std::path::PathBuf> {
                     use std::io::Write;
                     let dir = std::env::temp_dir();
-                    let filename = format!("pi_copy_{}.txt", Utc::now().timestamp_millis());
+                    let filename = format!("skaffen_copy_{}.txt", Utc::now().timestamp_millis());
                     let path = dir.join(filename);
 
                     let mut options = std::fs::OpenOptions::new();
@@ -1929,7 +1929,7 @@ result in account suspension/ban. Prefer using an Anthropic API key (ANTHROPIC_A
                         // Block until the callback arrives or the sender is dropped.
                         if let Ok(path) = server.rx.recv() {
                             let full_url = format!("http://localhost{path}");
-                            let _ = event_tx.try_send(PiMsg::OAuthCallbackReceived(full_url));
+                            let _ = event_tx.try_send(SkaffenMsg::OAuthCallbackReceived(full_url));
                         }
                     });
                 }
@@ -2335,14 +2335,14 @@ result in account suspension/ban. Prefer using an Anthropic API key (ANTHROPIC_A
                         let _ = write!(status, " ({diag_count} diagnostics)");
                     }
 
-                    let _ = event_tx.try_send(PiMsg::ResourcesReloaded {
+                    let _ = event_tx.try_send(SkaffenMsg::ResourcesReloaded {
                         resources,
                         status,
                         diagnostics,
                     });
                 }
                 Err(err) => {
-                    let _ = event_tx.try_send(PiMsg::AgentError(format!(
+                    let _ = event_tx.try_send(SkaffenMsg::AgentError(format!(
                         "Failed to reload resources: {err}"
                     )));
                 }

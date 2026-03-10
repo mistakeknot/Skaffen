@@ -4,7 +4,7 @@
 //!
 //! Tests are organized into:
 //! 1. Helper function unit tests (parse, resolve, match, strip)
-//! 2. Model selector overlay integration with `PiApp`
+//! 2. Model selector overlay integration with `SkaffenApp`
 //! 3. Scoped cycling deterministic ordering tests
 //! 4. Resolve + cycling integration
 
@@ -19,7 +19,7 @@ use futures::stream;
 use skaffen::agent::{Agent, AgentConfig};
 use skaffen::config::Config;
 use skaffen::interactive::{
-    PiApp, model_entry_matches, parse_scoped_model_patterns, resolve_scoped_model_entries,
+    SkaffenApp, model_entry_matches, parse_scoped_model_patterns, resolve_scoped_model_entries,
     strip_thinking_level_suffix,
 };
 use skaffen::keybindings::KeyBindings;
@@ -108,7 +108,7 @@ fn build_app_with_models(
     current: ModelEntry,
     scope: Vec<ModelEntry>,
     available: Vec<ModelEntry>,
-) -> PiApp {
+) -> SkaffenApp {
     build_app_with_models_and_config(harness, current, scope, available, Config::default())
 }
 
@@ -118,7 +118,7 @@ fn build_app_with_models_and_config(
     scope: Vec<ModelEntry>,
     available: Vec<ModelEntry>,
     config: Config,
-) -> PiApp {
+) -> SkaffenApp {
     let cwd = harness.temp_dir().to_path_buf();
     let tools = ToolRegistry::new(&[], &cwd, Some(&config));
     let provider: Arc<dyn Provider> = Arc::new(DummyProvider);
@@ -137,7 +137,7 @@ fn build_app_with_models_and_config(
     };
     let (event_tx, _event_rx) = mpsc::channel(1024);
 
-    let mut app = PiApp::new(
+    let mut app = SkaffenApp::new(
         agent,
         session,
         config,
@@ -160,12 +160,12 @@ fn build_app_with_models_and_config(
     app
 }
 
-fn get_status(app: &PiApp) -> Option<&str> {
+fn get_status(app: &SkaffenApp) -> Option<&str> {
     app.status_message()
 }
 
 #[allow(dead_code)]
-fn get_view(app: &PiApp) -> String {
+fn get_view(app: &SkaffenApp) -> String {
     BubbleteaModel::view(app)
 }
 
@@ -451,7 +451,7 @@ fn resolve_sorted_by_full_id() {
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// 2. Model selector overlay integration with PiApp
+// 2. Model selector overlay integration with SkaffenApp
 // ═══════════════════════════════════════════════════════════════════
 
 #[test]

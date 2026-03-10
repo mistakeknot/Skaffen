@@ -30,7 +30,7 @@ use common::harness::TestHarness;
 use futures::stream;
 use skaffen::agent::{Agent, AgentConfig};
 use skaffen::config::Config;
-use skaffen::interactive::{ConversationMessage, MessageRole, PiApp, PiMsg};
+use skaffen::interactive::{ConversationMessage, MessageRole, SkaffenApp, SkaffenMsg};
 use skaffen::keybindings::KeyBindings;
 use skaffen::model::{StreamEvent, Usage};
 use skaffen::models::ModelEntry;
@@ -110,7 +110,7 @@ fn dummy_model_entry() -> ModelEntry {
     }
 }
 
-fn build_perf_app(harness: &TestHarness, messages: Vec<ConversationMessage>) -> PiApp {
+fn build_perf_app(harness: &TestHarness, messages: Vec<ConversationMessage>) -> SkaffenApp {
     let cwd = harness.temp_dir().to_path_buf();
     let config = Config::default();
     let tools = ToolRegistry::new(&[], &cwd, Some(&config));
@@ -130,7 +130,7 @@ fn build_perf_app(harness: &TestHarness, messages: Vec<ConversationMessage>) -> 
     let model_entry = dummy_model_entry();
     let (event_tx, _event_rx) = mpsc::channel(1024);
 
-    let mut app = PiApp::new(
+    let mut app = SkaffenApp::new(
         agent,
         Arc::new(Mutex::new(Session::in_memory())),
         config,
@@ -405,14 +405,14 @@ fn e2e_perf_streaming_with_history() {
     // Start streaming: simulate agent starting a response
     BubbleteaModel::update(
         &mut app,
-        Message::new(PiMsg::TextDelta("Starting response...".to_string())),
+        Message::new(SkaffenMsg::TextDelta("Starting response...".to_string())),
     );
 
     // Measure frame times during streaming (simulating 50 tokens)
     let mut streaming_times = Vec::with_capacity(50);
     for token_idx in 0..50 {
         let token = format!(" token_{token_idx}");
-        BubbleteaModel::update(&mut app, Message::new(PiMsg::TextDelta(token)));
+        BubbleteaModel::update(&mut app, Message::new(SkaffenMsg::TextDelta(token)));
 
         let start = Instant::now();
         let _view = BubbleteaModel::view(&app);

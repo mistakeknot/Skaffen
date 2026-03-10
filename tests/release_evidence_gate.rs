@@ -62,7 +62,7 @@ const FRANKEN_NODE_TIER3_REQUIRED_EVIDENCE_TOKENS: &[&str] = &[
     "runtime-substrate generalization evidence for bd-3ar8v.7.5",
     "multi-tier execution engine evidence for bd-3ar8v.7.6",
     "compatibility remediation backlog generator evidence for bd-3ar8v.7.16",
-    "crate reintegration evidence into pi_agent_rust",
+    "crate reintegration evidence into skaffen",
 ];
 
 fn collect_non_empty_string_array(

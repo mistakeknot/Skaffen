@@ -1687,15 +1687,15 @@ mod tests {
 
     #[test]
     fn for_sessions_root_constructs_correct_paths() {
-        let root = Path::new("/home/user/.pi/sessions");
+        let root = Path::new("/home/user/.skaffen/sessions");
         let index = SessionIndex::for_sessions_root(root);
         assert_eq!(
             index.db_path,
-            PathBuf::from("/home/user/.pi/sessions/session-index.sqlite")
+            PathBuf::from("/home/user/.skaffen/sessions/session-index.sqlite")
         );
         assert_eq!(
             index.lock_path,
-            PathBuf::from("/home/user/.pi/sessions/session-index.lock")
+            PathBuf::from("/home/user/.skaffen/sessions/session-index.lock")
         );
     }
 
@@ -1703,7 +1703,7 @@ mod tests {
 
     #[test]
     fn sessions_root_returns_parent_of_db_path() {
-        let root = Path::new("/home/user/.pi/sessions");
+        let root = Path::new("/home/user/.skaffen/sessions");
         let index = SessionIndex::for_sessions_root(root);
         assert_eq!(index.sessions_root(), root);
     }
@@ -1921,7 +1921,7 @@ mod tests {
                 .iter()
                 .cloned()
                 .enumerate()
-                .map(|(idx, row)| (format!("/tmp/pi-session-index-{idx}.jsonl"), row))
+                .map(|(idx, row)| (format!("/tmp/skaffen-session-index-{idx}.jsonl"), row))
                 .collect();
 
             index
@@ -1931,7 +1931,7 @@ mod tests {
                         .map_err(|err| Error::session(format!("delete sessions: {err}")))?;
 
                     for (idx, row) in rows.iter().enumerate() {
-                        let path = format!("/tmp/pi-session-index-{idx}.jsonl");
+                        let path = format!("/tmp/skaffen-session-index-{idx}.jsonl");
                         conn.execute_sync(
                             "INSERT INTO sessions (path,id,cwd,timestamp,message_count,last_modified_ms,size_bytes,name)
                              VALUES (?1,?2,?3,?4,?5,?6,?7,?8)",

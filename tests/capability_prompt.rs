@@ -20,7 +20,7 @@ use futures::stream;
 use skaffen::agent::{Agent, AgentConfig};
 use skaffen::config::Config;
 use skaffen::extensions::{ExtensionManager, ExtensionUiRequest, ExtensionUiResponse};
-use skaffen::interactive::{PiApp, PiMsg};
+use skaffen::interactive::{SkaffenApp, SkaffenMsg};
 use skaffen::keybindings::KeyBindings;
 use skaffen::model::{StreamEvent, Usage};
 use skaffen::models::ModelEntry;
@@ -104,7 +104,7 @@ fn dummy_model_entry() -> ModelEntry {
     }
 }
 
-fn build_app(harness: &TestHarness, extensions: Option<ExtensionManager>) -> PiApp {
+fn build_app(harness: &TestHarness, extensions: Option<ExtensionManager>) -> SkaffenApp {
     let cwd = harness.temp_dir().to_path_buf();
     let config = Config::default();
     let tools = ToolRegistry::new(&[], &cwd, Some(&config));
@@ -128,7 +128,7 @@ fn build_app(harness: &TestHarness, extensions: Option<ExtensionManager>) -> PiA
     let session = Session::create();
     let session = Arc::new(Mutex::new(session));
 
-    let mut app = PiApp::new(
+    let mut app = SkaffenApp::new(
         agent,
         session,
         config,
@@ -180,15 +180,15 @@ fn normalize_view(input: &str) -> String {
         .join("\n")
 }
 
-fn view_text(app: &PiApp) -> String {
+fn view_text(app: &SkaffenApp) -> String {
     normalize_view(&BubbleteaModel::view(app))
 }
 
-fn send_pi_msg(app: &mut PiApp, msg: PiMsg) {
+fn send_pi_msg(app: &mut SkaffenApp, msg: SkaffenMsg) {
     BubbleteaModel::update(app, Message::new(msg));
 }
 
-fn send_key(app: &mut PiApp, key: KeyMsg) {
+fn send_key(app: &mut SkaffenApp, key: KeyMsg) {
     BubbleteaModel::update(app, Message::new(key));
 }
 
@@ -665,7 +665,7 @@ mod tui_prompt {
             "No prompt before request"
         );
 
-        send_pi_msg(&mut app, PiMsg::ExtensionUiRequest(make_cap_request()));
+        send_pi_msg(&mut app, SkaffenMsg::ExtensionUiRequest(make_cap_request()));
 
         let view_after = view_text(&app);
         assert!(
@@ -683,7 +683,7 @@ mod tui_prompt {
         let mut app = build_app(&harness, Some(manager));
 
         // Show the prompt.
-        send_pi_msg(&mut app, PiMsg::ExtensionUiRequest(make_cap_request()));
+        send_pi_msg(&mut app, SkaffenMsg::ExtensionUiRequest(make_cap_request()));
 
         // Type some text - it should NOT reach the input field.
         send_key(&mut app, KeyMsg::from_runes(vec!['h', 'e', 'l', 'l', 'o']));
@@ -704,7 +704,7 @@ mod tui_prompt {
         manager.set_ui_sender(ui_tx);
         let mut app = build_app(&harness, Some(manager));
 
-        send_pi_msg(&mut app, PiMsg::ExtensionUiRequest(make_cap_request()));
+        send_pi_msg(&mut app, SkaffenMsg::ExtensionUiRequest(make_cap_request()));
 
         // Initial focus is index 0 = "Allow Once".
         let v0 = view_text(&app);
@@ -737,7 +737,7 @@ mod tui_prompt {
         manager.set_ui_sender(ui_tx);
         let mut app = build_app(&harness, Some(manager));
 
-        send_pi_msg(&mut app, PiMsg::ExtensionUiRequest(make_cap_request()));
+        send_pi_msg(&mut app, SkaffenMsg::ExtensionUiRequest(make_cap_request()));
 
         // Press Left from index 0 should wrap to index 3 (Deny Always).
         send_key(&mut app, KeyMsg::from_type(KeyType::Left));
@@ -758,7 +758,7 @@ mod tui_prompt {
         manager.set_ui_sender(ui_tx);
         let mut app = build_app(&harness, Some(manager));
 
-        send_pi_msg(&mut app, PiMsg::ExtensionUiRequest(make_cap_request()));
+        send_pi_msg(&mut app, SkaffenMsg::ExtensionUiRequest(make_cap_request()));
 
         // Tab should work like Right.
         send_key(&mut app, KeyMsg::from_type(KeyType::Tab));
@@ -777,7 +777,7 @@ mod tui_prompt {
         manager.set_ui_sender(ui_tx);
         let mut app = build_app(&harness, Some(manager));
 
-        send_pi_msg(&mut app, PiMsg::ExtensionUiRequest(make_cap_request()));
+        send_pi_msg(&mut app, SkaffenMsg::ExtensionUiRequest(make_cap_request()));
 
         // Focus is on index 0 = "Allow Once". Press Enter.
         send_key(&mut app, KeyMsg::from_type(KeyType::Enter));
@@ -800,7 +800,7 @@ mod tui_prompt {
         manager.set_ui_sender(ui_tx);
         let mut app = build_app(&harness, Some(manager));
 
-        send_pi_msg(&mut app, PiMsg::ExtensionUiRequest(make_cap_request()));
+        send_pi_msg(&mut app, SkaffenMsg::ExtensionUiRequest(make_cap_request()));
 
         // Press Escape to deny.
         send_key(&mut app, KeyMsg::from_type(KeyType::Esc));
@@ -820,7 +820,7 @@ mod tui_prompt {
         manager.set_ui_sender(ui_tx);
         let mut app = build_app(&harness, Some(manager));
 
-        send_pi_msg(&mut app, PiMsg::ExtensionUiRequest(make_cap_request()));
+        send_pi_msg(&mut app, SkaffenMsg::ExtensionUiRequest(make_cap_request()));
 
         // Navigate to index 2 = "Deny" (Right, Right).
         send_key(&mut app, KeyMsg::from_type(KeyType::Right));
@@ -842,7 +842,7 @@ mod tui_prompt {
         manager.set_ui_sender(ui_tx);
         let mut app = build_app(&harness, Some(manager));
 
-        send_pi_msg(&mut app, PiMsg::ExtensionUiRequest(make_non_cap_confirm()));
+        send_pi_msg(&mut app, SkaffenMsg::ExtensionUiRequest(make_non_cap_confirm()));
 
         let view = view_text(&app);
         // Should NOT show the capability prompt overlay (no Allow Once/Deny Always buttons).
@@ -861,7 +861,7 @@ mod tui_prompt {
         manager.set_ui_sender(ui_tx);
         let mut app = build_app(&harness, Some(manager));
 
-        send_pi_msg(&mut app, PiMsg::ExtensionUiRequest(make_cap_request()));
+        send_pi_msg(&mut app, SkaffenMsg::ExtensionUiRequest(make_cap_request()));
 
         // Press 'l' (vim right) to move focus.
         send_key(&mut app, KeyMsg::from_runes(vec!['l']));
@@ -902,7 +902,7 @@ mod prompt_persistence_integration {
         let mut app = build_app(&harness, Some(manager));
 
         let request = cap_prompt_request("p-1", "test-ext", "exec", "Run commands");
-        send_pi_msg(&mut app, PiMsg::ExtensionUiRequest(request));
+        send_pi_msg(&mut app, SkaffenMsg::ExtensionUiRequest(request));
 
         // Navigate to index 1 = "Allow Always" and press Enter.
         send_key(&mut app, KeyMsg::from_type(KeyType::Right));
@@ -918,7 +918,7 @@ mod prompt_persistence_integration {
         // The handler calls PermissionStore::open_default().record() for persistent actions.
         // We can verify the intent by checking that the cache was updated by
         // the manager (since cache_policy_prompt_decision is called separately).
-        // The actual persistence to ~/.pi/... happens in the TUI handler.
+        // The actual persistence to ~/.skaffen/... happens in the TUI handler.
     }
 
     #[test]
@@ -930,7 +930,7 @@ mod prompt_persistence_integration {
         let mut app = build_app(&harness, Some(manager));
 
         let request = cap_prompt_request("p-2", "test-ext", "exec", "Run commands");
-        send_pi_msg(&mut app, PiMsg::ExtensionUiRequest(request));
+        send_pi_msg(&mut app, SkaffenMsg::ExtensionUiRequest(request));
 
         // Navigate to index 3 = "Deny Always" (Right, Right, Right) and Enter.
         send_key(&mut app, KeyMsg::from_type(KeyType::Right));
@@ -962,7 +962,7 @@ mod prompt_persistence_integration {
         let mut app = build_app(&harness, Some(manager));
 
         let request = cap_prompt_request("p-3", "test-ext", "exec", "Run commands");
-        send_pi_msg(&mut app, PiMsg::ExtensionUiRequest(request));
+        send_pi_msg(&mut app, SkaffenMsg::ExtensionUiRequest(request));
 
         // Index 0 = "Allow Once". Press Enter.
         send_key(&mut app, KeyMsg::from_type(KeyType::Enter));
@@ -987,7 +987,7 @@ mod prompt_persistence_integration {
         let mut app = build_app(&harness, Some(manager));
 
         let request = cap_prompt_request("p-4", "test-ext", "exec", "Run commands");
-        send_pi_msg(&mut app, PiMsg::ExtensionUiRequest(request));
+        send_pi_msg(&mut app, SkaffenMsg::ExtensionUiRequest(request));
 
         // Escape = deny once.
         send_key(&mut app, KeyMsg::from_type(KeyType::Esc));

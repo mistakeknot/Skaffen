@@ -3538,14 +3538,14 @@ async fn export_html_snapshot(
             snapshot.path.as_ref().map_or_else(
                 || {
                     let ts = chrono::Utc::now().format("%Y-%m-%dT%H-%M-%S%.3fZ");
-                    PathBuf::from(format!("pi-session-{ts}.html"))
+                    PathBuf::from(format!("skaffen-session-{ts}.html"))
                 },
                 |session_path| {
                     let basename = session_path
                         .file_stem()
                         .and_then(|s| s.to_str())
                         .unwrap_or("session");
-                    PathBuf::from(format!("pi-session-{basename}.html"))
+                    PathBuf::from(format!("skaffen-session-{basename}.html"))
                 },
             )
         },
@@ -3606,7 +3606,7 @@ async fn ingest_bash_rpc_chunk(
     if *total_bytes > DEFAULT_MAX_BYTES && temp_file.is_none() && !*spill_failed {
         let id_full = uuid::Uuid::new_v4().simple().to_string();
         let id = &id_full[..16];
-        let path = std::env::temp_dir().join(format!("pi-rpc-bash-{id}.log"));
+        let path = std::env::temp_dir().join(format!("skaffen-rpc-bash-{id}.log"));
 
         // Secure synchronous creation
         let expected_inode: Option<u64> = {

@@ -1,7 +1,7 @@
 //! JSON theme file format and loader.
 //!
 //! This module defines a Pi-specific theme schema and discovery rules:
-//! - Global themes: `~/.pi/agent/themes/*.json`
+//! - Global themes: `~/.skaffen/agent/themes/*.json`
 //! - Project themes: `<cwd>/.pi/themes/*.json`
 
 use crate::config::Config;

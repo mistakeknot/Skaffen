@@ -225,7 +225,7 @@ fn ts_oracle_node_path() -> &'static Path {
         fn symlink_pkg(_scope_dir: &Path, _name: &str, _target: &Path) {}
 
         let base = PathBuf::from(format!(
-            "/tmp/pi_agent_rust_ts_oracle_node_path-{}",
+            "/tmp/skaffen_ts_oracle_node_path-{}",
             std::process::id()
         ));
 
@@ -2125,7 +2125,7 @@ fn diff_thirdparty_manifest() {
 // ─── Built-in extensions (bd-k7i) ─────────────────────────────────────────
 
 /// Differential conformance tests on built-in pi-mono extensions (4 extensions
-/// from .pi/extensions/).
+/// from .skaffen/extensions/).
 #[test]
 fn diff_builtin_manifest() {
     let selected: Vec<(String, String)> = builtin_extensions().clone();

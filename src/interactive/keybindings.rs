@@ -1,7 +1,7 @@
 use super::commands::model_entry_matches;
 use super::*;
 
-impl PiApp {
+impl SkaffenApp {
     pub(super) fn handle_custom_extension_key(&mut self, key: &KeyMsg) -> bool {
         if !self.custom_overlay_input_is_available() {
             return false;
@@ -229,7 +229,7 @@ impl PiApp {
             }
 
             let mut temp_file = tempfile::Builder::new()
-                .prefix("pi-paste-")
+                .prefix("skaffen-paste-")
                 .suffix(".png")
                 .tempfile()
                 .ok()?;
@@ -475,8 +475,8 @@ impl PiApp {
 
         // Drop the async → bubbletea bridge sender so bubbletea can shut down cleanly.
         // Without this, bubbletea's external forwarder thread can block on `recv()` during quit.
-        let _ = self.event_tx.try_send(PiMsg::UiShutdown);
-        let (tx, _rx) = mpsc::channel::<PiMsg>(1);
+        let _ = self.event_tx.try_send(SkaffenMsg::UiShutdown);
+        let (tx, _rx) = mpsc::channel::<SkaffenMsg>(1);
         drop(std::mem::replace(&mut self.event_tx, tx));
         quit()
     }
@@ -1053,7 +1053,7 @@ mod tests {
         }
     }
 
-    fn build_test_app(current: ModelEntry, available: Vec<ModelEntry>) -> PiApp {
+    fn build_test_app(current: ModelEntry, available: Vec<ModelEntry>) -> SkaffenApp {
         let provider: Arc<dyn Provider> = Arc::new(DummyProvider);
         let agent = Agent::new(
             provider,
@@ -1073,7 +1073,7 @@ mod tests {
             theme_paths: Vec::new(),
         };
         let (event_tx, _event_rx) = mpsc::channel(64);
-        PiApp::new(
+        SkaffenApp::new(
             agent,
             session,
             Config::default(),

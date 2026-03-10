@@ -309,11 +309,11 @@ impl TestHarness {
             env_root.join("agent").display().to_string(),
         );
         env.set(
-            "PI_CONFIG_PATH",
+            "SKAFFEN_CONFIG_PATH",
             env_root.join("settings.json").display().to_string(),
         );
         env.set(
-            "PI_SESSIONS_DIR",
+            "SKAFFEN_SESSIONS_DIR",
             env_root.join("sessions").display().to_string(),
         );
         env.set(

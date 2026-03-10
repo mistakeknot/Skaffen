@@ -75,7 +75,7 @@ const NATIVE_RUNTIME_DESCRIPTOR: &str = r#"
 "#;
 
 #[derive(Parser, Debug)]
-#[command(name = "pijs_workload")]
+#[command(name = "skaffen_js_workload")]
 #[command(about = "Deterministic PiJS workload runner for perf baselines")]
 struct Args {
     /// Outer loop iterations.
@@ -270,7 +270,7 @@ fn run() -> Result<()> {
         "{}",
         json!({
             "schema": "pi.perf.workload.v1",
-            "tool": "pijs_workload",
+            "tool": "skaffen_js_workload",
             "scenario": "tool_call_roundtrip",
             "iterations": args.iterations,
             "tool_calls_per_iteration": args.tool_calls,
@@ -300,7 +300,7 @@ fn run() -> Result<()> {
 
 fn setup_native_runtime_bench_handle() -> Result<ExtensionRuntimeHandle> {
     let descriptor_path = std::env::temp_dir().join(format!(
-        "pi_agent_rust_native_bench_descriptor_{}.native.json",
+        "skaffen_native_bench_descriptor_{}.native.json",
         std::process::id()
     ));
     fs::write(&descriptor_path, NATIVE_RUNTIME_DESCRIPTOR).map_err(|err| {

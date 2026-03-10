@@ -1,6 +1,6 @@
 //! Authentication storage and API key resolution.
 //!
-//! Auth file: ~/.pi/agent/auth.json
+//! Auth file: ~/.skaffen/agent/auth.json
 
 use crate::agent_cx::AgentCx;
 use crate::config::Config;
@@ -183,7 +183,7 @@ pub struct AuthStorage {
 impl AuthStorage {
     fn allow_external_provider_lookup(&self) -> bool {
         // External credential auto-detection is intended for Pi's global auth
-        // file (typically `~/.pi/agent/auth.json`). Scoping it this way keeps
+        // file (typically `~/.skaffen/agent/auth.json`). Scoping it this way keeps
         // tests and custom auth sandboxes deterministic.
         self.path == Config::auth_path()
     }
@@ -1928,7 +1928,7 @@ fn kimi_device_id_paths() -> Option<(PathBuf, PathBuf)> {
     let primary = kimi_share_dir()?.join("device_id");
     let legacy = home_dir().map_or_else(
         || primary.clone(),
-        |home| home.join(".pi").join("agent").join("kimi-device-id"),
+        |home| home.join(".skaffen").join("agent").join("kimi-device-id"),
     );
     Some((primary, legacy))
 }

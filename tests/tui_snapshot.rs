@@ -8,7 +8,7 @@ use common::TestHarness;
 use futures::stream;
 use skaffen::agent::{Agent, AgentConfig};
 use skaffen::config::Config;
-use skaffen::interactive::{ConversationMessage, MessageRole, PiApp, PiMsg};
+use skaffen::interactive::{ConversationMessage, MessageRole, SkaffenApp, SkaffenMsg};
 use skaffen::keybindings::KeyBindings;
 use skaffen::model::{ContentBlock, Cost, StopReason, StreamEvent, TextContent, Usage};
 use skaffen::models::ModelEntry;
@@ -92,11 +92,11 @@ fn dummy_model_entry() -> ModelEntry {
     }
 }
 
-fn build_app(harness: &TestHarness) -> PiApp {
+fn build_app(harness: &TestHarness) -> SkaffenApp {
     build_app_with_config(harness, Config::default())
 }
 
-fn build_app_with_config(harness: &TestHarness, config: Config) -> PiApp {
+fn build_app_with_config(harness: &TestHarness, config: Config) -> SkaffenApp {
     let cwd = harness.temp_dir().to_path_buf();
     let tools = ToolRegistry::new(&[], &cwd, Some(&config));
     let provider: Arc<dyn Provider> = Arc::new(DummyProvider);
@@ -118,7 +118,7 @@ fn build_app_with_config(harness: &TestHarness, config: Config) -> PiApp {
     let available_models = vec![model_entry.clone()];
     let (event_tx, _event_rx) = mpsc::channel(1024);
 
-    let mut app = PiApp::new(
+    let mut app = SkaffenApp::new(
         agent,
         session,
         config,
@@ -141,23 +141,23 @@ fn build_app_with_config(harness: &TestHarness, config: Config) -> PiApp {
     app
 }
 
-fn send_pi(app: &mut PiApp, msg: PiMsg) {
+fn send_pi(app: &mut SkaffenApp, msg: SkaffenMsg) {
     let _ = BubbleteaModel::update(app, Message::new(msg));
 }
 
-fn send_key(app: &mut PiApp, key: KeyMsg) {
+fn send_key(app: &mut SkaffenApp, key: KeyMsg) {
     let _ = BubbleteaModel::update(app, Message::new(key));
 }
 
 fn set_conversation(
-    app: &mut PiApp,
+    app: &mut SkaffenApp,
     messages: Vec<ConversationMessage>,
     usage: Usage,
     status: Option<&str>,
 ) {
     send_pi(
         app,
-        PiMsg::ConversationReset {
+        SkaffenMsg::ConversationReset {
             messages,
             usage,
             status: status.map(str::to_string),
@@ -165,13 +165,13 @@ fn set_conversation(
     );
 }
 
-fn set_input_text(app: &mut PiApp, text: &str) {
+fn set_input_text(app: &mut SkaffenApp, text: &str) {
     if !text.is_empty() {
         send_key(app, KeyMsg::from_runes(text.chars().collect()));
     }
 }
 
-fn set_multiline_input(app: &mut PiApp, lines: &[&str]) {
+fn set_multiline_input(app: &mut SkaffenApp, lines: &[&str]) {
     send_key(app, KeyMsg::from_type(KeyType::Enter).with_alt());
     for (idx, line) in lines.iter().enumerate() {
         if !line.is_empty() {
@@ -198,7 +198,7 @@ fn normalize_snapshot(input: &str) -> String {
         .join("\n")
 }
 
-fn snapshot(harness: &TestHarness, name: &str, app: &PiApp, context: &[(String, String)]) {
+fn snapshot(harness: &TestHarness, name: &str, app: &SkaffenApp, context: &[(String, String)]) {
     harness
         .log()
         .info_ctx("snapshot", format!("render {name}"), |ctx| {
@@ -365,10 +365,10 @@ fn tui_snapshot_system_message() {
 fn tui_snapshot_streaming_text() {
     let harness = TestHarness::new("tui_snapshot_streaming_text");
     let mut app = build_app(&harness);
-    send_pi(&mut app, PiMsg::AgentStart);
+    send_pi(&mut app, SkaffenMsg::AgentStart);
     send_pi(
         &mut app,
-        PiMsg::TextDelta("Streaming response...".to_string()),
+        SkaffenMsg::TextDelta("Streaming response...".to_string()),
     );
     let context = vec![
         ("scenario".to_string(), "streaming-text".to_string()),
@@ -381,12 +381,12 @@ fn tui_snapshot_streaming_text() {
 fn tui_snapshot_streaming_thinking() {
     let harness = TestHarness::new("tui_snapshot_streaming_thinking");
     let mut app = build_app(&harness);
-    send_pi(&mut app, PiMsg::AgentStart);
+    send_pi(&mut app, SkaffenMsg::AgentStart);
     send_pi(
         &mut app,
-        PiMsg::ThinkingDelta("Considering options...".to_string()),
+        SkaffenMsg::ThinkingDelta("Considering options...".to_string()),
     );
-    send_pi(&mut app, PiMsg::TextDelta("Partial answer.".to_string()));
+    send_pi(&mut app, SkaffenMsg::TextDelta("Partial answer.".to_string()));
     let context = vec![
         ("scenario".to_string(), "streaming-thinking".to_string()),
         ("state".to_string(), "processing".to_string()),
@@ -400,7 +400,7 @@ fn tui_snapshot_tool_running() {
     let mut app = build_app(&harness);
     send_pi(
         &mut app,
-        PiMsg::ToolStart {
+        SkaffenMsg::ToolStart {
             name: "read".to_string(),
             tool_id: "tool-1".to_string(),
         },
@@ -418,14 +418,14 @@ fn tui_snapshot_tool_output_message() {
     let mut app = build_app(&harness);
     send_pi(
         &mut app,
-        PiMsg::ToolStart {
+        SkaffenMsg::ToolStart {
             name: "read".to_string(),
             tool_id: "tool-2".to_string(),
         },
     );
     send_pi(
         &mut app,
-        PiMsg::ToolUpdate {
+        SkaffenMsg::ToolUpdate {
             name: "read".to_string(),
             tool_id: "tool-2".to_string(),
             content: vec![ContentBlock::Text(TextContent::new("file contents here"))],
@@ -434,7 +434,7 @@ fn tui_snapshot_tool_output_message() {
     );
     send_pi(
         &mut app,
-        PiMsg::ToolEnd {
+        SkaffenMsg::ToolEnd {
             name: "read".to_string(),
             tool_id: "tool-2".to_string(),
             is_error: false,
@@ -442,7 +442,7 @@ fn tui_snapshot_tool_output_message() {
     );
     send_pi(
         &mut app,
-        PiMsg::AgentDone {
+        SkaffenMsg::AgentDone {
             usage: None,
             stop_reason: StopReason::Stop,
             error_message: None,
@@ -461,7 +461,7 @@ fn tui_snapshot_status_message() {
     let mut app = build_app(&harness);
     send_pi(
         &mut app,
-        PiMsg::ResourcesReloaded {
+        SkaffenMsg::ResourcesReloaded {
             resources: ResourceLoader::empty(true),
             status: "Reloaded resources".to_string(),
             diagnostics: None,

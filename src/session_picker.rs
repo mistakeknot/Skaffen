@@ -1323,7 +1323,7 @@ mod tests {
 
         let result = delete_session_file_with_trash_cmd(
             &session_path,
-            "__pi_agent_rust_nonexistent_trash_command__",
+            "__skaffen_nonexistent_trash_command__",
         );
         assert!(result.is_ok(), "delete should fall back to remove_file");
         assert!(!session_path.exists(), "session file should be deleted");
@@ -1390,7 +1390,7 @@ mod tests {
 
         let result = delete_session_file_with_trash_cmd(
             &session_path,
-            "__pi_agent_rust_nonexistent_trash_command__",
+            "__skaffen_nonexistent_trash_command__",
         );
         assert!(result.is_ok(), "delete should fall back to remove_file");
         assert!(
@@ -1413,7 +1413,7 @@ mod tests {
 
         let result = delete_session_file_with_trash_cmd(
             &session_path,
-            "__pi_agent_rust_nonexistent_trash_command__",
+            "__skaffen_nonexistent_trash_command__",
         );
         assert!(
             result.is_err(),

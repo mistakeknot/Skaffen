@@ -870,7 +870,7 @@ fn e2e_live_provider_harness_smoke() {
 
             assert!(
                 attempted > 0,
-                "CI_E2E_TESTS=1 but no providers were runnable. Ensure ~/.pi/agent/models.json and API keys are configured."
+                "CI_E2E_TESTS=1 but no providers were runnable. Ensure ~/.skaffen/agent/models.json and API keys are configured."
             );
             assert!(
                 failed.is_empty(),

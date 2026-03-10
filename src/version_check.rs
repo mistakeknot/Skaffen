@@ -62,7 +62,7 @@ fn strip_build_metadata(mut version: Version) -> Version {
 /// Path to the version check cache file.
 fn cache_path() -> PathBuf {
     let config_dir = dirs::config_dir().unwrap_or_else(|| PathBuf::from("."));
-    config_dir.join("pi").join(".version_check_cache")
+    config_dir.join("skaffen").join(".version_check_cache")
 }
 
 /// Read a cached version if the cache is fresh (within TTL).

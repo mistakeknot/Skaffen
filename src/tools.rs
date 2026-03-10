@@ -4288,8 +4288,8 @@ pub fn cleanup_temp_files() {
                 continue;
             };
 
-            // Match "pi-bash-" or "pi-rpc-bash-" prefix and ".log" suffix.
-            if (file_name.starts_with("pi-bash-") || file_name.starts_with("pi-rpc-bash-"))
+            // Match "pi-bash-" or "skaffen-rpc-bash-" prefix and ".log" suffix.
+            if (file_name.starts_with("pi-bash-") || file_name.starts_with("skaffen-rpc-bash-"))
                 && std::path::Path::new(file_name)
                     .extension()
                     .is_some_and(|ext| ext.eq_ignore_ascii_case("log"))

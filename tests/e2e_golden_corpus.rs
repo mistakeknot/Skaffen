@@ -113,11 +113,11 @@ impl GoldenTestHarness {
             env_root.join("agent").display().to_string(),
         );
         env.insert(
-            "PI_CONFIG_PATH".to_string(),
+            "SKAFFEN_CONFIG_PATH".to_string(),
             env_root.join("settings.json").display().to_string(),
         );
         env.insert(
-            "PI_SESSIONS_DIR".to_string(),
+            "SKAFFEN_SESSIONS_DIR".to_string(),
             env_root.join("sessions").display().to_string(),
         );
         env.insert(
@@ -210,7 +210,7 @@ impl GoldenTestHarness {
             cassette_dir.display().to_string(),
         );
         self.env
-            .insert("PI_VCR_TEST_NAME".to_string(), cassette_name.to_string());
+            .insert("SKAFFEN_VCR_TEST_NAME".to_string(), cassette_name.to_string());
         self.env
             .insert("ANTHROPIC_API_KEY".to_string(), "test-vcr-key".to_string());
         self.env.insert("PI_TEST_MODE".to_string(), "1".to_string());

@@ -5,7 +5,7 @@ use super::*;
 pub(super) struct InteractiveExtensionHostActions {
     pub(super) session: Arc<Mutex<Session>>,
     pub(super) agent: Arc<Mutex<Agent>>,
-    pub(super) event_tx: mpsc::Sender<PiMsg>,
+    pub(super) event_tx: mpsc::Sender<SkaffenMsg>,
     pub(super) extension_streaming: Arc<AtomicBool>,
     pub(super) user_queue: Arc<StdMutex<InteractiveMessageQueue>>,
     pub(super) injected_queue: Arc<StdMutex<InjectedMessageQueue>>,
@@ -71,7 +71,7 @@ impl ExtensionHostActions for InteractiveExtensionHostActions {
                 if custom.display {
                     let _ = self
                         .event_tx
-                        .try_send(PiMsg::SystemNote(custom.content.clone()));
+                        .try_send(SkaffenMsg::SystemNote(custom.content.clone()));
                 }
             }
             return Ok(());
@@ -89,14 +89,14 @@ impl ExtensionHostActions for InteractiveExtensionHostActions {
             if custom.display {
                 let _ = self
                     .event_tx
-                    .try_send(PiMsg::SystemNote(custom.content.clone()));
+                    .try_send(SkaffenMsg::SystemNote(custom.content.clone()));
             }
         }
 
         if Self::should_trigger_turn(message.deliver_as, message.trigger_turn) {
             let _ = self
                 .event_tx
-                .try_send(PiMsg::EnqueuePendingInput(PendingInput::Continue));
+                .try_send(SkaffenMsg::EnqueuePendingInput(PendingInput::Continue));
         }
 
         Ok(())
@@ -123,7 +123,7 @@ impl ExtensionHostActions for InteractiveExtensionHostActions {
 
         let _ = self
             .event_tx
-            .try_send(PiMsg::EnqueuePendingInput(PendingInput::Text(message.text)));
+            .try_send(SkaffenMsg::EnqueuePendingInput(PendingInput::Text(message.text)));
         Ok(())
     }
 }
@@ -597,7 +597,7 @@ mod tests {
         Pin<Box<dyn futures::Stream<Item = crate::error::Result<StreamEvent>> + Send>>;
     type HostActionsHarness = (
         InteractiveExtensionHostActions,
-        mpsc::Receiver<PiMsg>,
+        mpsc::Receiver<SkaffenMsg>,
         Arc<Mutex<Session>>,
         Arc<Mutex<Agent>>,
     );
@@ -762,7 +762,7 @@ mod tests {
             let queued = event_rx.try_recv().expect("continue should be queued");
             assert!(matches!(
                 queued,
-                PiMsg::EnqueuePendingInput(PendingInput::Continue)
+                SkaffenMsg::EnqueuePendingInput(PendingInput::Continue)
             ));
 
             let cx = Cx::for_request();

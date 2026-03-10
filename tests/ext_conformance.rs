@@ -356,30 +356,30 @@ fn regression_dynamic_resources_path_suffix_matching() {
 
     // Suffix matching works for each file
     assert!(path_suffix_match(
-        "/home/user/.pi/extensions/dynamic-resources/dynamic.md",
+        "/home/user/.skaffen/extensions/dynamic-resources/dynamic.md",
         "dynamic.md"
     ));
     assert!(path_suffix_match(
-        "/home/user/.pi/extensions/dynamic-resources/SKILL.md",
+        "/home/user/.skaffen/extensions/dynamic-resources/SKILL.md",
         "SKILL.md"
     ));
     assert!(path_suffix_match(
-        "/home/user/.pi/extensions/dynamic-resources/dynamic.json",
+        "/home/user/.skaffen/extensions/dynamic-resources/dynamic.json",
         "dynamic.json"
     ));
 
     // Verify the actual fixture values would match
     let actual_paths = [
         (
-            "/home/user/.pi/extensions/dynamic-resources/dynamic.md",
+            "/home/user/.skaffen/extensions/dynamic-resources/dynamic.md",
             "dynamic.md",
         ),
         (
-            "/home/user/.pi/extensions/dynamic-resources/SKILL.md",
+            "/home/user/.skaffen/extensions/dynamic-resources/SKILL.md",
             "SKILL.md",
         ),
         (
-            "/home/user/.pi/extensions/dynamic-resources/dynamic.json",
+            "/home/user/.skaffen/extensions/dynamic-resources/dynamic.json",
             "dynamic.json",
         ),
     ];

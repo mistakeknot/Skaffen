@@ -571,7 +571,7 @@ impl Default for RpcTransportOptions {
     }
 }
 
-/// Subprocess-backed SDK transport for `pi --mode rpc`.
+/// Subprocess-backed SDK transport for `skaffen --mode rpc`.
 pub struct RpcTransportClient {
     child: Child,
     stdin: BufWriter<ChildStdin>,

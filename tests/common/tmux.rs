@@ -330,11 +330,11 @@ impl TuiSession {
             env_root.join("agent").display().to_string(),
         );
         env.insert(
-            "PI_CONFIG_PATH".to_string(),
+            "SKAFFEN_CONFIG_PATH".to_string(),
             env_root.join("config.toml").display().to_string(),
         );
         env.insert(
-            "PI_SESSIONS_DIR".to_string(),
+            "SKAFFEN_SESSIONS_DIR".to_string(),
             env_root.join("sessions").display().to_string(),
         );
         env.insert(

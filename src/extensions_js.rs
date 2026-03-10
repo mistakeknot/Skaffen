@@ -4478,8 +4478,8 @@ pub struct PiJsRuntimeConfig {
     ///
     /// When set, transpiled module sources are cached on disk keyed by a
     /// content-aware hash so that SWC transpilation is skipped across process
-    /// restarts. Defaults to `~/.pi/agent/cache/modules/` (overridden by
-    /// `PIJS_MODULE_CACHE_DIR`). Set to `None` to disable.
+    /// restarts. Defaults to `~/.skaffen/agent/cache/modules/` (overridden by
+    /// `SKAFFEN_JS_MODULE_CACHE_DIR`). Set to `None` to disable.
     pub disk_cache_dir: Option<PathBuf>,
 }
 
@@ -4507,17 +4507,17 @@ impl Default for PiJsRuntimeConfig {
 
 /// Resolve the persistent module disk cache directory.
 ///
-/// Priority: `PIJS_MODULE_CACHE_DIR` env var > `~/.pi/agent/cache/modules/`.
-/// Set `PIJS_MODULE_CACHE_DIR=""` to explicitly disable the disk cache.
+/// Priority: `SKAFFEN_JS_MODULE_CACHE_DIR` env var > `~/.skaffen/agent/cache/modules/`.
+/// Set `SKAFFEN_JS_MODULE_CACHE_DIR=""` to explicitly disable the disk cache.
 fn runtime_disk_cache_dir() -> Option<PathBuf> {
-    if let Some(raw) = std::env::var_os("PIJS_MODULE_CACHE_DIR") {
+    if let Some(raw) = std::env::var_os("SKAFFEN_JS_MODULE_CACHE_DIR") {
         return if raw.is_empty() {
             None
         } else {
             Some(PathBuf::from(raw))
         };
     }
-    dirs::home_dir().map(|home| home.join(".pi").join("agent").join("cache").join("modules"))
+    dirs::home_dir().map(|home| home.join(".skaffen").join("agent").join("cache").join("modules"))
 }
 
 #[derive(Debug)]

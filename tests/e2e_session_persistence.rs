@@ -182,11 +182,11 @@ fn isolated_cli_env(harness: &TestHarness) -> BTreeMap<String, String> {
         env_root.join("agent").display().to_string(),
     );
     env.insert(
-        "PI_CONFIG_PATH".to_string(),
+        "SKAFFEN_CONFIG_PATH".to_string(),
         env_root.join("settings.json").display().to_string(),
     );
     env.insert(
-        "PI_SESSIONS_DIR".to_string(),
+        "SKAFFEN_SESSIONS_DIR".to_string(),
         env_root.join("sessions").display().to_string(),
     );
     env.insert(
@@ -1036,7 +1036,7 @@ fn session_dir_override_and_env_sessions_path() {
     std::fs::create_dir_all(&env_sessions).expect("create env sessions dir");
     let mut env = isolated_cli_env(&harness);
     env.insert(
-        "PI_SESSIONS_DIR".to_string(),
+        "SKAFFEN_SESSIONS_DIR".to_string(),
         env_sessions.display().to_string(),
     );
 
@@ -1154,7 +1154,7 @@ fn cli_continue_tmux_loads_existing_session() {
         cassette_dir.display().to_string(),
     );
     env.insert(
-        "PI_VCR_TEST_NAME".to_string(),
+        "SKAFFEN_VCR_TEST_NAME".to_string(),
         "e2e_continue_session".to_string(),
     );
     env.insert("ANTHROPIC_API_KEY".to_string(), "test-vcr-key".to_string());
@@ -1173,7 +1173,7 @@ fn cli_continue_tmux_loads_existing_session() {
     .expect("write cassette");
     harness.record_artifact("continue-cassette.json", &cassette_path);
 
-    let sessions_dir = PathBuf::from(env.get("PI_SESSIONS_DIR").expect("PI_SESSIONS_DIR"));
+    let sessions_dir = PathBuf::from(env.get("SKAFFEN_SESSIONS_DIR").expect("SKAFFEN_SESSIONS_DIR"));
     let project_sessions = sessions_dir.join(encode_cwd(harness.temp_dir()));
     std::fs::create_dir_all(&project_sessions).expect("create project sessions dir");
     let session_file = project_sessions.join("2026-02-06T00-00-00.000Z_continue.jsonl");
@@ -1292,7 +1292,7 @@ fn cli_continue_tmux_loads_existing_session() {
             ));
             ctx.push((
                 "cassette_name".into(),
-                env.get("PI_VCR_TEST_NAME").cloned().unwrap_or_default(),
+                env.get("SKAFFEN_VCR_TEST_NAME").cloned().unwrap_or_default(),
             ));
             ctx.push(("cassette_path".into(), cassette_path.display().to_string()));
         });

@@ -1483,7 +1483,7 @@ pub mod normalization {
     /// implementation.
     #[derive(Debug, Clone)]
     pub struct NormalizationContext {
-        /// Absolute path to the pi_agent_rust repository root.
+        /// Absolute path to the skaffen repository root.
         pub project_root: String,
         /// Absolute path to `legacy_pi_mono_code/pi-mono`.
         pub pi_mono_root: String,

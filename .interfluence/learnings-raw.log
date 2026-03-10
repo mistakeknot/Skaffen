@@ -166,3 +166,213 @@ NEW:         let (mut app, mut event_rx) = build_test_app_with_provider(provider
 --- 2026-03-10T18:13:34Z | src/cli.rs | CONTEXT:unknown ---
 OLD:                 assert_eq!(result.0, vec!["pi"]);
 NEW:                 assert_eq!(result.0, vec!["skaffen"]);
+
+--- 2026-03-10T18:20:58Z | src/lib.rs | CONTEXT:unknown ---
+OLD: pub mod models;
+pub mod package_manager;
+NEW: pub mod models;
+#[cfg(feature = "skaffen-oodarc")]
+pub mod oodarc;
+pub mod package_manager;
+
+--- 2026-03-10T18:21:09Z | Cargo.toml | CONTEXT:unknown ---
+OLD: fuzzing = []
+jemalloc = ["tikv-jemallocator"]
+NEW: fuzzing = []
+jemalloc = ["tikv-jemallocator"]
+skaffen-oodarc = []
+
+--- 2026-03-10T18:21:27Z | src/agent.rs | CONTEXT:unknown ---
+OLD:                 on_event(turn_start_event);
+
+                for message in std::mem::take(&mut pending_messages) {
+NEW:                 on_event(turn_start_event);
+
+                #[cfg(feature = "skaffen-oodarc")]
+                {
+                    use crate::oodarc::{NoopOodarcHook, OodarcHook};
+                    let hook = NoopOodarcHook;
+                    hook.on_observe();
+                }
+
+                for message in std::mem::take(&mut pending_messages) {
+
+--- 2026-03-10T19:33:10Z | Cargo.toml | CONTEXT:unknown ---
+OLD: [profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
+
+[profile.dev]
+opt-level = 0
+debug = true
+
+# Performance benchmarking profile: opt-level=3, with debug info.
+[profile.perf]
+inherits = "release"
+opt-level = 3
+lto = "thin"
+debug = 1
+strip = false
+NEW: [profile.release]
+opt-level = 3
+lto = "thin"           # thin LTO: ~80% of full LTO perf, 2-5x faster link
+codegen-units = 1
+panic = "abort"
+strip = true
+
+[profile.dev]
+opt-level = 0
+debug = true
+split-debuginfo = "unpacked"  # separate .dwo files — avoids slow linker relocations
+codegen-units = 256            # max parallelism (no cost at opt-level=0)
+incremental = true
+
+# Performance benchmarking profile: opt-level=3, with debug info.
+[profile.perf]
+inherits = "release"
+opt-level = 3
+lto = "thin"
+debug = 1
+split-debuginfo = "unpacked"
+strip = false
+
+--- 2026-03-10T19:38:25Z | Cargo.toml | CONTEXT:unknown ---
+OLD: [profile.dev]
+opt-level = 0
+debug = true
+split-debuginfo = "unpacked"  # separate .dwo files — avoids slow linker relocations
+codegen-units = 256            # max parallelism (no cost at opt-level=0)
+incremental = true
+NEW: [profile.dev]
+opt-level = 0
+debug = true
+split-debuginfo = "unpacked"  # separate .dwo files — avoids slow linker relocations
+incremental = true
+
+--- 2026-03-10T19:55:10Z | Cargo.toml | CONTEXT:unknown ---
+OLD: [profile.dev]
+opt-level = 0
+debug = true
+split-debuginfo = "unpacked"  # separate .dwo files — avoids slow linker relocations
+incremental = true
+NEW: [profile.dev]
+opt-level = 0
+debug = true
+incremental = true
+
+--- 2026-03-10T20:09:07Z | Cargo.toml | CONTEXT:unknown ---
+OLD: [profile.dev]
+opt-level = 0
+debug = true
+incremental = true
+NEW: [profile.dev]
+opt-level = 0
+debug = true
+split-debuginfo = "unpacked"  # separate .dwo files — avoids slow linker relocations
+incremental = true
+
+--- 2026-03-10T20:59:47Z | .gitignore | CONTEXT:unknown ---
+OLD: # Per-agent cargo home directories (Codex/concurrent agents)
+.cargo-home*/
+NEW: # Local cargo config (machine-specific: sccache path, mold, job count)
+.cargo/
+
+# Per-agent cargo home directories (Codex/concurrent agents)
+.cargo-home*/
+
+--- 2026-03-10T21:00:15Z | README.md | CONTEXT:unknown ---
+OLD: # Skaffen
+
+**Demarch's sovereign agent runtime.** OODARC-native coding agent forked from [pi_agent_rust](https://github.com/Dicklesworthstone/pi_agent_rust).
+NEW: # Skaffen
+
+[![Skaffen CI](https://github.com/mistakeknot/Demarch/actions/workflows/skaffen-ci.yml/badge.svg)](https://github.com/mistakeknot/Demarch/actions/workflows/skaffen-ci.yml)
+
+**Demarch's sovereign agent runtime.** OODARC-native coding agent forked from [pi_agent_rust](https://github.com/Dicklesworthstone/pi_agent_rust).
+
+--- 2026-03-10T21:00:24Z | README.md | CONTEXT:unknown ---
+OLD: ## Status
+
+Pre-fork. Design brainstorm in progress.
+NEW: ## Status
+
+v0.1 — forked, rebranded, builds and passes CI. OODARC coupling spike behind feature flag.
+
+--- 2026-03-10T21:02:28Z | README.md | CONTEXT:unknown ---
+OLD: [![Skaffen CI](https://github.com/mistakeknot/Demarch/actions/workflows/skaffen-ci.yml/badge.svg)](https://github.com/mistakeknot/Demarch/actions/workflows/skaffen-ci.yml)
+NEW: [![CI](https://github.com/mistakeknot/Skaffen/actions/workflows/ci.yml/badge.svg)](https://github.com/mistakeknot/Skaffen/actions/workflows/ci.yml)
+
+--- 2026-03-10T21:11:43Z | benches/system.rs | CONTEXT:unknown ---
+OLD: "pi.exe", "pi"
+NEW: "skaffen.exe", "skaffen"
+
+--- 2026-03-10T21:11:48Z | benches/system.rs | CONTEXT:unknown ---
+OLD: &["pi"]
+NEW: &["skaffen"]
+
+--- 2026-03-10T21:11:53Z | benches/system.rs | CONTEXT:unknown ---
+OLD: "pi"
+NEW: "skaffen"
+
+--- 2026-03-10T21:11:58Z | benches/system.rs | CONTEXT:unknown ---
+OLD: PI_BENCH_BINARY
+NEW: SKAFFEN_BENCH_BINARY
+
+--- 2026-03-10T21:12:10Z | benches/system.rs | CONTEXT:unknown ---
+OLD: /tmp/target/release/pi
+NEW: /tmp/target/release/skaffen
+
+--- 2026-03-10T21:12:14Z | benches/system.rs | CONTEXT:unknown ---
+OLD: /tmp/target/debug/pi
+NEW: /tmp/target/debug/skaffen
+
+--- 2026-03-10T21:12:19Z | benches/system.rs | CONTEXT:unknown ---
+OLD: /tmp/pi
+NEW: /tmp/skaffen
+
+--- 2026-03-10T21:12:23Z | benches/system.rs | CONTEXT:unknown ---
+OLD: "pi.exe"
+NEW: "skaffen.exe"
+
+--- 2026-03-10T21:12:28Z | benches/system.rs | CONTEXT:unknown ---
+OLD: execute pi
+NEW: execute skaffen
+
+--- 2026-03-10T21:12:33Z | benches/system.rs | CONTEXT:unknown ---
+OLD: spawn pi
+NEW: spawn skaffen
+
+--- 2026-03-10T21:12:37Z | benches/system.rs | CONTEXT:unknown ---
+OLD: `pi --version`
+NEW: `skaffen --version`
+
+--- 2026-03-10T21:12:42Z | benches/system.rs | CONTEXT:unknown ---
+OLD: `pi --help`
+NEW: `skaffen --help`
+
+--- 2026-03-10T21:12:46Z | benches/system.rs | CONTEXT:unknown ---
+OLD: `pi --list-models`
+NEW: `skaffen --list-models`
+
+--- 2026-03-10T21:12:51Z | benches/system.rs | CONTEXT:unknown ---
+OLD: "pi --version failed"
+NEW: "skaffen --version failed"
+
+--- 2026-03-10T21:12:55Z | benches/system.rs | CONTEXT:unknown ---
+OLD: "pi --help failed"
+NEW: "skaffen --help failed"
+
+--- 2026-03-10T21:13:00Z | benches/system.rs | CONTEXT:unknown ---
+OLD: resolve_pi_binary
+NEW: resolve_skaffen_binary
+
+--- 2026-03-10T21:13:09Z | benches/system.rs | CONTEXT:unknown ---
+OLD: /tmp/target/debug/release/pi
+NEW: /tmp/target/debug/release/skaffen
+
+--- 2026-03-10T22:14:34Z | src/main.rs | CONTEXT:unknown ---
+OLD:         "pi {} ({} {})",
+NEW:         "skaffen {} ({} {})",

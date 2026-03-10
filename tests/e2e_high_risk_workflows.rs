@@ -184,11 +184,11 @@ fn isolated_cli_env(harness: &TestHarness) -> BTreeMap<String, String> {
         env_root.join("agent").display().to_string(),
     );
     env.insert(
-        "PI_CONFIG_PATH".to_string(),
+        "SKAFFEN_CONFIG_PATH".to_string(),
         env_root.join("settings.json").display().to_string(),
     );
     env.insert(
-        "PI_SESSIONS_DIR".to_string(),
+        "SKAFFEN_SESSIONS_DIR".to_string(),
         env_root.join("sessions").display().to_string(),
     );
     env.insert(

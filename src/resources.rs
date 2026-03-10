@@ -2276,7 +2276,7 @@ mod tests {
             let extension_path = temp_dir.path().join("ext.native.json");
             fs::write(&extension_path, "{}").expect("write extension");
 
-            let settings_dir = temp_dir.path().join(".pi");
+            let settings_dir = temp_dir.path().join(".skaffen");
             fs::create_dir_all(&settings_dir).expect("create settings dir");
             let settings_path = settings_dir.join("settings.json");
             let settings = json!({
@@ -2527,7 +2527,7 @@ still frontmatter",
                 },
             },
             ResolvedResource {
-                path: PathBuf::from("/project/.pi/prompts/review.md"),
+                path: PathBuf::from("/project/.skaffen/prompts/review.md"),
                 enabled: true,
                 metadata: crate::package_manager::PathMetadata {
                     source: "local:project".to_string(),
@@ -2537,7 +2537,7 @@ still frontmatter",
                 },
             },
             ResolvedResource {
-                path: PathBuf::from("/global/.pi/prompts/review.md"),
+                path: PathBuf::from("/global/.skaffen/prompts/review.md"),
                 enabled: true,
                 metadata: crate::package_manager::PathMetadata {
                     source: "local:user".to_string(),
@@ -2583,8 +2583,8 @@ still frontmatter",
             sorted,
             vec![
                 PathBuf::from("/tmp/cli-ext/review.md"),
-                PathBuf::from("/project/.pi/prompts/review.md"),
-                PathBuf::from("/global/.pi/prompts/review.md"),
+                PathBuf::from("/project/.skaffen/prompts/review.md"),
+                PathBuf::from("/global/.skaffen/prompts/review.md"),
                 PathBuf::from("/project/package/review.md"),
                 PathBuf::from("/global/package/review.md"),
             ]
@@ -2615,7 +2615,7 @@ still frontmatter",
                 },
             },
             ResolvedResource {
-                path: PathBuf::from("/project/.pi/prompts/review.md"),
+                path: PathBuf::from("/project/.skaffen/prompts/review.md"),
                 enabled: true,
                 metadata: crate::package_manager::PathMetadata {
                     source: "local:project".to_string(),
@@ -2632,7 +2632,7 @@ still frontmatter",
             vec![
                 PathBuf::from("/tmp/cli-ext/zeta/review.md"),
                 PathBuf::from("/tmp/cli-ext/alpha/review.md"),
-                PathBuf::from("/project/.pi/prompts/review.md"),
+                PathBuf::from("/project/.skaffen/prompts/review.md"),
             ],
             "same-tier resources should keep their original source order"
         );
@@ -2655,7 +2655,7 @@ still frontmatter",
             }],
             vec![
                 ResolvedResource {
-                    path: PathBuf::from("/project/.pi/prompts/review.md"),
+                    path: PathBuf::from("/project/.skaffen/prompts/review.md"),
                     enabled: true,
                     metadata: crate::package_manager::PathMetadata {
                         source: "local:project".to_string(),
@@ -2665,7 +2665,7 @@ still frontmatter",
                     },
                 },
                 ResolvedResource {
-                    path: PathBuf::from("/global/.pi/prompts/review.md"),
+                    path: PathBuf::from("/global/.skaffen/prompts/review.md"),
                     enabled: true,
                     metadata: crate::package_manager::PathMetadata {
                         source: "local:user".to_string(),
@@ -2683,8 +2683,8 @@ still frontmatter",
             vec![
                 explicit_path,
                 PathBuf::from("/tmp/cli-ext/review.md"),
-                PathBuf::from("/project/.pi/prompts/review.md"),
-                PathBuf::from("/global/.pi/prompts/review.md"),
+                PathBuf::from("/project/.skaffen/prompts/review.md"),
+                PathBuf::from("/global/.skaffen/prompts/review.md"),
             ]
         );
     }

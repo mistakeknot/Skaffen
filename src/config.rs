@@ -332,10 +332,10 @@ impl Config {
         }
     }
 
-    /// Resolve the `PI_CONFIG_PATH` override relative to the supplied cwd.
+    /// Resolve the `SKAFFEN_CONFIG_PATH` override relative to the supplied cwd.
     #[must_use]
     pub fn config_path_override_from_env(cwd: &Path) -> Option<PathBuf> {
-        std::env::var_os("PI_CONFIG_PATH")
+        std::env::var_os("SKAFFEN_CONFIG_PATH")
             .map(PathBuf::from)
             .map(|path| Self::resolve_config_override_path(&path, cwd))
     }
@@ -347,7 +347,7 @@ impl Config {
 
     /// Get the project configuration directory.
     pub fn project_dir() -> PathBuf {
-        PathBuf::from(".pi")
+        PathBuf::from(".skaffen")
     }
 
     /// Get the sessions directory.
@@ -969,7 +969,7 @@ where
         || {
             dirs::home_dir()
                 .unwrap_or_else(|| PathBuf::from("."))
-                .join(".pi")
+                .join(".skaffen")
                 .join("agent")
         },
         PathBuf::from,
@@ -980,7 +980,7 @@ fn sessions_dir_from_env<F>(get_env: F, global_dir: &Path) -> PathBuf
 where
     F: Fn(&str) -> Option<String>,
 {
-    get_env("PI_SESSIONS_DIR").map_or_else(|| global_dir.join("sessions"), PathBuf::from)
+    get_env("SKAFFEN_SESSIONS_DIR").map_or_else(|| global_dir.join("sessions"), PathBuf::from)
 }
 
 fn package_dir_from_env<F>(get_env: F, global_dir: &Path) -> PathBuf
@@ -1318,7 +1318,7 @@ mod tests {
             r#"{ "theme": "global", "default_provider": "anthropic" }"#,
         );
         write_file(
-            &cwd.join(".pi/settings.json"),
+            &cwd.join(".skaffen/settings.json"),
             r#"{ "theme": "project", "default_provider": "google" }"#,
         );
 
@@ -1386,7 +1386,7 @@ mod tests {
             r#"{ "default_provider": "anthropic", "default_model": "global", "theme": "global" }"#,
         );
         write_file(
-            &cwd.join(".pi/settings.json"),
+            &cwd.join(".skaffen/settings.json"),
             r#"{ "default_model": "project" }"#,
         );
 
@@ -1406,7 +1406,7 @@ mod tests {
             r#"{ "compaction": { "enabled": true, "reserve_tokens": 1234, "keep_recent_tokens": 5678 } }"#,
         );
         write_file(
-            &cwd.join(".pi/settings.json"),
+            &cwd.join(".skaffen/settings.json"),
             r#"{ "compaction": { "enabled": false } }"#,
         );
 
@@ -1472,7 +1472,7 @@ mod tests {
     fn directory_helpers_honor_environment_overrides() {
         let env = HashMap::from([
             ("PI_CODING_AGENT_DIR".to_string(), "env-root".to_string()),
-            ("PI_SESSIONS_DIR".to_string(), "env-sessions".to_string()),
+            ("SKAFFEN_SESSIONS_DIR".to_string(), "env-sessions".to_string()),
             ("PI_PACKAGE_DIR".to_string(), "env-packages".to_string()),
             (
                 "PI_EXTENSION_INDEX_PATH".to_string(),
@@ -1965,7 +1965,7 @@ mod tests {
             r#"{ "thinking_budgets": { "minimal": 100, "low": 200 } }"#,
         );
         write_file(
-            &cwd.join(".pi/settings.json"),
+            &cwd.join(".skaffen/settings.json"),
             r#"{ "thinking_budgets": { "minimal": 999 } }"#,
         );
 
@@ -1993,7 +1993,7 @@ mod tests {
             }"#,
         );
         write_file(
-            &cwd.join(".pi/settings.json"),
+            &cwd.join(".skaffen/settings.json"),
             r#"{
                 "extensionRisk": {
                     "alpha": 0.05,
@@ -2031,7 +2031,7 @@ mod tests {
                 }
             }"#,
         );
-        write_file(&cwd.join(".pi/settings.json"), r#"{ "extensionRisk": {} }"#);
+        write_file(&cwd.join(".skaffen/settings.json"), r#"{ "extensionRisk": {} }"#);
 
         let config = Config::load_with_roots(None, &global_dir, &cwd).expect("load");
         let risk = config.extension_risk.expect("merged extension risk");
@@ -2229,7 +2229,7 @@ mod tests {
             r#"{ "extensionPolicy": { "profile": "safe" } }"#,
         );
         write_file(
-            &cwd.join(".pi/settings.json"),
+            &cwd.join(".skaffen/settings.json"),
             r#"{ "extensionPolicy": { "profile": "permissive" } }"#,
         );
 
@@ -2278,7 +2278,7 @@ mod tests {
         );
         // Project sets allowDangerous=true but not profile
         write_file(
-            &cwd.join(".pi/settings.json"),
+            &cwd.join(".skaffen/settings.json"),
             r#"{ "extensionPolicy": { "allowDangerous": true } }"#,
         );
 
@@ -2480,7 +2480,7 @@ mod tests {
             r#"{ "repairPolicy": { "mode": "off" } }"#,
         );
         write_file(
-            &cwd.join(".pi/settings.json"),
+            &cwd.join(".skaffen/settings.json"),
             r#"{ "repairPolicy": { "mode": "auto-safe" } }"#,
         );
 

@@ -409,7 +409,7 @@ fn artifact_retention_summary_report() {
 
     let upload_count = ci_content.matches("actions/upload-artifact").count();
     let retention_30d = ci_content.matches("retention-days: 30").count();
-    let total_paths = ci_content.matches("pi_agent_rust/tests/").count();
+    let total_paths = ci_content.matches("skaffen/tests/").count();
 
     let report = serde_json::json!({
         "schema": "pi.ci.artifact_retention_report.v1",

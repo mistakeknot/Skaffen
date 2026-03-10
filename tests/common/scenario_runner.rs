@@ -414,7 +414,7 @@ impl ScenarioRunner {
         if let Some(vcr) = &scenario.vcr {
             session.set_env("VCR_MODE", "playback");
             session.set_env("VCR_CASSETTE_DIR", &vcr.cassette_dir.display().to_string());
-            session.set_env("PI_VCR_TEST_NAME", &vcr.test_name);
+            session.set_env("SKAFFEN_VCR_TEST_NAME", &vcr.test_name);
         }
 
         // Launch
@@ -530,7 +530,7 @@ impl ScenarioRunner {
         // Write TUI step artifacts first
         session.write_artifacts();
 
-        let session_root = scenario.env.get("PI_SESSIONS_DIR").map_or_else(
+        let session_root = scenario.env.get("SKAFFEN_SESSIONS_DIR").map_or_else(
             || session.harness.temp_dir().join("env").join("sessions"),
             PathBuf::from,
         );

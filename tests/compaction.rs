@@ -1047,7 +1047,7 @@ fn compaction_pipeline_save_and_open_round_trip_rehydrates_compaction_context() 
     let mut session = Session::in_memory();
     session.header.id = "sess-bd-p2l".to_string();
     session.header.timestamp = TS.to_string();
-    session.header.cwd = "/data/projects/pi_agent_rust".to_string();
+    session.header.cwd = "/data/projects/skaffen".to_string();
 
     session.entries = vec![
         message_entry("u0", None, user_text("old")),
@@ -1249,7 +1249,7 @@ fn compaction_pipeline_second_pass_seeds_previous_details_and_updates_summary() 
     let mut session = Session::in_memory();
     session.header.id = "sess-bd-p2l-2".to_string();
     session.header.timestamp = TS.to_string();
-    session.header.cwd = "/data/projects/pi_agent_rust".to_string();
+    session.header.cwd = "/data/projects/skaffen".to_string();
     session.entries = entries2;
 
     let details2 = skaffen::compaction::compaction_details_to_value(&result2.details).expect("details2");

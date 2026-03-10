@@ -24,7 +24,7 @@ use bubbletea::{Message, Model as BubbleteaModel};
 use futures::stream;
 use skaffen::agent::{Agent, AgentConfig};
 use skaffen::config::Config;
-use skaffen::interactive::{ConversationMessage, MessageRole, PiApp, PiMsg};
+use skaffen::interactive::{ConversationMessage, MessageRole, SkaffenApp, SkaffenMsg};
 use skaffen::keybindings::KeyBindings;
 use skaffen::model::{StreamEvent, Usage};
 use skaffen::models::ModelEntry;
@@ -115,7 +115,7 @@ fn dummy_model_entry() -> ModelEntry {
 // App factory
 // ---------------------------------------------------------------------------
 
-fn create_bench_app() -> PiApp {
+fn create_bench_app() -> SkaffenApp {
     let tmp = tempfile::tempdir().expect("tempdir");
     let cwd = tmp.path().to_path_buf();
     let config = Config::default();
@@ -143,7 +143,7 @@ fn create_bench_app() -> PiApp {
     // Leak the TempDir so the directory persists for the benchmark iteration.
     let _keep = Box::leak(Box::new(tmp));
 
-    let mut app = PiApp::new(
+    let mut app = SkaffenApp::new(
         agent,
         session,
         config,
@@ -238,10 +238,10 @@ fn generate_conversation(n: usize) -> Vec<ConversationMessage> {
     msgs
 }
 
-fn load_conversation(app: &mut PiApp, messages: Vec<ConversationMessage>) {
+fn load_conversation(app: &mut SkaffenApp, messages: Vec<ConversationMessage>) {
     let _ = BubbleteaModel::update(
         app,
-        Message::new(PiMsg::ConversationReset {
+        Message::new(SkaffenMsg::ConversationReset {
             messages,
             usage: Usage::default(),
             status: None,

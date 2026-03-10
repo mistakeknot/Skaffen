@@ -1,6 +1,6 @@
 use super::*;
 
-impl PiApp {
+impl SkaffenApp {
     #[allow(clippy::too_many_lines)]
     pub(super) fn handle_tree_ui_key(&mut self, key: &KeyMsg) -> Option<Cmd> {
         let tree_ui = self.tree_ui.take()?;
@@ -389,7 +389,7 @@ impl PiApp {
                     .await
                     .unwrap_or(false);
                 if cancelled {
-                    let _ = event_tx.try_send(PiMsg::System(
+                    let _ = event_tx.try_send(SkaffenMsg::System(
                         "Session switch cancelled by extension".to_string(),
                     ));
                     return;
@@ -413,7 +413,7 @@ impl PiApp {
                     Ok(summary) => summary,
                     Err(err) => {
                         let _ = event_tx
-                            .try_send(PiMsg::AgentError(format!("Branch summary failed: {err}")));
+                            .try_send(SkaffenMsg::AgentError(format!("Branch summary failed: {err}")));
                         return;
                     }
                 }
@@ -426,14 +426,14 @@ impl PiApp {
                     Ok(guard) => guard,
                     Err(err) => {
                         let _ = event_tx
-                            .try_send(PiMsg::AgentError(format!("Failed to lock session: {err}")));
+                            .try_send(SkaffenMsg::AgentError(format!("Failed to lock session: {err}")));
                         return;
                     }
                 };
 
                 if let Some(target_id) = &pending.new_leaf_id {
                     if !guard.navigate_to(target_id) {
-                        let _ = event_tx.try_send(PiMsg::AgentError(format!(
+                        let _ = event_tx.try_send(SkaffenMsg::AgentError(format!(
                             "Branch target not found: {target_id}"
                         )));
                         return;
@@ -460,7 +460,7 @@ impl PiApp {
                     Ok(guard) => guard,
                     Err(err) => {
                         let _ = event_tx
-                            .try_send(PiMsg::AgentError(format!("Failed to lock agent: {err}")));
+                            .try_send(SkaffenMsg::AgentError(format!("Failed to lock agent: {err}")));
                         return;
                     }
                 };
@@ -472,7 +472,7 @@ impl PiApp {
                     Ok(guard) => guard,
                     Err(err) => {
                         let _ = event_tx
-                            .try_send(PiMsg::AgentError(format!("Failed to lock session: {err}")));
+                            .try_send(SkaffenMsg::AgentError(format!("Failed to lock session: {err}")));
                         return;
                     }
                 };
@@ -487,14 +487,14 @@ impl PiApp {
                 Some(format!("Switched to {to_id_for_event}"))
             };
 
-            let _ = event_tx.try_send(PiMsg::ConversationReset {
+            let _ = event_tx.try_send(SkaffenMsg::ConversationReset {
                 messages,
                 usage,
                 status,
             });
 
             if let Some(text) = pending.editor_text {
-                let _ = event_tx.try_send(PiMsg::SetEditorText(text));
+                let _ = event_tx.try_send(SkaffenMsg::SetEditorText(text));
             }
 
             if let Some(manager) = extensions {

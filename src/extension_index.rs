@@ -81,7 +81,7 @@ impl ExtensionIndex {
 
     /// Resolve a unique `installSource` for an id/name, if present.
     ///
-    /// This is used to support ergonomic forms like `pi install checkpoint-pi` without requiring
+    /// This is used to support ergonomic forms like `skaffen install checkpoint-skaffen` without requiring
     /// users to spell out `npm:` / `git:` prefixes. If resolution is ambiguous, returns `None`.
     #[must_use]
     pub fn resolve_install_source(&self, query: &str) -> Option<String> {
@@ -912,7 +912,7 @@ mod tests {
     #[test]
     fn store_resolve_install_source_falls_back_to_seed() {
         let store = ExtensionIndexStore::new(std::path::PathBuf::from("this-file-does-not-exist"));
-        let resolved = store.resolve_install_source("checkpoint-pi");
+        let resolved = store.resolve_install_source("checkpoint-skaffen");
         // The exact seed contents can change; the important part is "no error".
         assert!(resolved.is_ok());
     }
@@ -923,12 +923,12 @@ mod tests {
           "objects": [
             {
               "package": {
-                "name": "checkpoint-pi",
+                "name": "checkpoint-skaffen",
                 "version": "1.2.3",
                 "description": "checkpoint helper",
                 "keywords": ["pi-extension", "checkpoint"],
                 "license": "MIT",
-                "links": { "npm": "https://www.npmjs.com/package/checkpoint-pi" }
+                "links": { "npm": "https://www.npmjs.com/package/checkpoint-skaffen" }
               }
             }
           ]
@@ -937,10 +937,10 @@ mod tests {
         let entries = parse_npm_search_entries(body).expect("parse npm search");
         assert_eq!(entries.len(), 1);
         let entry = &entries[0];
-        assert_eq!(entry.id, "npm/checkpoint-pi");
+        assert_eq!(entry.id, "npm/checkpoint-skaffen");
         assert_eq!(
             entry.install_source.as_deref(),
-            Some("npm:checkpoint-pi@1.2.3")
+            Some("npm:checkpoint-skaffen@1.2.3")
         );
         assert!(entry.tags.iter().any(|tag| tag == "checkpoint"));
     }
@@ -974,21 +974,21 @@ mod tests {
     #[test]
     fn merge_entries_preserves_existing_fields_when_incoming_missing() {
         let existing = vec![ExtensionIndexEntry {
-            id: "npm/checkpoint-pi".to_string(),
-            name: "checkpoint-pi".to_string(),
+            id: "npm/checkpoint-skaffen".to_string(),
+            name: "checkpoint-skaffen".to_string(),
             description: Some("existing description".to_string()),
             tags: vec!["npm".to_string()],
             license: Some("MIT".to_string()),
             source: Some(ExtensionIndexSource::Npm {
-                package: "checkpoint-pi".to_string(),
+                package: "checkpoint-skaffen".to_string(),
                 version: Some("1.0.0".to_string()),
                 url: None,
             }),
-            install_source: Some("npm:checkpoint-pi@1.0.0".to_string()),
+            install_source: Some("npm:checkpoint-skaffen@1.0.0".to_string()),
         }];
         let incoming = vec![ExtensionIndexEntry {
-            id: "npm/checkpoint-pi".to_string(),
-            name: "checkpoint-pi".to_string(),
+            id: "npm/checkpoint-skaffen".to_string(),
+            name: "checkpoint-skaffen".to_string(),
             description: None,
             tags: vec!["extension".to_string()],
             license: None,
@@ -1002,7 +1002,7 @@ mod tests {
         assert_eq!(entry.description.as_deref(), Some("existing description"));
         assert_eq!(
             entry.install_source.as_deref(),
-            Some("npm:checkpoint-pi@1.0.0")
+            Some("npm:checkpoint-skaffen@1.0.0")
         );
         assert!(entry.tags.iter().any(|tag| tag == "npm"));
         assert!(entry.tags.iter().any(|tag| tag == "extension"));
