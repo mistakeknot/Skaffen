@@ -3101,7 +3101,7 @@ fn handle_doctor(
 
 fn print_version() {
     println!(
-        "pi {} ({} {})",
+        "skaffen {} ({} {})",
         env!("CARGO_PKG_VERSION"),
         option_env!("VERGEN_GIT_SHA").unwrap_or("unknown"),
         option_env!("VERGEN_BUILD_TIMESTAMP").unwrap_or(""),
