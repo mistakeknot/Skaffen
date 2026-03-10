@@ -1,0 +1,5 @@
+project_name: Skaffen
+project_type: application
+languages:
+  - rust
+roadmap_scan_dirs: []

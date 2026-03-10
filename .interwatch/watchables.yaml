@@ -1,0 +1,13 @@
+watchables:
+  - path: CLAUDE.md
+    type: operational
+    refresh_command: null
+  - path: AGENTS.md
+    type: operational
+    refresh_command: null
+  - path: PHILOSOPHY.md
+    type: strategic
+    refresh_command: null
+  - path: README.md
+    type: public
+    refresh_command: null
