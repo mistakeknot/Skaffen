@@ -1,0 +1,5 @@
+# Rust build artifacts — massive and transient
+target/
+
+# Vendored crate sources — committed to git, not needed in sync
+vendor/

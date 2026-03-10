@@ -1,0 +1,5 @@
+# UBS ignore globs (project-local)
+#
+# Beads is issue-tracker state, not executable source. UBS "secrets" heuristics can false-positive
+# on JSONL content, and we don't want that noise to block code work.
+.beads/**

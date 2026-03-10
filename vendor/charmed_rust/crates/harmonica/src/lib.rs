@@ -1,0 +1,91 @@
+#![forbid(unsafe_code)]
+#![cfg_attr(not(feature = "std"), no_std)]
+// Allow these clippy lints for physics/math code readability
+#![allow(clippy::must_use_candidate)]
+#![allow(clippy::suboptimal_flops)]
+#![allow(clippy::doc_markdown)]
+#![allow(clippy::use_self)]
+#![allow(clippy::return_self_not_must_use)]
+#![allow(clippy::missing_const_for_fn)]
+#![allow(clippy::cast_lossless)]
+#![allow(clippy::struct_field_names)]
+
+//! # Harmonica
+//!
+//! Physics-based animation tools for 2D and 3D applications.
+//!
+//! Harmonica provides:
+//! - **Spring**: A damped harmonic oscillator for smooth, realistic motion
+//! - **Projectile**: A simple projectile simulator for particles and projectiles
+//!
+//! ## Role in `charmed_rust`
+//!
+//! Harmonica is a foundational crate that supplies physics-based motion used across
+//! the ecosystem:
+//! - **bubbletea** uses it for time-based animation helpers.
+//! - **bubbles** uses it to animate components like progress bars.
+//! - **demo_showcase** uses it to demonstrate smooth, springy UI motion.
+//!
+//! ## Spring Example
+//!
+//! ```rust
+//! use harmonica::{fps, Spring};
+//!
+//! // Initialize the spring once
+//! let spring = Spring::new(fps(60), 6.0, 0.2);
+//!
+//! // Update in your animation loop
+//! let mut pos = 0.0;
+//! let mut vel = 0.0;
+//! let target = 100.0;
+//!
+//! // Simulate for 2 seconds (120 frames at 60 FPS)
+//! for _ in 0..120 {
+//!     (pos, vel) = spring.update(pos, vel, target);
+//! }
+//!
+//! // Position should approach target
+//! assert!((pos - target).abs() < 5.0);
+//! ```
+//!
+//! ## Projectile Example
+//!
+//! ```rust
+//! use harmonica::{fps, Point, Vector, Projectile, TERMINAL_GRAVITY};
+//!
+//! // Create a projectile with gravity
+//! let mut projectile = Projectile::new(
+//!     fps(60),
+//!     Point::new(0.0, 0.0, 0.0),
+//!     Vector::new(10.0, -5.0, 0.0),
+//!     TERMINAL_GRAVITY,
+//! );
+//!
+//! // Update each frame
+//! let pos = projectile.update();
+//! ```
+//!
+//! ## Damping Ratios
+//!
+//! The damping ratio determines the spring's behavior:
+//!
+//! - **Over-damped (ζ > 1)**: No oscillation, slow return to equilibrium
+//! - **Critically-damped (ζ = 1)**: Fastest return without oscillation
+//! - **Under-damped (ζ < 1)**: Oscillates around equilibrium with decay
+//!
+//! ## Attribution
+//!
+//! The spring algorithm is based on Ryan Juckett's damped harmonic motion:
+//! <https://www.ryanjuckett.com/damped-springs/>
+
+mod projectile;
+mod spring;
+
+pub use projectile::{GRAVITY, Point, Projectile, TERMINAL_GRAVITY, Vector};
+pub use spring::{Spring, fps};
+
+/// Prelude module for convenient imports.
+pub mod prelude {
+    pub use crate::projectile::{GRAVITY, Point, Projectile, TERMINAL_GRAVITY, Vector};
+    pub use crate::spring::{Spring, fps};
+}

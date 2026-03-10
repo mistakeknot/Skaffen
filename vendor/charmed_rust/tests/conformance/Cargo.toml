@@ -1,0 +1,54 @@
+[package]
+name = "charmed_conformance"
+version = "0.2.0"
+edition = "2024"
+rust-version = "1.85"
+publish = false
+description = "Conformance testing harness for charmed_rust crates"
+
+[dependencies]
+# Internal crates under test
+harmonica = { package = "charmed-harmonica", path = "../../crates/harmonica" }
+lipgloss = { package = "charmed-lipgloss", path = "../../crates/lipgloss" }
+bubbletea = { package = "charmed-bubbletea", path = "../../crates/bubbletea" }
+bubbles = { package = "charmed-bubbles", path = "../../crates/bubbles" }
+charmed_log = { package = "charmed-log", path = "../../crates/charmed_log" }
+glamour = { package = "charmed-glamour", path = "../../crates/glamour", features = ["syntax-highlighting"] }
+huh = { package = "charmed-huh", path = "../../crates/huh" }
+glow = { package = "charmed-glow", path = "../../crates/glow" }
+wish = { package = "charmed-wish", path = "../../crates/wish", optional = true }
+
+# Test infrastructure
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+similar = "2"              # Diff generation
+termcolor = "1"            # Colored output
+unicode-normalization = "0.1" # Unicode NFC normalization
+parking_lot = "0.12"       # Thread-safe primitives
+once_cell = "1"            # Lazy statics
+chrono = { workspace = true } # Timestamps
+rayon = { workspace = true }  # Parallel test execution
+tokio = { version = "1.35", features = ["rt", "sync"] }
+paste = "1.0.15"
+
+[features]
+# Enable wish conformance tests by default (51 tests, all pass non-interactively)
+default = ["wish"]
+wish = ["dep:wish"]
+
+[dev-dependencies]
+criterion = "0.8"          # Benchmarking
+proptest = "1"             # Property testing
+tempfile = "3"             # Temp directories
+
+[lints]
+workspace = true
+
+[[bin]]
+name = "run-conformance"
+path = "src/bin/run_conformance.rs"
+
+[[bin]]
+name = "generate-report"
+path = "src/bin/generate_report.rs"

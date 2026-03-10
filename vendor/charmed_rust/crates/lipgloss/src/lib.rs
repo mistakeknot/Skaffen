@@ -1,0 +1,1069 @@
+#![forbid(unsafe_code)]
+// Allow these clippy lints for API ergonomics and terminal UI code
+#![allow(clippy::must_use_candidate)]
+#![allow(clippy::doc_markdown)]
+#![allow(clippy::missing_panics_doc)]
+#![allow(clippy::use_self)]
+#![allow(clippy::return_self_not_must_use)]
+#![allow(clippy::missing_const_for_fn)]
+#![allow(clippy::cast_lossless)]
+#![allow(clippy::cast_possible_truncation)]
+#![allow(clippy::cast_sign_loss)]
+#![allow(clippy::cast_precision_loss)]
+#![allow(clippy::struct_field_names)]
+#![allow(clippy::struct_excessive_bools)]
+#![allow(clippy::enum_glob_use)]
+#![allow(clippy::match_like_matches_macro)]
+#![allow(clippy::redundant_closure)]
+#![allow(clippy::redundant_closure_for_method_calls)]
+#![allow(clippy::similar_names)]
+#![allow(clippy::too_many_lines)]
+#![allow(clippy::items_after_statements)]
+#![allow(clippy::module_name_repetitions)]
+#![allow(clippy::single_match_else)]
+#![allow(clippy::needless_pass_by_value)]
+#![allow(clippy::new_without_default)]
+#![allow(clippy::collapsible_if)]
+#![allow(clippy::missing_fields_in_debug)]
+#![allow(clippy::option_if_let_else)]
+#![allow(clippy::uninlined_format_args)]
+#![allow(clippy::manual_repeat_n)]
+#![allow(clippy::if_not_else)]
+#![allow(clippy::map_unwrap_or)]
+#![allow(clippy::same_item_push)]
+#![allow(clippy::bool_to_int_with_if)]
+#![allow(clippy::if_same_then_else)]
+#![allow(clippy::branches_sharing_code)]
+#![allow(clippy::items_after_test_module)]
+
+//! # Lipgloss
+//!
+//! A powerful terminal styling library for creating beautiful CLI applications.
+//!
+//! Lipgloss provides a declarative, CSS-like approach to terminal styling with support for:
+//! - **Colors**: ANSI, 256-color, true color, and adaptive colors
+//! - **Text formatting**: Bold, italic, underline, strikethrough, and more
+//! - **Layout**: Padding, margins, borders, and alignment
+//! - **Word wrapping** and **text truncation**
+//!
+//! ## Role in `charmed_rust`
+//!
+//! Lipgloss is the styling foundation for the entire stack:
+//! - **bubbletea** renders views using lipgloss styles.
+//! - **bubbles** components expose styling hooks via lipgloss.
+//! - **glamour** uses lipgloss for Markdown theming.
+//! - **charmed_log** formats log output with lipgloss styles.
+//! - **demo_showcase** centralizes themes and visual identity with lipgloss.
+//!
+//! ## Quick Start
+//!
+//! ```rust
+//! use lipgloss::{Style, Border, Position};
+//!
+//! // Create a styled box
+//! let style = Style::new()
+//!     .bold()
+//!     .foreground("#ff00ff")
+//!     .background("#1a1a1a")
+//!     .padding((1, 2))
+//!     .border(Border::rounded())
+//!     .align(Position::Center);
+//!
+//! println!("{}", style.render("Hello, Lipgloss!"));
+//! ```
+//!
+//! ## Style Builder
+//!
+//! Styles are built using a fluent API where each method returns a new style:
+//!
+//! ```rust
+//! use lipgloss::Style;
+//!
+//! let base = Style::new().bold();
+//! let red = base.clone().foreground("#ff0000");
+//! let blue = base.clone().foreground("#0000ff");
+//! ```
+//!
+//! ## Colors
+//!
+//! Multiple color formats are supported:
+//!
+//! ```rust
+//! use lipgloss::{Style, AdaptiveColor, Color};
+//!
+//! // Hex colors
+//! let style = Style::new().foreground("#ff00ff");
+//!
+//! // ANSI 256 colors
+//! let style = Style::new().foreground("196");
+//!
+//! // Adaptive colors (light/dark themes)
+//! let adaptive = AdaptiveColor {
+//!     light: Color::from("#000000"),
+//!     dark: Color::from("#ffffff"),
+//! };
+//! let style = Style::new().foreground_color(adaptive);
+//! ```
+//!
+//! ## Borders
+//!
+//! Several preset borders are available:
+//!
+//! ```rust
+//! use lipgloss::{Style, Border};
+//!
+//! let style = Style::new()
+//!     .border(Border::rounded())
+//!     .padding(1);
+//!
+//! // Available borders:
+//! // Border::normal()    ┌───┐
+//! // Border::rounded()   ╭───╮
+//! // Border::thick()     ┏━━━┓
+//! // Border::double()    ╔═══╗
+//! // Border::hidden()    (spaces)
+//! // Border::ascii()     +---+
+//! ```
+//!
+//! ## Layout
+//!
+//! CSS-like padding and margin with shorthand notation:
+//!
+//! ```rust
+//! use lipgloss::Style;
+//!
+//! // All sides
+//! let style = Style::new().padding(2);
+//!
+//! // Vertical, horizontal
+//! let style = Style::new().padding((1, 2));
+//!
+//! // Top, horizontal, bottom
+//! let style = Style::new().padding((1, 2, 3));
+//!
+//! // Top, right, bottom, left (clockwise)
+//! let style = Style::new().padding((1, 2, 3, 4));
+//! ```
+
+pub mod backend;
+pub mod border;
+pub mod color;
+pub mod position;
+pub mod renderer;
+pub mod style;
+pub mod theme;
+
+#[cfg(feature = "wasm")]
+pub mod wasm;
+
+// Re-exports
+pub use backend::{
+    AnsiBackend, DefaultBackend, HtmlBackend, OutputBackend, PlainBackend, default_backend,
+};
+pub use border::{Border, BorderEdges};
+pub use color::{
+    AdaptiveColor, AnsiColor, Color, ColorProfile, CompleteAdaptiveColor, CompleteColor, NoColor,
+    RgbColor, TerminalColor,
+};
+pub use position::{Position, Sides};
+pub use renderer::{Renderer, color_profile, default_renderer, has_dark_background};
+pub use style::{Style, truncate_line_ansi};
+#[cfg(feature = "tokio")]
+pub use theme::AsyncThemeContext;
+pub use theme::{
+    CachedThemedStyle, CatppuccinFlavor, ColorSlot, ColorTransform, ListenerId, Theme,
+    ThemeChangeListener, ThemeColors, ThemeContext, ThemePreset, ThemeRole, ThemedColor,
+    ThemedStyle, global_theme, set_global_preset, set_global_theme,
+};
+
+// WASM bindings (only available with the "wasm" feature)
+#[cfg(feature = "wasm")]
+pub use wasm::{
+    JsColor, JsStyle, join_horizontal as wasm_join_horizontal, join_vertical as wasm_join_vertical,
+    new_style as wasm_new_style, place as wasm_place,
+};
+
+/// Prelude module for convenient imports.
+pub mod prelude {
+    pub use crate::backend::{
+        AnsiBackend, DefaultBackend, HtmlBackend, OutputBackend, PlainBackend,
+    };
+    pub use crate::border::Border;
+    pub use crate::color::{AdaptiveColor, Color, ColorProfile, NoColor};
+    pub use crate::position::{Position, Sides};
+    pub use crate::renderer::Renderer;
+    pub use crate::style::Style;
+    #[cfg(feature = "tokio")]
+    pub use crate::theme::AsyncThemeContext;
+    pub use crate::theme::{
+        CachedThemedStyle, CatppuccinFlavor, ColorSlot, ColorTransform, ListenerId, Theme,
+        ThemeChangeListener, ThemeColors, ThemeContext, ThemePreset, ThemeRole, ThemedColor,
+        ThemedStyle, global_theme, set_global_preset, set_global_theme,
+    };
+    #[cfg(feature = "wasm")]
+    pub use crate::wasm::{JsColor, JsStyle};
+}
+
+// Convenience constructors
+
+/// Create a new empty style.
+///
+/// This is equivalent to `Style::new()`.
+pub fn new_style() -> Style {
+    Style::new()
+}
+
+// Join utilities
+
+/// Horizontally joins multi-line strings along a vertical axis.
+///
+/// The `pos` parameter controls vertical alignment of blocks:
+/// - `Position::Top` (0.0): Align to top
+/// - `Position::Center` (0.5): Center vertically
+/// - `Position::Bottom` (1.0): Align to bottom
+///
+/// # Example
+///
+/// ```rust
+/// use lipgloss::{join_horizontal, Position};
+///
+/// let left = "Line 1\nLine 2\nLine 3";
+/// let right = "A\nB";
+/// let combined = join_horizontal(Position::Top, &[left, right]);
+/// ```
+pub fn join_horizontal(pos: Position, strs: &[&str]) -> String {
+    if strs.is_empty() {
+        return String::new();
+    }
+    if strs.len() == 1 {
+        return strs[0].to_string();
+    }
+
+    // Split each string into lines and calculate dimensions
+    let blocks: Vec<Vec<&str>> = strs.iter().map(|s| s.lines().collect()).collect();
+    let widths: Vec<usize> = blocks
+        .iter()
+        .map(|lines| lines.iter().map(|l| visible_width(l)).max().unwrap_or(0))
+        .collect();
+    let max_height = blocks.iter().map(|lines| lines.len()).max().unwrap_or(0);
+
+    // Pre-compute alignment factor once
+    let factor = pos.factor();
+
+    // Pre-compute vertical offsets for each block (avoid per-row calculation)
+    // Use round() to match Go's lipgloss behavior for center alignment (bd-3vqi)
+    let offsets: Vec<usize> = blocks
+        .iter()
+        .map(|block| {
+            let extra = max_height.saturating_sub(block.len());
+            (extra as f64 * factor).round() as usize
+        })
+        .collect();
+
+    // Estimate total capacity: sum of widths * max_height + newlines
+    let total_width: usize = widths.iter().sum();
+    let estimated_capacity = max_height * (total_width + 1);
+    let mut result = String::with_capacity(estimated_capacity);
+
+    // Build result directly without intermediate Vec<String>
+    for row in 0..max_height {
+        if row > 0 {
+            result.push('\n');
+        }
+
+        for (block_idx, block) in blocks.iter().enumerate() {
+            let block_height = block.len();
+            let width = widths[block_idx];
+            let top_offset = offsets[block_idx];
+
+            // Determine which line from this block to use
+            let content = row
+                .checked_sub(top_offset)
+                .filter(|&br| br < block_height)
+                .map_or("", |br| block[br]);
+
+            // Pad to block width (avoid " ".repeat() allocation)
+            let content_width = visible_width(content);
+            let padding = width.saturating_sub(content_width);
+            result.push_str(content);
+            for _ in 0..padding {
+                result.push(' ');
+            }
+        }
+    }
+
+    result
+}
+
+/// Vertically joins multi-line strings along a horizontal axis.
+///
+/// The `pos` parameter controls horizontal alignment:
+/// - `Position::Left` (0.0): Align to left
+/// - `Position::Center` (0.5): Center horizontally
+/// - `Position::Right` (1.0): Align to right
+///
+/// # Example
+///
+/// ```rust
+/// use lipgloss::{join_vertical, Position};
+///
+/// let top = "Short";
+/// let bottom = "A longer line";
+/// let combined = join_vertical(Position::Center, &[top, bottom]);
+/// ```
+pub fn join_vertical(pos: Position, strs: &[&str]) -> String {
+    if strs.is_empty() {
+        return String::new();
+    }
+    if strs.len() == 1 {
+        return strs[0].to_string();
+    }
+
+    // Find the maximum width across all lines
+    let max_width = strs
+        .iter()
+        .flat_map(|s| s.lines())
+        .map(|l| visible_width(l))
+        .max()
+        .unwrap_or(0);
+
+    // Pre-compute alignment factor once
+    let factor = pos.factor();
+    let is_right_aligned = factor >= 1.0;
+
+    // Count total lines for capacity estimation (newlines + 1 per string, avoiding double iteration)
+    let line_count: usize = strs
+        .iter()
+        .map(|s| s.bytes().filter(|&b| b == b'\n').count() + 1)
+        .sum();
+    let estimated_capacity = line_count * (max_width + 1);
+    let mut result = String::with_capacity(estimated_capacity);
+
+    // Pad each line to max width based on position - single pass, no Vec<String>
+    let mut first = true;
+    for s in strs {
+        for line in s.lines() {
+            if !first {
+                result.push('\n');
+            }
+            first = false;
+
+            let line_width = visible_width(line);
+            let extra = max_width.saturating_sub(line_width);
+            // Use round() to match Go's lipgloss behavior for center alignment (bd-3vqi)
+            let left_pad = (extra as f64 * factor).round() as usize;
+            let right_pad = extra.saturating_sub(left_pad);
+
+            // Add left padding (avoid " ".repeat() allocation)
+            for _ in 0..left_pad {
+                result.push(' ');
+            }
+            result.push_str(line);
+
+            // Add right padding only if not right-aligned
+            if !is_right_aligned {
+                for _ in 0..right_pad {
+                    result.push(' ');
+                }
+            }
+        }
+    }
+
+    result
+}
+
+/// Calculate the visible width of a string, excluding ANSI escape sequences.
+///
+/// This is the canonical implementation used throughout lipgloss for measuring
+/// the display width of styled text. It properly handles:
+///
+/// - **SGR sequences** (e.g., `\x1b[31m` for red text)
+/// - **CSI sequences** (e.g., `\x1b[2J` for clear screen, `\x1b[10;20H` for cursor positioning)
+/// - **OSC sequences** (e.g., `\x1b]0;title\x07` for window titles)
+/// - **Simple escapes** (e.g., `\x1b7` for save cursor, `\x1b>` for keypad mode)
+/// - **Unicode width** (correctly handles wide characters like CJK and emoji)
+///
+/// # Examples
+///
+/// ```
+/// use lipgloss::visible_width;
+///
+/// // Plain ASCII text
+/// assert_eq!(visible_width("hello"), 5);
+///
+/// // Text with ANSI color codes (SGR)
+/// assert_eq!(visible_width("\x1b[31mred\x1b[0m"), 3);
+///
+/// // Text with cursor movement (CSI)
+/// assert_eq!(visible_width("\x1b[2Jcleared"), 7);
+///
+/// // Unicode wide characters (CJK)
+/// assert_eq!(visible_width("日本語"), 6);  // Each character is width 2
+///
+/// // Mixed content
+/// assert_eq!(visible_width("\x1b[1;32mHello 世界\x1b[0m"), 10);
+/// ```
+///
+/// # Performance
+///
+/// Includes a fast path for ASCII-only strings without escape sequences,
+/// which is the common case for most terminal text.
+#[inline]
+pub fn visible_width(s: &str) -> usize {
+    // Fast path: ASCII-only content without escapes (common case)
+    if s.is_ascii() && !s.contains('\x1b') {
+        return s.len();
+    }
+
+    fn grapheme_cluster_width(grapheme: &str) -> usize {
+        use unicode_width::UnicodeWidthChar;
+
+        // Keycap sequences (e.g., "1️⃣") are rendered as a single cell in Go's
+        // width calculations.
+        let chars: Vec<char> = grapheme.chars().collect();
+        if chars.len() == 2 || chars.len() == 3 {
+            if chars.last() == Some(&'\u{20e3}') {
+                let first_ok = matches!(chars[0], '0'..='9' | '#' | '*');
+                let mid_ok = chars.len() == 2 || chars.get(1) == Some(&'\u{fe0f}');
+                if first_ok && mid_ok {
+                    return 1;
+                }
+            }
+        }
+
+        // Flags are pairs of regional indicator symbols and occupy two cells.
+        if chars.len() == 2
+            && chars
+                .iter()
+                .all(|&c| ('\u{1f1e6}'..='\u{1f1ff}').contains(&c))
+        {
+            return 2;
+        }
+
+        let mut w = grapheme
+            .chars()
+            .map(|c| UnicodeWidthChar::width(c).unwrap_or(0))
+            .max()
+            .unwrap_or(0);
+
+        // Emoji variation selector 16 requests emoji presentation. Go's runewidth
+        // treats many VS16 sequences as double-width; match that behavior.
+        if grapheme.contains('\u{fe0f}') {
+            w = w.max(2);
+        }
+
+        w
+    }
+
+    fn text_width(text: &str) -> usize {
+        use unicode_segmentation::UnicodeSegmentation;
+
+        UnicodeSegmentation::graphemes(text, true)
+            .map(grapheme_cluster_width)
+            .sum()
+    }
+
+    // Full state machine for proper ANSI handling.
+    // Width is computed over grapheme clusters (not scalar values) to match
+    // Go's behavior for ZWJ emoji sequences, emoji modifiers, etc.
+    let mut width = 0;
+
+    #[derive(Clone, Copy)]
+    enum State {
+        Normal,
+        Esc,
+        Csi,
+        /// String-type sequence (OSC, DCS, SOS, PM, APC) — runs until BEL or ST.
+        Str,
+        /// Seen ESC while inside a string sequence — expecting `\` to complete ST.
+        StrEsc,
+    }
+
+    let mut state = State::Normal;
+    let mut segment_start = 0usize;
+
+    for (idx, c) in s.char_indices() {
+        match state {
+            State::Normal => {
+                if c == '\x1b' {
+                    width += text_width(&s[segment_start..idx]);
+                    state = State::Esc;
+                    segment_start = idx + c.len_utf8();
+                } else {
+                    // Defer counting until we have a full text segment.
+                }
+            }
+            State::Esc => {
+                match c {
+                    '[' => state = State::Csi,
+                    // OSC (]), DCS (P), SOS (X), PM (^), APC (_) are all
+                    // string-type sequences terminated by BEL or ST (ESC \).
+                    ']' | 'P' | 'X' | '^' | '_' => state = State::Str,
+                    _ => {
+                        // Simple escapes: single char after ESC (e.g., \x1b7 save cursor)
+                        state = State::Normal;
+                        segment_start = idx + c.len_utf8();
+                    }
+                }
+            }
+            State::Csi => {
+                // CSI sequence ends with final byte 0x40-0x7E (@ to ~)
+                if ('@'..='~').contains(&c) {
+                    state = State::Normal;
+                    segment_start = idx + c.len_utf8();
+                }
+            }
+            State::Str => {
+                // String sequence ends with BEL (\x07) or ST (ESC \)
+                if c == '\x07' {
+                    state = State::Normal;
+                    segment_start = idx + c.len_utf8();
+                } else if c == '\x1b' {
+                    state = State::StrEsc;
+                }
+                // All other characters are part of the payload, ignored for width
+            }
+            State::StrEsc => {
+                // We saw ESC while inside a string sequence.
+                if c == '\\' {
+                    // Valid ST terminator (ESC \) — sequence is properly closed.
+                    state = State::Normal;
+                    segment_start = idx + c.len_utf8();
+                } else if c == '[' {
+                    // Malformed sequence followed by a new CSI.
+                    state = State::Csi;
+                } else if c == ']' || c == 'P' || c == 'X' || c == '^' || c == '_' {
+                    // Malformed sequence followed by another string-type sequence.
+                    state = State::Str;
+                } else {
+                    // Unknown escape; recover to Normal.
+                    state = State::Normal;
+                    segment_start = idx + c.len_utf8();
+                }
+            }
+        }
+    }
+
+    if matches!(state, State::Normal) && segment_start <= s.len() {
+        width += text_width(&s[segment_start..]);
+    }
+
+    width
+}
+
+/// Get the width of the widest line in a string.
+pub fn width(s: &str) -> usize {
+    s.lines().map(|l| visible_width(l)).max().unwrap_or(0)
+}
+
+/// Get the number of lines in a string.
+pub fn height(s: &str) -> usize {
+    s.lines().count().max(1)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_join_vertical_left_alignment() {
+        let result = join_vertical(Position::Left, &["Short", "LongerText"]);
+        println!("Result bytes: {:?}", result.as_bytes());
+        println!("Result repr: {:?}", result);
+        // Expected: "Short     \nLongerText" (Short with 5 trailing spaces)
+        assert_eq!(result, "Short     \nLongerText");
+    }
+
+    #[test]
+    fn test_join_vertical_center_alignment() {
+        let result = join_vertical(Position::Center, &["Short", "LongerText"]);
+        println!("Result bytes: {:?}", result.as_bytes());
+        println!("Result repr: {:?}", result);
+        // Go rounds for center alignment: round(5 * 0.5) = 3 left, 2 right (bd-3vqi)
+        let expected = "   Short  \nLongerText";
+        assert_eq!(result, expected);
+    }
+
+    // =========================================================================
+    // visible_width tests - comprehensive coverage of ANSI escape handling
+    // =========================================================================
+
+    #[test]
+    fn test_visible_width_plain_ascii() {
+        assert_eq!(visible_width("hello"), 5);
+        assert_eq!(visible_width(""), 0);
+        assert_eq!(visible_width(" "), 1);
+        assert_eq!(visible_width("hello world"), 11);
+    }
+
+    #[test]
+    fn test_visible_width_sgr_sequences() {
+        // Basic SGR: ESC[Nm where N is parameter
+        assert_eq!(visible_width("\x1b[31mred\x1b[0m"), 3);
+        assert_eq!(visible_width("\x1b[1mbold\x1b[0m"), 4);
+        assert_eq!(visible_width("\x1b[1;32mbold green\x1b[0m"), 10);
+
+        // Multiple SGR codes
+        assert_eq!(visible_width("\x1b[1m\x1b[31m\x1b[4mhello\x1b[0m"), 5);
+
+        // SGR with no visible content
+        assert_eq!(visible_width("\x1b[31m\x1b[0m"), 0);
+    }
+
+    #[test]
+    fn test_visible_width_csi_sequences() {
+        // Cursor movement: ESC[H (cursor home), ESC[2J (clear screen)
+        assert_eq!(visible_width("\x1b[Hstart"), 5);
+        assert_eq!(visible_width("\x1b[2Jcleared"), 7);
+
+        // Cursor positioning: ESC[10;20H
+        assert_eq!(visible_width("\x1b[10;20Htext"), 4);
+
+        // Erase in line: ESC[K
+        assert_eq!(visible_width("text\x1b[Kmore"), 8);
+
+        // Scroll: ESC[5S (scroll up 5)
+        assert_eq!(visible_width("\x1b[5Sscrolled"), 8);
+    }
+
+    #[test]
+    fn test_visible_width_osc_sequences() {
+        // Window title (terminated with BEL \x07)
+        assert_eq!(visible_width("\x1b]0;My Title\x07text"), 4);
+
+        // Window title (terminated with ST: ESC \)
+        assert_eq!(visible_width("\x1b]0;Title\x1b\\visible"), 7);
+
+        // OSC with no visible content
+        assert_eq!(visible_width("\x1b]0;title\x07"), 0);
+    }
+
+    #[test]
+    fn test_visible_width_osc_st_termination() {
+        // Valid ST terminator (ESC \) after OSC
+        assert_eq!(visible_width("\x1b]0;title\x1b\\text"), 4);
+
+        // BEL terminator
+        assert_eq!(visible_width("\x1b]0;title\x07text"), 4);
+
+        // OSC 8 hyperlink (BEL terminated)
+        assert_eq!(
+            visible_width("\x1b]8;;https://example.com\x07link\x1b]8;;\x07"),
+            4
+        );
+
+        // OSC 8 hyperlink (ST terminated)
+        assert_eq!(
+            visible_width("\x1b]8;;https://example.com\x1b\\link\x1b]8;;\x1b\\"),
+            4
+        );
+
+        // Malformed: OSC followed immediately by CSI (no proper terminator)
+        assert_eq!(visible_width("\x1b]0;title\x1b[31mred\x1b[0m"), 3);
+
+        // Malformed: OSC followed by another OSC
+        assert_eq!(visible_width("\x1b]0;first\x1b]0;second\x07text"), 4);
+
+        // Truncated OSC at end of string (no terminator)
+        assert_eq!(visible_width("\x1b]0;title"), 0);
+
+        // Empty OSC with BEL
+        assert_eq!(visible_width("\x1b]\x07text"), 4);
+
+        // Empty OSC with ST
+        assert_eq!(visible_width("\x1b]\x1b\\text"), 4);
+
+        // OSC with ESC at end of string (incomplete ST)
+        assert_eq!(visible_width("\x1b]0;title\x1b"), 0);
+
+        // OSC then ESC followed by 'X' (SOS introducer) — enters a new
+        // string-type sequence per ECMA-48, so "visible" is payload, not visible.
+        assert_eq!(visible_width("\x1b]0;title\x1bXvisible"), 0);
+
+        // OSC then ESC followed by a non-sequence char — simple escape, back to Normal
+        assert_eq!(visible_width("\x1b]0;title\x1b7visible"), 7);
+    }
+
+    #[test]
+    fn test_visible_width_simple_escapes() {
+        // Save cursor: ESC 7
+        assert_eq!(visible_width("\x1b7text"), 4);
+
+        // Restore cursor: ESC 8
+        assert_eq!(visible_width("\x1b8text"), 4);
+
+        // Keypad mode: ESC > and ESC =
+        assert_eq!(visible_width("\x1b>text\x1b="), 4);
+    }
+
+    #[test]
+    fn test_visible_width_unicode() {
+        // CJK characters (width 2 each)
+        assert_eq!(visible_width("日本語"), 6);
+        assert_eq!(visible_width("中文"), 4);
+        assert_eq!(visible_width("한글"), 4);
+
+        // Emoji (typically width 2)
+        assert_eq!(visible_width("🦀"), 2);
+        assert_eq!(visible_width("🎉"), 2);
+        assert_eq!(visible_width("👋"), 2);
+    }
+
+    #[test]
+    fn test_visible_width_mixed_content() {
+        // ASCII + CJK
+        assert_eq!(visible_width("Hi日本"), 6); // 2 + 4
+
+        // ASCII + emoji
+        assert_eq!(visible_width("Hi 🦀!"), 6); // 2 + 1 + 2 + 1
+
+        // ANSI + Unicode
+        assert_eq!(visible_width("\x1b[31m日本\x1b[0m"), 4);
+        assert_eq!(visible_width("\x1b[1m🦀\x1b[0m"), 2);
+
+        // Complex mixed
+        assert_eq!(visible_width("\x1b[1;32mHello 世界\x1b[0m"), 10);
+    }
+
+    #[test]
+    fn test_visible_width_combining_chars() {
+        // e + combining acute accent = é (width 1)
+        let combining = "e\u{0301}";
+        assert_eq!(visible_width(combining), 1);
+
+        // Precomposed é (width 1)
+        let precomposed = "\u{00e9}";
+        assert_eq!(visible_width(precomposed), 1);
+    }
+
+    #[test]
+    fn test_visible_width_edge_cases() {
+        // Unterminated escape (escape at end)
+        assert_eq!(visible_width("text\x1b"), 4);
+
+        // Unterminated CSI
+        assert_eq!(visible_width("text\x1b[31"), 4);
+
+        // Double escape: second ESC acts as simple escape, then [31m is literal
+        // \x1b\x1b -> first ESC starts escape, second ESC is simple escape (back to normal)
+        // "[31m" is now literal text (width 4), then "red" (width 3) = 7
+        assert_eq!(visible_width("\x1b\x1b[31mred"), 7);
+
+        // Escape character itself has no width
+        assert_eq!(visible_width("\x1b"), 0);
+
+        // Empty CSI has no width (no final byte, but ESC[ consumed)
+        assert_eq!(visible_width("\x1b["), 0);
+    }
+
+    #[test]
+    fn test_visible_width_fast_path() {
+        // Pure ASCII without escapes uses fast path
+        let ascii = "The quick brown fox jumps over the lazy dog";
+        assert_eq!(visible_width(ascii), 43);
+
+        // Long ASCII string
+        let long_ascii = "x".repeat(1000);
+        assert_eq!(visible_width(&long_ascii), 1000);
+    }
+}
+
+/// Place a string at a position within a given width and height.
+///
+/// # Example
+///
+/// ```rust
+/// use lipgloss::{place, Position};
+///
+/// let text = "Hello";
+/// let placed = place(20, 5, Position::Center, Position::Center, text);
+/// ```
+pub fn place(width: usize, height: usize, h_pos: Position, v_pos: Position, s: &str) -> String {
+    let content_width = self::width(s);
+    let content_height = self::height(s);
+
+    // Horizontal padding - use floor() to match Go lipgloss Place() behavior
+    let h_extra = width.saturating_sub(content_width);
+    let left_pad = (h_extra as f64 * h_pos.factor()).floor() as usize;
+    let _right_pad = h_extra.saturating_sub(left_pad);
+
+    // Vertical padding - use floor() to match Go lipgloss Place() behavior
+    let v_extra = height.saturating_sub(content_height);
+    let top_pad = (v_extra as f64 * v_pos.factor()).floor() as usize;
+    let bottom_pad = v_extra.saturating_sub(top_pad);
+
+    // Pre-compute alignment factor once for content lines
+    let h_factor = h_pos.factor();
+
+    // Pre-allocate blank line once for reuse (avoids allocation per blank line)
+    let blank_line = " ".repeat(width);
+
+    // Pre-allocate result with estimated capacity: height lines * (width + newline)
+    let estimated_capacity = height * (width + 1);
+    let mut result = String::with_capacity(estimated_capacity);
+
+    // Top padding - reuse blank_line
+    for i in 0..top_pad {
+        if i > 0 {
+            result.push('\n');
+        }
+        result.push_str(&blank_line);
+    }
+
+    // Content with horizontal padding - single-pass, avoid format!
+    for (i, line) in s.lines().enumerate() {
+        if top_pad > 0 || i > 0 {
+            result.push('\n');
+        }
+
+        let line_width = visible_width(line);
+        let line_extra = width.saturating_sub(line_width);
+        // Use floor() to match Go lipgloss Place() behavior
+        let line_left = (line_extra as f64 * h_factor).floor() as usize;
+        let line_right = line_extra.saturating_sub(line_left);
+
+        // Use slices of blank_line for padding (no allocation)
+        result.push_str(&blank_line[..line_left]);
+        result.push_str(line);
+        result.push_str(&blank_line[..line_right]);
+    }
+
+    // Bottom padding - reuse blank_line
+    for _ in 0..bottom_pad {
+        result.push('\n');
+        result.push_str(&blank_line);
+    }
+
+    result
+}
+
+// =============================================================================
+// StyleRanges and Range
+// =============================================================================
+
+/// Range specifies a section of text with a start index, end index, and the Style to apply.
+///
+/// Used with [`style_ranges`] to apply different styles to different parts of a string.
+///
+/// # Example
+///
+/// ```rust
+/// use lipgloss::{Range, Style, style_ranges};
+///
+/// let style = Style::new().bold();
+/// let range = Range {
+///     start: 0,
+///     end: 5,
+///     style,
+/// };
+/// ```
+#[derive(Debug, Clone)]
+pub struct Range {
+    /// The starting index (inclusive, in bytes).
+    pub start: usize,
+    /// The ending index (exclusive, in bytes).
+    pub end: usize,
+    /// The Style to apply to this range.
+    pub style: Style,
+}
+
+impl Range {
+    /// Creates a new Range.
+    pub fn new(start: usize, end: usize, style: Style) -> Self {
+        Self { start, end, style }
+    }
+}
+
+/// Creates a new Range that can be used with [`style_ranges`].
+///
+/// # Arguments
+///
+/// * `start` - The starting index of the range (inclusive, in bytes)
+/// * `end` - The ending index of the range (exclusive, in bytes)
+/// * `style` - The Style to apply to this range
+///
+/// # Example
+///
+/// ```rust
+/// use lipgloss::{new_range, Style, style_ranges};
+///
+/// let styled = style_ranges(
+///     "Hello, World!",
+///     &[
+///         new_range(0, 5, Style::new().bold()),
+///         new_range(7, 12, Style::new().italic()),
+///     ],
+/// );
+/// ```
+pub fn new_range(start: usize, end: usize, style: Style) -> Range {
+    Range::new(start, end, style)
+}
+
+/// Applies styles to ranges in a string. Existing ANSI styles will be taken into account.
+/// Ranges should not overlap.
+///
+/// # Arguments
+///
+/// * `s` - The input string to style
+/// * `ranges` - A slice of Range objects specifying which parts of the string to style
+///
+/// # Returns
+///
+/// The styled string with each range having its specified style applied.
+///
+/// # Example
+///
+/// ```rust
+/// use lipgloss::{style_ranges, new_range, Style};
+///
+/// let styled = style_ranges(
+///     "Hello, World!",
+///     &[
+///         new_range(0, 5, Style::new().bold()),
+///         new_range(7, 12, Style::new().italic()),
+///     ],
+/// );
+/// ```
+pub fn style_ranges(s: &str, ranges: &[Range]) -> String {
+    if ranges.is_empty() {
+        return s.to_string();
+    }
+
+    // Sort ranges by start position
+    let mut sorted_ranges: Vec<_> = ranges.iter().collect();
+    sorted_ranges.sort_by_key(|r| r.start);
+
+    let bytes = s.as_bytes();
+    let mut result = String::new();
+    let mut current_pos = 0;
+
+    for range in sorted_ranges {
+        let start = range.start.min(bytes.len());
+        let end = range.end.min(bytes.len());
+
+        if start > current_pos {
+            // Add unstyled text between ranges
+            if let Ok(text) = std::str::from_utf8(&bytes[current_pos..start]) {
+                result.push_str(text);
+            }
+        }
+
+        if end > start {
+            // Apply style to this range
+            if let Ok(text) = std::str::from_utf8(&bytes[start..end]) {
+                result.push_str(&range.style.render(text));
+            }
+        }
+
+        current_pos = end.max(current_pos);
+    }
+
+    // Add remaining text after last range
+    if current_pos < bytes.len() {
+        if let Ok(text) = std::str::from_utf8(&bytes[current_pos..]) {
+            result.push_str(text);
+        }
+    }
+
+    result
+}
+
+/// Applies styles to runes at the given indices in the string.
+///
+/// You must provide styling options for both matched and unmatched runes.
+/// Indices out of bounds will be ignored.
+///
+/// # Arguments
+///
+/// * `s` - The input string to style
+/// * `indices` - Array of character indices indicating which runes to style
+/// * `matched` - The Style to apply to runes at the specified indices
+/// * `unmatched` - The Style to apply to all other runes
+///
+/// # Example
+///
+/// ```rust
+/// use lipgloss::{style_runes, Style};
+///
+/// let styled = style_runes(
+///     "Hello",
+///     &[0, 1, 2],
+///     Style::new().bold(),
+///     Style::new().faint(),
+/// );
+/// ```
+pub fn style_runes(s: &str, indices: &[usize], matched: Style, unmatched: Style) -> String {
+    use std::collections::HashSet;
+    let indices_set: HashSet<_> = indices.iter().copied().collect();
+
+    let mut result = String::new();
+
+    for (i, c) in s.chars().enumerate() {
+        let char_str = c.to_string();
+        if indices_set.contains(&i) {
+            result.push_str(&matched.render(&char_str));
+        } else {
+            result.push_str(&unmatched.render(&char_str));
+        }
+    }
+
+    result
+}
+
+#[cfg(test)]
+mod escape_sequence_tests {
+    use super::*;
+
+    #[test]
+    fn test_width_with_terminal_escape_sequences() {
+        // CSI DEC private modes (like hide cursor)
+        assert_eq!(
+            visible_width("\x1b[?25l"),
+            0,
+            "Hide cursor CSI should have 0 width"
+        );
+        assert_eq!(
+            visible_width("\x1b[?1000h"),
+            0,
+            "Mouse mode CSI should have 0 width"
+        );
+
+        // MoveTo and Clear
+        assert_eq!(
+            visible_width("\x1b[1;1H"),
+            0,
+            "MoveTo CSI should have 0 width"
+        );
+        assert_eq!(visible_width("\x1b[2J"), 0, "Clear CSI should have 0 width");
+
+        // OSC title
+        assert_eq!(
+            visible_width("\x1b]0;Title\x07"),
+            0,
+            "OSC title should have 0 width"
+        );
+        assert_eq!(
+            visible_width("\x1b]0;Title\x1b\\"),
+            0,
+            "OSC title with ST should have 0 width"
+        );
+
+        // Combined sequence like in PTY output
+        let setup = "\x1b[?25l\x1b[?1000h\x1b[1;1H\x1b[2JLoading...";
+        assert_eq!(
+            visible_width(setup),
+            10,
+            "Setup + Loading... should be 10 chars"
+        );
+
+        // With OSC title
+        let with_title = "\x1b[?25l\x1b[1;1H\x1b[2JLoading...\x1b]0;Charmed\x07More";
+        assert_eq!(
+            visible_width(with_title),
+            14,
+            "With OSC should count Loading + More = 14"
+        );
+
+        println!("All escape sequence width tests passed!");
+    }
+}

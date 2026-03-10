@@ -1,0 +1,31 @@
+---
+source: crates/demo_showcase/tests/snapshot_tests.rs
+expression: view
+---
+ Charmed Control Center                
+Connected[Dark]                        
+> [] Dashboard DEGRADED   10/12 servi..
+  >_ Services                          
+  >> Jobs     ╭────────╮╭───────╮╭─────
+   # Logs     │Services││Active│ │Compl
+   ? Docs     │10/12│   │Jobs │  │9 ↓1 
+  <> Files    │↓1   │   │10 3 │  │faile
+   * Wizard   │issues│  │running│╰─────
+   @ Settings ╰────────╯╰───────╯      
+                                       
+                ── Services ──         
+                ● log-svc            0.
+                ● telemetry-server   2.
+                ℹ user-engine        1.
+                ● payment-server     0.
+                ● queue-svc          0.
+                ✕ search-engine      0.
+                                       
+                 Recent Jobs ─         
+                ● metrics-aggregate-891
+                ● cache-warmup-8648    
+                ℹ certificate-renewal-5
+                ● cleanup-expired-3113 
+  r refresh  j/k nav  Tab cycle  Enter 
+details  |  1-7 pages  [ sidebar  ?    
+help  q quit

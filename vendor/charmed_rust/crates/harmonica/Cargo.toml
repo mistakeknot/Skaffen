@@ -1,0 +1,30 @@
+[package]
+name = "charmed-harmonica"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+authors.workspace = true
+readme = "README.md"
+documentation = "https://docs.rs/charmed-harmonica"
+description = "Physics-based animation tools: spring oscillator and projectile motion"
+keywords = ["animation", "spring", "physics", "tui", "terminal"]
+categories = ["game-development", "simulation", "no-std"]
+
+[lib]
+name = "harmonica"
+
+[features]
+default = ["std"]
+std = []
+
+[dependencies]
+# For no_std math functions
+libm = { version = "0.2", optional = true }
+
+[dev-dependencies]
+proptest.workspace = true
+
+[lints]
+workspace = true

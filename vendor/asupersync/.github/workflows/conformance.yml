@@ -1,0 +1,233 @@
+name: Conformance Tests
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'conformance/**'
+      - 'tests/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'conformance/**'
+      - 'tests/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  RUST_LOG: info
+  RUST_TOOLCHAIN: nightly-2026-02-05
+
+jobs:
+  conformance:
+    name: Conformance Suite
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-conformance-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-conformance-
+
+      - name: Build conformance package
+        working-directory: conformance
+        run: cargo build
+
+      - name: Run conformance suite
+        run: ./scripts/run_conformance_suite.sh
+        continue-on-error: true
+
+      - name: Parse test results
+        id: parse_results
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import pathlib
+
+          path = pathlib.Path("target/conformance-results/latest.json")
+          data = json.loads(path.read_text())
+          results = data.get("results", {})
+
+          passed = int(results.get("passed", 0))
+          failed = int(results.get("failed", 0))
+          total = int(results.get("total", 0))
+
+          coverage = int((passed * 100 / total) if total else 0)
+
+          output_path = os.environ["GITHUB_OUTPUT"]
+          with open(output_path, "a", encoding="utf-8") as handle:
+              handle.write(f"passed={passed}\n")
+              handle.write(f"failed={failed}\n")
+              handle.write(f"total={total}\n")
+              handle.write(f"coverage={coverage}\n")
+
+          summary_path = os.environ["GITHUB_STEP_SUMMARY"]
+          with open(summary_path, "a", encoding="utf-8") as handle:
+              handle.write("### Conformance Test Results\n\n")
+              handle.write("| Metric | Value |\n")
+              handle.write("|--------|-------|\n")
+              handle.write(f"| Passed | {passed} |\n")
+              handle.write(f"| Failed | {failed} |\n")
+              handle.write(f"| Total | {total} |\n")
+              handle.write(f"| Pass Rate | {coverage}% |\n")
+          PY
+
+      - name: Check coverage threshold
+        run: |
+          COVERAGE=${{ steps.parse_results.outputs.coverage }}
+          THRESHOLD=90
+
+          echo "Coverage: $COVERAGE%"
+          echo "Threshold: $THRESHOLD%"
+
+          if [ "$COVERAGE" -lt "$THRESHOLD" ]; then
+            echo "::error::Conformance coverage $COVERAGE% is below threshold $THRESHOLD%"
+            exit 1
+          else
+            echo "Coverage $COVERAGE% meets threshold $THRESHOLD%"
+          fi
+
+      - name: Upload conformance log
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: conformance-log
+          path: target/conformance-results/latest.log
+          retention-days: 14
+
+  performance-bounds:
+    name: Performance Conformance
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-perf-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Run performance benchmarks
+        working-directory: conformance
+        run: |
+          cargo bench 2>&1 | tee ../perf_output.log || true
+
+      - name: Check for performance regressions
+        run: |
+          # Parse benchmark output for any failures
+          if grep -q "regression" perf_output.log; then
+            echo "::warning::Potential performance regression detected"
+          fi
+
+          echo "### Performance Results" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          tail -50 perf_output.log >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload performance log
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: performance-log
+          path: perf_output.log
+          retention-days: 14
+
+  runtime-matrix:
+    name: Runtime Matrix
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest]
+        runtime: [lab, production]
+        include:
+          - os: ubuntu-latest
+            runtime: lab
+            features: test-internals
+          - os: ubuntu-latest
+            runtime: production
+            features: test-internals
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ matrix.runtime }}-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Run tests with ${{ matrix.runtime }} runtime
+        run: |
+          echo "Testing with runtime: ${{ matrix.runtime }}"
+          cargo test --features ${{ matrix.features }} -- --nocapture
+        env:
+          ASUPERSYNC_RUNTIME: ${{ matrix.runtime }}
+
+  negative-tests:
+    name: Negative Tests (Expected Failures)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-negative-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Run negative conformance tests
+        working-directory: conformance
+        run: |
+          # Negative tests verify that certain patterns correctly fail
+          cargo test negative -- --nocapture 2>&1 | tee ../negative_output.log || true
+
+      - name: Upload negative test log
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: negative-tests-log
+          path: negative_output.log
+          retention-days: 14

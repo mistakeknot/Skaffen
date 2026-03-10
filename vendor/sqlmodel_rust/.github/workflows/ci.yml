@@ -1,0 +1,239 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Clone dependencies
+        run: |
+          cd ..
+          git clone https://github.com/Dicklesworthstone/asupersync.git asupersync || true
+          git clone https://github.com/Dicklesworthstone/rich_rust.git rich_rust || true
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache cargo registry and build
+        uses: Swatinem/rust-cache@v2
+
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
+      - name: Run Clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+  test:
+    name: Test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Clone dependencies (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          cd ..
+          git clone https://github.com/Dicklesworthstone/asupersync.git asupersync || true
+          git clone https://github.com/Dicklesworthstone/rich_rust.git rich_rust || true
+
+      - name: Clone dependencies (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          cd ..
+          git clone https://github.com/Dicklesworthstone/asupersync.git asupersync 2>$null
+          git clone https://github.com/Dicklesworthstone/rich_rust.git rich_rust 2>$null
+          if (-not $?) { Write-Host "Dependencies already exist or clone failed" }
+
+      - name: Install SQLite (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          vcpkg integrate install
+          vcpkg install sqlite3:x64-windows
+          $vcpkgRoot = $env:VCPKG_INSTALLATION_ROOT
+          $libDir = "$vcpkgRoot\installed\x64-windows\lib"
+          echo "SQLITE3_LIB_DIR=$libDir" >> $env:GITHUB_ENV
+          echo "SQLITE3_INCLUDE_DIR=$vcpkgRoot\installed\x64-windows\include" >> $env:GITHUB_ENV
+          # Add to LIB for MSVC linker to find sqlite3.lib
+          echo "LIB=$libDir;$env:LIB" >> $env:GITHUB_ENV
+          # Add to PATH for runtime DLL
+          echo "$vcpkgRoot\installed\x64-windows\bin" >> $env:GITHUB_PATH
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@nightly
+
+      - name: Cache cargo registry and build
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.os }}
+
+      - name: Build
+        run: cargo build --workspace --all-targets
+
+      - name: Run tests
+        run: cargo test --workspace --verbose
+
+      - name: Run doc tests
+        run: cargo test --workspace --doc
+
+  security:
+    name: Security Audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Clone dependencies
+        run: |
+          cd ..
+          git clone https://github.com/Dicklesworthstone/asupersync.git asupersync || true
+          git clone https://github.com/Dicklesworthstone/rich_rust.git rich_rust || true
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@nightly
+
+      - name: Install cargo-audit
+        run: cargo install cargo-audit --locked
+
+      - name: Run security audit
+        run: cargo audit || true  # Don't fail CI on advisories, just report
+
+  docs:
+    name: Documentation
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Clone dependencies
+        run: |
+          cd ..
+          git clone https://github.com/Dicklesworthstone/asupersync.git asupersync || true
+          git clone https://github.com/Dicklesworthstone/rich_rust.git rich_rust || true
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@nightly
+
+      - name: Cache cargo registry and build
+        uses: Swatinem/rust-cache@v2
+
+      - name: Check documentation
+        run: cargo doc --workspace --no-deps
+        env:
+          RUSTDOCFLAGS: -D warnings
+
+  msrv:
+    name: MSRV Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Clone dependencies
+        run: |
+          cd ..
+          git clone https://github.com/Dicklesworthstone/asupersync.git asupersync || true
+          git clone https://github.com/Dicklesworthstone/rich_rust.git rich_rust || true
+
+      - name: Install Rust toolchain (MSRV)
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: nightly-2024-12-01
+
+      - name: Cache cargo registry and build
+        uses: Swatinem/rust-cache@v2
+
+      - name: Check MSRV compilation
+        run: cargo check --workspace
+
+  build:
+    name: Build (${{ matrix.target }})
+    needs: [lint, test]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+          - os: macos-14
+            target: aarch64-apple-darwin
+          - os: macos-13
+            target: x86_64-apple-darwin
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Clone dependencies (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          cd ..
+          git clone https://github.com/Dicklesworthstone/asupersync.git asupersync || true
+          git clone https://github.com/Dicklesworthstone/rich_rust.git rich_rust || true
+
+      - name: Clone dependencies (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          cd ..
+          git clone https://github.com/Dicklesworthstone/asupersync.git asupersync 2>$null
+          git clone https://github.com/Dicklesworthstone/rich_rust.git rich_rust 2>$null
+          if (-not $?) { Write-Host "Dependencies already exist or clone failed" }
+
+      - name: Install SQLite (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          vcpkg integrate install
+          vcpkg install sqlite3:x64-windows
+          $vcpkgRoot = $env:VCPKG_INSTALLATION_ROOT
+          $libDir = "$vcpkgRoot\installed\x64-windows\lib"
+          echo "SQLITE3_LIB_DIR=$libDir" >> $env:GITHUB_ENV
+          echo "SQLITE3_INCLUDE_DIR=$vcpkgRoot\installed\x64-windows\include" >> $env:GITHUB_ENV
+          # Add to LIB for MSVC linker to find sqlite3.lib
+          echo "LIB=$libDir;$env:LIB" >> $env:GITHUB_ENV
+          # Add to PATH for runtime DLL
+          echo "$vcpkgRoot\installed\x64-windows\bin" >> $env:GITHUB_PATH
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@nightly
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Cache cargo registry and build
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
+
+      - name: Build release
+        run: cargo build --workspace --release --target ${{ matrix.target }}

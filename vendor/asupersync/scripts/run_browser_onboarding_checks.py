@@ -1,0 +1,526 @@
+#!/usr/bin/env python3
+"""Deterministic Browser Edition onboarding runner.
+
+Runs documented onboarding command bundles for:
+- vanilla browser smoke
+- react readiness
+- next readiness
+
+Emits structured per-step NDJSON logs and scenario summary JSON artifacts under
+artifacts/onboarding/.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import subprocess
+import sys
+import time
+from dataclasses import dataclass
+from datetime import UTC, datetime
+from pathlib import Path
+from typing import Iterable
+
+
+def now_iso() -> str:
+    return datetime.now(UTC).isoformat()
+
+
+@dataclass(frozen=True)
+class Step:
+    step_id: str
+    command: str
+    remediation_hint: str
+    package_entrypoint: str = ""
+    adapter_path: str = ""
+    runtime_profile: str = "FP-BR-DEV"
+    diagnostic_category: str = "onboarding"
+    coverage_kind: str = "policy"
+    trace_artifact_hint: str = ""
+
+
+SCENARIOS: dict[str, list[Step]] = {
+    "vanilla": [
+        Step(
+            "vanilla.typescript_type_model",
+            "python3 scripts/check_wasm_typescript_type_model_policy.py "
+            "--policy .github/wasm_typescript_type_model_policy.json "
+            "--only-scenario TS-TYPE-VANILLA",
+            "Resolve type-model policy findings for vanilla TypeScript semantics.",
+            package_entrypoint="@asupersync/browser",
+            adapter_path="none",
+            runtime_profile="FP-BR-DEV",
+            diagnostic_category="type_model",
+        ),
+        Step(
+            "vanilla.typescript_package_topology",
+            "python3 scripts/check_wasm_typescript_package_policy.py "
+            "--policy .github/wasm_typescript_package_policy.json "
+            "--only-scenario TS-PKG-VANILLA-ESM "
+            "--only-scenario TS-PKG-VANILLA-CJS",
+            "Resolve package topology/export-map policy findings for vanilla TypeScript onboarding.",
+            package_entrypoint="@asupersync/browser",
+            adapter_path="none",
+            runtime_profile="FP-BR-DEV",
+            diagnostic_category="package_topology",
+        ),
+        Step(
+            "vanilla.browser_ready_handoff",
+            "rch exec -- cargo test -p asupersync browser_ready_handoff -- --nocapture",
+            "Inspect scheduler fairness/handoff regressions in src/runtime/scheduler/three_lane.rs.",
+            package_entrypoint="@asupersync/browser",
+            adapter_path="none",
+            runtime_profile="FP-BR-DEV",
+            diagnostic_category="runtime_handoff",
+        ),
+        Step(
+            "vanilla.quiescence",
+            "rch exec -- cargo test --test close_quiescence_regression "
+            "browser_nested_cancel_cascade_reaches_quiescence -- --nocapture",
+            "Verify region close drains cancellation/finalizers before close acknowledgement.",
+            package_entrypoint="@asupersync/browser",
+            adapter_path="none",
+            runtime_profile="FP-BR-DEV",
+            diagnostic_category="quiescence",
+        ),
+        Step(
+            "vanilla.security_policy",
+            "rch exec -- cargo test --test security_invariants browser_fetch_security -- --nocapture",
+            "Review browser fetch capability defaults and allowlist policy in src/io/cap.rs.",
+            package_entrypoint="@asupersync/browser",
+            adapter_path="none",
+            runtime_profile="FP-BR-DEV",
+            diagnostic_category="security_policy",
+            coverage_kind="behavioral",
+            trace_artifact_hint="artifacts/onboarding/vanilla.security_policy.log",
+        ),
+        Step(
+            "vanilla.behavior_loser_drain_replay",
+            "rch exec -- cargo test --test e2e_combinator "
+            "browser_spork_harness_deterministic_replay -- --nocapture",
+            "Investigate browser loser-drain replay determinism regressions in tests/e2e/combinator/cancel_correctness/browser_loser_drain.rs.",
+            package_entrypoint="@asupersync/browser",
+            adapter_path="none",
+            runtime_profile="FP-BR-DEV",
+            diagnostic_category="loser_drain",
+            coverage_kind="behavioral",
+            trace_artifact_hint="artifacts/onboarding/vanilla.behavior_loser_drain_replay.log",
+        ),
+        Step(
+            "vanilla.negative_skipped_loser_detection",
+            "rch exec -- cargo test --test e2e_combinator "
+            "browser_oracle_detects_skipped_loser -- --nocapture",
+            "Ensure loser-drain oracle violations are surfaced with deterministic diagnostics.",
+            package_entrypoint="@asupersync/browser",
+            adapter_path="none",
+            runtime_profile="FP-BR-DEV",
+            diagnostic_category="loser_drain_negative",
+            coverage_kind="negative",
+            trace_artifact_hint="artifacts/onboarding/vanilla.negative_skipped_loser_detection.log",
+        ),
+        Step(
+            "vanilla.timing_mid_computation_drain",
+            "rch exec -- cargo test --test e2e_combinator "
+            "browser_mid_computation_task_drained_on_region_close -- --nocapture",
+            "Verify mid-computation cancellation drains under browser-style cooperative scheduling.",
+            package_entrypoint="@asupersync/browser",
+            adapter_path="none",
+            runtime_profile="FP-BR-DEV",
+            diagnostic_category="timing_stress",
+            coverage_kind="timing_stress",
+            trace_artifact_hint="artifacts/onboarding/vanilla.timing_mid_computation_drain.log",
+        ),
+        Step(
+            "vanilla.lifecycle_tab_suspension_multi_obligation",
+            "rch exec -- cargo test --test obligation_wasm_parity "
+            "wasm_host_interruption_tab_suspension_multi_obligation -- --nocapture",
+            "Investigate lifecycle chaos drift for multi-obligation tab suspension handling.",
+            package_entrypoint="@asupersync/browser",
+            adapter_path="none",
+            runtime_profile="FP-BR-DEV",
+            diagnostic_category="lifecycle_chaos",
+            coverage_kind="lifecycle_chaos",
+            trace_artifact_hint="artifacts/onboarding/vanilla.lifecycle_tab_suspension_multi_obligation.log",
+        ),
+        Step(
+            "vanilla.lifecycle_suspend_resume_cancel_drain",
+            "rch exec -- cargo test --test obligation_wasm_parity "
+            "wasm_host_interruption_during_cancel_drain -- --nocapture",
+            "Verify suspend/resume cancel-drain path stays leak-free under lifecycle interruption.",
+            package_entrypoint="@asupersync/browser",
+            adapter_path="none",
+            runtime_profile="FP-BR-DEV",
+            diagnostic_category="lifecycle_chaos",
+            coverage_kind="lifecycle_chaos",
+            trace_artifact_hint="artifacts/onboarding/vanilla.lifecycle_suspend_resume_cancel_drain.log",
+        ),
+    ],
+    "react": [
+        Step(
+            "react.typescript_type_model",
+            "python3 scripts/check_wasm_typescript_type_model_policy.py "
+            "--policy .github/wasm_typescript_type_model_policy.json "
+            "--only-scenario TS-TYPE-REACT",
+            "Resolve type-model policy findings for React adapter semantics.",
+            package_entrypoint="@asupersync/react",
+            adapter_path="react/provider",
+            runtime_profile="FP-BR-DEV",
+            diagnostic_category="type_model",
+        ),
+        Step(
+            "react.typescript_package_topology",
+            "python3 scripts/check_wasm_typescript_package_policy.py "
+            "--policy .github/wasm_typescript_package_policy.json "
+            "--only-scenario TS-PKG-REACT-ESM "
+            "--only-scenario TS-PKG-REACT-CJS",
+            "Resolve package topology/export-map policy findings for React adapter onboarding.",
+            package_entrypoint="@asupersync/react",
+            adapter_path="react/provider",
+            runtime_profile="FP-BR-DEV",
+            diagnostic_category="package_topology",
+        ),
+        Step(
+            "react.clock_start_zero",
+            "rch exec -- cargo test --test native_seam_parity "
+            "browser_clock_through_trait_starts_at_zero -- --nocapture",
+            "Check BrowserMonotonicClock bootstrap semantics and time source trait wiring.",
+            package_entrypoint="@asupersync/react",
+            adapter_path="react/provider",
+            runtime_profile="FP-BR-DEV",
+            diagnostic_category="adapter_lifecycle",
+        ),
+        Step(
+            "react.clock_advances",
+            "rch exec -- cargo test --test native_seam_parity "
+            "browser_clock_through_trait_advances_with_host_samples -- --nocapture",
+            "Check monotonic clamp policy and host-sample advancement path for browser clock.",
+            package_entrypoint="@asupersync/react",
+            adapter_path="react/provider",
+            runtime_profile="FP-BR-DEV",
+            diagnostic_category="adapter_lifecycle",
+        ),
+        Step(
+            "react.obligation_lifecycle",
+            "rch exec -- cargo test --test obligation_wasm_parity "
+            "wasm_full_browser_lifecycle_simulation -- --nocapture",
+            "Inspect obligation drain/commit lifecycle invariants in tests/obligation_wasm_parity.rs.",
+            package_entrypoint="@asupersync/react",
+            adapter_path="react/provider",
+            runtime_profile="FP-BR-DEV",
+            diagnostic_category="obligation_lifecycle",
+            coverage_kind="behavioral",
+            trace_artifact_hint="artifacts/onboarding/react.obligation_lifecycle.log",
+        ),
+        Step(
+            "react.behavior_strict_mode_double_invocation",
+            "rch exec -- cargo test --test react_wasm_strictmode_harness "
+            "strict_mode_double_invocation_is_leak_free_and_cancel_correct -- --nocapture",
+            "Fix React strict-mode lifecycle leaks or cancel/join sequencing drift.",
+            package_entrypoint="@asupersync/react",
+            adapter_path="react/provider",
+            runtime_profile="FP-BR-DEV",
+            diagnostic_category="strict_mode_behavior",
+            coverage_kind="behavioral",
+            trace_artifact_hint="artifacts/onboarding/react.behavior_strict_mode_double_invocation.log",
+        ),
+        Step(
+            "react.timing_restart_churn",
+            "rch exec -- cargo test --test react_wasm_strictmode_harness "
+            "rapid_restart_churn_keeps_event_sequence_balanced -- --nocapture",
+            "Investigate restart-churn race regressions in React adapter task cancellation/join sequencing.",
+            package_entrypoint="@asupersync/react",
+            adapter_path="react/provider",
+            runtime_profile="FP-BR-DEV",
+            diagnostic_category="restart_churn",
+            coverage_kind="timing_stress",
+            trace_artifact_hint="artifacts/onboarding/react.timing_restart_churn.log",
+        ),
+        Step(
+            "react.lifecycle_background_throttle_suspend_resume",
+            "rch exec -- cargo test --test react_wasm_strictmode_harness "
+            "lifecycle_background_throttle_suspend_resume_navigation_churn_is_deterministic -- --nocapture",
+            "Investigate React lifecycle chaos regressions across background throttle, suspend/resume, and navigation churn.",
+            package_entrypoint="@asupersync/react",
+            adapter_path="react/provider",
+            runtime_profile="FP-BR-DEV",
+            diagnostic_category="lifecycle_chaos",
+            coverage_kind="lifecycle_chaos",
+            trace_artifact_hint="artifacts/onboarding/react.lifecycle_background_throttle_suspend_resume.log",
+        ),
+    ],
+    "next": [
+        Step(
+            "next.typescript_type_model",
+            "python3 scripts/check_wasm_typescript_type_model_policy.py "
+            "--policy .github/wasm_typescript_type_model_policy.json "
+            "--only-scenario TS-TYPE-NEXT",
+            "Resolve type-model policy findings for Next.js adapter semantics.",
+            package_entrypoint="@asupersync/next",
+            adapter_path="next/app-router",
+            runtime_profile="FP-BR-DEV",
+            diagnostic_category="type_model",
+        ),
+        Step(
+            "next.typescript_package_topology",
+            "python3 scripts/check_wasm_typescript_package_policy.py "
+            "--policy .github/wasm_typescript_package_policy.json "
+            "--only-scenario TS-PKG-NEXT-ESM "
+            "--only-scenario TS-PKG-NEXT-CJS",
+            "Resolve package topology/export-map policy findings for Next.js adapter onboarding.",
+            package_entrypoint="@asupersync/next",
+            adapter_path="next/app-router",
+            runtime_profile="FP-BR-DEV",
+            diagnostic_category="package_topology",
+        ),
+        Step(
+            "next.dependency_policy",
+            "python3 scripts/check_wasm_dependency_policy.py "
+            "--policy .github/wasm_dependency_policy.json",
+            "Resolve forbidden or unresolved wasm dependency policy findings before Next integration.",
+            package_entrypoint="@asupersync/next",
+            adapter_path="next/app-router",
+            runtime_profile="FP-BR-DEV",
+            diagnostic_category="dependency_policy",
+        ),
+        Step(
+            "next.wasm_profile_check",
+            "rch exec -- cargo check --target wasm32-unknown-unknown "
+            "--no-default-features --features wasm-browser-dev",
+            "Resolve wasm32 compile blockers (for example getrandom wasm_js gating) before Next onboarding.",
+            package_entrypoint="@asupersync/next",
+            adapter_path="next/app-router",
+            runtime_profile="FP-BR-DEV",
+            diagnostic_category="profile_closure",
+        ),
+        Step(
+            "next.bootstrap_state_machine_contract",
+            "rch exec -- cargo test --test wasm_abi_contract nextjs_bootstrap_ -- --nocapture",
+            "Fix Next.js bootstrap transition/recovery contract regressions and ensure deterministic log fields.",
+            package_entrypoint="@asupersync/next",
+            adapter_path="next/app-router",
+            runtime_profile="FP-BR-DEV",
+            diagnostic_category="bootstrap_contract",
+            coverage_kind="behavioral",
+            trace_artifact_hint="artifacts/onboarding/next.bootstrap_state_machine_contract.log",
+        ),
+        Step(
+            "next.behavior_bootstrap_harness",
+            "rch exec -- cargo test --test nextjs_bootstrap_harness -- --nocapture",
+            "Investigate Next.js hydration/bootstrap behavior regressions in harness tests.",
+            package_entrypoint="@asupersync/next",
+            adapter_path="next/app-router",
+            runtime_profile="FP-BR-DEV",
+            diagnostic_category="bootstrap_harness",
+            coverage_kind="behavioral",
+            trace_artifact_hint="artifacts/onboarding/next.behavior_bootstrap_harness.log",
+        ),
+        Step(
+            "next.timing_navigation_churn",
+            "rch exec -- cargo test --test nextjs_bootstrap_harness "
+            "rapid_navigation_churn_with_interleaved_recovery_remains_deterministic -- --nocapture",
+            "Investigate navigation-churn timing/recovery regressions in Next.js bootstrap state machine.",
+            package_entrypoint="@asupersync/next",
+            adapter_path="next/app-router",
+            runtime_profile="FP-BR-DEV",
+            diagnostic_category="lifecycle_chaos",
+            coverage_kind="lifecycle_chaos",
+            trace_artifact_hint="artifacts/onboarding/next.timing_navigation_churn.log",
+        ),
+        Step(
+            "next.optimization_policy",
+            "python3 scripts/check_wasm_optimization_policy.py "
+            "--policy .github/wasm_optimization_policy.json",
+            "Fix optimization policy schema/profile mapping and regenerate summary artifact.",
+            package_entrypoint="@asupersync/next",
+            adapter_path="next/app-router",
+            runtime_profile="FP-BR-DEV",
+            diagnostic_category="optimization_policy",
+            coverage_kind="policy",
+            trace_artifact_hint="artifacts/onboarding/next.optimization_policy.log",
+        ),
+    ],
+}
+
+
+def write_ndjson(path: Path, rows: Iterable[dict]) -> None:
+    with path.open("w", encoding="utf-8") as f:
+        for row in rows:
+            f.write(json.dumps(row, sort_keys=True))
+            f.write("\n")
+
+
+def tail_excerpt(path: Path, max_lines: int = 30) -> str:
+    if not path.exists():
+        return ""
+    lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+    return "\n".join(lines[-max_lines:])
+
+
+def run_step(
+    scenario_id: str,
+    step_index: int,
+    step: Step,
+    out_dir: Path,
+    dry_run: bool,
+) -> dict:
+    log_path = out_dir / f"{step.step_id}.log"
+    started_at = now_iso()
+    t0 = time.perf_counter()
+
+    env_metadata = {
+        "cwd": str(Path.cwd()),
+        "target": "wasm32-unknown-unknown",
+        "runner": "rch",
+        "runtime_profile": step.runtime_profile,
+        "framework_lane": scenario_id,
+    }
+
+    if dry_run:
+        return {
+            "scenario_id": scenario_id,
+            "step_index": step_index,
+            "step_id": step.step_id,
+            "correlation_id": f"{scenario_id}:{step_index:02d}:{step.step_id}",
+            "command": step.command,
+            "repro_command": step.command,
+            "started_at": started_at,
+            "ended_at": started_at,
+            "duration_ms": 0,
+            "exit_code": 0,
+            "outcome": "dry_run",
+            "env": env_metadata,
+            "artifact_log_path": str(log_path),
+            "remediation_hint": step.remediation_hint,
+            "package_entrypoint": step.package_entrypoint,
+            "adapter_path": step.adapter_path,
+            "runtime_profile": step.runtime_profile,
+            "diagnostic_category": step.diagnostic_category,
+            "coverage_kind": step.coverage_kind,
+            "trace_artifact_hint": step.trace_artifact_hint,
+        }
+
+    with log_path.open("w", encoding="utf-8") as log_f:
+        proc = subprocess.run(
+            step.command,
+            shell=True,
+            stdout=log_f,
+            stderr=subprocess.STDOUT,
+            text=True,
+            check=False,
+        )
+
+    duration_ms = int((time.perf_counter() - t0) * 1000)
+    ended_at = now_iso()
+    outcome = "pass" if proc.returncode == 0 else "fail"
+
+    return {
+        "scenario_id": scenario_id,
+        "step_index": step_index,
+        "step_id": step.step_id,
+        "correlation_id": f"{scenario_id}:{step_index:02d}:{step.step_id}",
+        "command": step.command,
+        "repro_command": step.command,
+        "started_at": started_at,
+        "ended_at": ended_at,
+        "duration_ms": duration_ms,
+        "exit_code": proc.returncode,
+        "outcome": outcome,
+        "env": env_metadata,
+        "artifact_log_path": str(log_path),
+        "failure_excerpt": tail_excerpt(log_path, max_lines=40) if outcome == "fail" else "",
+        "remediation_hint": step.remediation_hint,
+        "package_entrypoint": step.package_entrypoint,
+        "adapter_path": step.adapter_path,
+        "runtime_profile": step.runtime_profile,
+        "diagnostic_category": step.diagnostic_category,
+        "coverage_kind": step.coverage_kind,
+        "trace_artifact_hint": step.trace_artifact_hint,
+    }
+
+
+def run_scenario(scenario_id: str, out_dir: Path, dry_run: bool) -> int:
+    steps = SCENARIOS[scenario_id]
+    rows: list[dict] = []
+    scenario_status = "pass"
+
+    for index, step in enumerate(steps):
+        row = run_step(
+            scenario_id=scenario_id,
+            step_index=index,
+            step=step,
+            out_dir=out_dir,
+            dry_run=dry_run,
+        )
+        rows.append(row)
+        if row["outcome"] == "fail":
+            scenario_status = "fail"
+            # Preserve deterministic partial artifact set and stop early.
+            break
+
+    suffix = ".dry_run" if dry_run else ""
+    ndjson_path = out_dir / f"{scenario_id}{suffix}.ndjson"
+    summary_path = out_dir / f"{scenario_id}{suffix}.summary.json"
+    write_ndjson(ndjson_path, rows)
+
+    summary = {
+        "schema": "asupersync-onboarding-summary-v1",
+        "scenario_id": scenario_id,
+        "status": scenario_status if not dry_run else "dry_run",
+        "step_count": len(rows),
+        "failed_steps": [r["step_id"] for r in rows if r["outcome"] == "fail"],
+        "ordered_correlation_ids": [r["correlation_id"] for r in rows],
+        "ndjson_path": str(ndjson_path),
+        "generated_at": now_iso(),
+    }
+    summary_path.write_text(json.dumps(summary, indent=2, sort_keys=True), encoding="utf-8")
+
+    print(
+        f"[onboarding] scenario={scenario_id} status={summary['status']} "
+        f"steps={summary['step_count']} ndjson={ndjson_path}"
+    )
+    return 0 if summary["status"] in {"pass", "dry_run"} else 1
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Run browser onboarding check bundles.")
+    parser.add_argument(
+        "--scenario",
+        choices=["vanilla", "react", "next", "all"],
+        default="all",
+        help="Scenario to run (default: all).",
+    )
+    parser.add_argument(
+        "--out-dir",
+        default="artifacts/onboarding",
+        help="Output directory for logs and summaries.",
+    )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Emit artifacts without executing commands.",
+    )
+    return parser.parse_args()
+
+
+def main() -> int:
+    args = parse_args()
+    out_dir = Path(args.out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    scenarios = ["vanilla", "react", "next"] if args.scenario == "all" else [args.scenario]
+
+    exit_code = 0
+    for scenario_id in scenarios:
+        scenario_exit = run_scenario(
+            scenario_id=scenario_id,
+            out_dir=out_dir,
+            dry_run=args.dry_run,
+        )
+        exit_code = max(exit_code, scenario_exit)
+
+    return exit_code
+
+
+if __name__ == "__main__":
+    sys.exit(main())

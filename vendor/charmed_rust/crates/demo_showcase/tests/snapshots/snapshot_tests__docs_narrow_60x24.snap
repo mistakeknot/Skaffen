@@ -1,0 +1,31 @@
+---
+source: crates/demo_showcase/tests/snapshot_tests.rs
+expression: view
+---
+ Charmed Control Center   Connected                [Dark]  
+  [] Dashboard╭────────────────────────╮ ╭─────────────────
+  >_ Services │      Documents         │ │Welcome [S·] 0%  
+  >> Jobs     │──────────────────────  │ │─────────────────
+   # Logs     │ › Welcome              │ │                 
+>  ? Docs     │   Architecture         │ │                 
+  <> Files    │                        │ │   Welcome to Cha
+   * Wizard   │                        │ │  Your unified pl
+   @ Settings │                        │ │  infrastructure 
+              │                        │ │  operations.    
+              │                        │ │                 
+              │                        │ │                 
+              │                        │ │  │ Note: This sh
+              │                        │ │  │ the charmed_r
+              │                        │ │  │ https://githu
+              │                        │ │  │ TUI framework
+              │                        │ │  │ data is simul
+              │                        │ │  │ demonstration
+              │                        │ │                 
+              │                        │ │  ## Getting Star
+              │                        │ │  Navigate using 
+              │                        │ │  or the sidebar:
+              │                        │ │                 
+              │                        │ │                 
+              ╰────────────────────────╯ ╰─────────────────
+  j/k nav  Tab focus  Enter select  |  1-7 pages  [ sidebar
+ ? help  q quit

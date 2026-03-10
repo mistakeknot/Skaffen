@@ -1,0 +1,967 @@
+//! Damped harmonic oscillator (spring) implementation.
+//!
+//! This is a port of Ryan Juckett's simple damped harmonic motion algorithm,
+//! originally written in C++ and ported to Go by Charmbracelet.
+//!
+//! For background on the algorithm see:
+//! <https://www.ryanjuckett.com/damped-springs/>
+//!
+//! # License
+//!
+//! ```text
+//! Copyright (c) 2008-2012 Ryan Juckett
+//! http://www.ryanjuckett.com/
+//!
+//! This software is provided 'as-is', without any express or implied
+//! warranty. In no event will the authors be held liable for any damages
+//! arising from the use of this software.
+//!
+//! Permission is granted to anyone to use this software for any purpose,
+//! including commercial applications, and to alter it and redistribute it
+//! freely, subject to the following restrictions:
+//!
+//! 1. The origin of this software must not be misrepresented; you must not
+//!    claim that you wrote the original software. If you use this software
+//!    in a product, an acknowledgment in the product documentation would be
+//!    appreciated but is not required.
+//!
+//! 2. Altered source versions must be plainly marked as such, and must not be
+//!    misrepresented as being the original software.
+//!
+//! 3. This notice may not be removed or altered from any source
+//!    distribution.
+//!
+//! Ported to Go by Charmbracelet, Inc. in 2021.
+//! Ported to Rust by Charmed Rust in 2026.
+//! ```
+
+/// Tolerance for damping-ratio boundary comparisons.
+///
+/// Using `f64::EPSILON` (~2.2e-16) is too tight — floating-point arithmetic
+/// in the over-damped and under-damped paths computes `sqrt(x)` where `x`
+/// is near zero at the boundary, then divides by that result. A wider band
+/// routes near-critical values to the numerically stable critically-damped
+/// path, avoiding division by near-zero.
+const EPSILON: f64 = 1e-6;
+
+/// Returns a time delta for a given number of frames per second.
+///
+/// This value can be used as the time delta when initializing a [`Spring`].
+/// Note that game engines often provide the time delta as well, which you
+/// should use instead of this function if possible.
+///
+/// If `n` is 0, this returns `0.0`.
+///
+/// # Example
+///
+/// ```rust
+/// use harmonica::{fps, Spring};
+///
+/// let spring = Spring::new(fps(60), 5.0, 0.2);
+/// ```
+#[inline]
+pub fn fps(n: u32) -> f64 {
+    if n == 0 {
+        return 0.0;
+    }
+    1.0 / f64::from(n)
+}
+
+/// Precomputed spring motion parameters for efficient animation updates.
+///
+/// A `Spring` contains cached coefficients that can be used to efficiently
+/// update multiple springs using the same time step, angular frequency, and
+/// damping ratio.
+///
+/// # Creating a Spring
+///
+/// Use [`Spring::new`] with the time delta (animation frame length), angular
+/// frequency, and damping ratio:
+///
+/// ```rust
+/// use harmonica::{fps, Spring};
+///
+/// // Precompute spring coefficients
+/// let spring = Spring::new(fps(60), 5.0, 0.2);
+/// ```
+///
+/// # Damping Ratios
+///
+/// The damping ratio determines how the spring behaves:
+///
+/// - **Over-damped (ζ > 1)**: No oscillation, slow approach to equilibrium
+/// - **Critically-damped (ζ = 1)**: Fastest approach without oscillation
+/// - **Under-damped (ζ < 1)**: Oscillates around equilibrium with decay
+///
+/// # Example
+///
+/// ```rust
+/// use harmonica::{fps, Spring};
+///
+/// // Create spring for X and Y positions
+/// let mut x = 0.0;
+/// let mut x_vel = 0.0;
+/// let mut y = 0.0;
+/// let mut y_vel = 0.0;
+///
+/// let spring = Spring::new(fps(60), 5.0, 0.2);
+///
+/// // In your update loop:
+/// (x, x_vel) = spring.update(x, x_vel, 10.0);  // Move X toward 10
+/// (y, y_vel) = spring.update(y, y_vel, 20.0);  // Move Y toward 20
+/// ```
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
+pub struct Spring {
+    pos_pos_coef: f64,
+    pos_vel_coef: f64,
+    vel_pos_coef: f64,
+    vel_vel_coef: f64,
+}
+
+impl Spring {
+    /// Creates a new spring, computing the parameters needed to simulate
+    /// a damped spring over a given period of time.
+    ///
+    /// # Arguments
+    ///
+    /// * `delta_time` - The time step to advance (essentially the framerate).
+    ///   Use [`fps`] to compute this from a frame rate.
+    /// * `angular_frequency` - The angular frequency of motion, which affects
+    ///   the speed. Higher values make the spring move faster.
+    /// * `damping_ratio` - The damping ratio, which determines oscillation:
+    ///   - `> 1.0`: Over-damped (no oscillation, slow return)
+    ///   - `= 1.0`: Critically-damped (fastest without oscillation)
+    ///   - `< 1.0`: Under-damped (oscillates with decay)
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use harmonica::{fps, Spring};
+    ///
+    /// // Create an under-damped spring (will oscillate)
+    /// let bouncy = Spring::new(fps(60), 6.0, 0.2);
+    ///
+    /// // Create a critically-damped spring (no oscillation)
+    /// let smooth = Spring::new(fps(60), 6.0, 1.0);
+    ///
+    /// // Create an over-damped spring (very slow, no oscillation)
+    /// let sluggish = Spring::new(fps(60), 6.0, 2.0);
+    /// ```
+    pub fn new(delta_time: f64, angular_frequency: f64, damping_ratio: f64) -> Self {
+        // Keep values in a legal range
+        let angular_frequency = angular_frequency.max(0.0);
+        let damping_ratio = damping_ratio.max(0.0);
+
+        // If there is no angular frequency, the spring will not move
+        // and we return identity coefficients
+        if angular_frequency < EPSILON {
+            return Self {
+                pos_pos_coef: 1.0,
+                pos_vel_coef: 0.0,
+                vel_pos_coef: 0.0,
+                vel_vel_coef: 1.0,
+            };
+        }
+
+        if damping_ratio > 1.0 + EPSILON {
+            // Over-damped
+            Self::over_damped(delta_time, angular_frequency, damping_ratio)
+        } else if damping_ratio < 1.0 - EPSILON {
+            // Under-damped
+            Self::under_damped(delta_time, angular_frequency, damping_ratio)
+        } else {
+            // Critically damped
+            Self::critically_damped(delta_time, angular_frequency)
+        }
+    }
+
+    /// Computes coefficients for over-damped spring (damping_ratio > 1).
+    fn over_damped(delta_time: f64, angular_frequency: f64, damping_ratio: f64) -> Self {
+        let za = -angular_frequency * damping_ratio;
+        let zb = angular_frequency * (damping_ratio * damping_ratio - 1.0).sqrt();
+        let z1 = za - zb;
+        let z2 = za + zb;
+
+        let e1 = exp(z1 * delta_time);
+        let e2 = exp(z2 * delta_time);
+
+        let inv_two_zb = 1.0 / (2.0 * zb); // = 1 / (z2 - z1)
+
+        let e1_over_two_zb = e1 * inv_two_zb;
+        let e2_over_two_zb = e2 * inv_two_zb;
+
+        let z1e1_over_two_zb = z1 * e1_over_two_zb;
+        let z2e2_over_two_zb = z2 * e2_over_two_zb;
+
+        Self {
+            pos_pos_coef: e1_over_two_zb * z2 - z2e2_over_two_zb + e2,
+            pos_vel_coef: -e1_over_two_zb + e2_over_two_zb,
+            vel_pos_coef: (z1e1_over_two_zb - z2e2_over_two_zb + e2) * z2,
+            vel_vel_coef: -z1e1_over_two_zb + z2e2_over_two_zb,
+        }
+    }
+
+    /// Computes coefficients for under-damped spring (damping_ratio < 1).
+    fn under_damped(delta_time: f64, angular_frequency: f64, damping_ratio: f64) -> Self {
+        let omega_zeta = angular_frequency * damping_ratio;
+        let alpha = angular_frequency * (1.0 - damping_ratio * damping_ratio).sqrt();
+
+        let exp_term = exp(-omega_zeta * delta_time);
+        let cos_term = cos(alpha * delta_time);
+        let sin_term = sin(alpha * delta_time);
+
+        let inv_alpha = 1.0 / alpha;
+
+        let exp_sin = exp_term * sin_term;
+        let exp_cos = exp_term * cos_term;
+        let exp_omega_zeta_sin_over_alpha = exp_term * omega_zeta * sin_term * inv_alpha;
+
+        Self {
+            pos_pos_coef: exp_cos + exp_omega_zeta_sin_over_alpha,
+            pos_vel_coef: exp_sin * inv_alpha,
+            vel_pos_coef: -exp_sin * alpha - omega_zeta * exp_omega_zeta_sin_over_alpha,
+            vel_vel_coef: exp_cos - exp_omega_zeta_sin_over_alpha,
+        }
+    }
+
+    /// Computes coefficients for critically-damped spring (damping_ratio ≈ 1).
+    fn critically_damped(delta_time: f64, angular_frequency: f64) -> Self {
+        let exp_term = exp(-angular_frequency * delta_time);
+        let time_exp = delta_time * exp_term;
+        let time_exp_freq = time_exp * angular_frequency;
+
+        Self {
+            pos_pos_coef: time_exp_freq + exp_term,
+            pos_vel_coef: time_exp,
+            vel_pos_coef: -angular_frequency * time_exp_freq,
+            vel_vel_coef: -time_exp_freq + exp_term,
+        }
+    }
+
+    /// Updates position and velocity values against a given target value.
+    ///
+    /// Call this after creating a spring to update values each frame.
+    ///
+    /// # Arguments
+    ///
+    /// * `pos` - Current position
+    /// * `vel` - Current velocity
+    /// * `equilibrium_pos` - Target position to move toward
+    ///
+    /// # Returns
+    ///
+    /// A tuple of `(new_position, new_velocity)`.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use harmonica::{fps, Spring};
+    ///
+    /// let spring = Spring::new(fps(60), 5.0, 0.2);
+    /// let mut pos = 0.0;
+    /// let mut vel = 0.0;
+    /// let target = 100.0;
+    ///
+    /// // Simulate 60 frames (1 second at 60 FPS)
+    /// for _ in 0..60 {
+    ///     (pos, vel) = spring.update(pos, vel, target);
+    /// }
+    ///
+    /// println!("Position: {pos}, Velocity: {vel}");
+    /// ```
+    #[inline]
+    pub fn update(&self, pos: f64, vel: f64, equilibrium_pos: f64) -> (f64, f64) {
+        // Update in equilibrium-relative space
+        let old_pos = pos - equilibrium_pos;
+        let old_vel = vel;
+
+        let new_pos = old_pos * self.pos_pos_coef + old_vel * self.pos_vel_coef + equilibrium_pos;
+        let new_vel = old_pos * self.vel_pos_coef + old_vel * self.vel_vel_coef;
+
+        (new_pos, new_vel)
+    }
+}
+
+// Math helper functions that work in both std and no_std environments
+
+#[cfg(feature = "std")]
+#[inline]
+fn exp(x: f64) -> f64 {
+    x.exp()
+}
+
+#[cfg(not(feature = "std"))]
+#[inline]
+fn exp(x: f64) -> f64 {
+    // e^x using the constant E
+    libm::exp(x)
+}
+
+#[cfg(feature = "std")]
+#[inline]
+fn sin(x: f64) -> f64 {
+    x.sin()
+}
+
+#[cfg(not(feature = "std"))]
+#[inline]
+fn sin(x: f64) -> f64 {
+    libm::sin(x)
+}
+
+#[cfg(feature = "std")]
+#[inline]
+fn cos(x: f64) -> f64 {
+    x.cos()
+}
+
+#[cfg(not(feature = "std"))]
+#[inline]
+fn cos(x: f64) -> f64 {
+    libm::cos(x)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const TOLERANCE: f64 = 1e-10;
+
+    fn approx_eq(a: f64, b: f64) -> bool {
+        (a - b).abs() < TOLERANCE
+    }
+
+    #[test]
+    fn test_fps() {
+        assert!(approx_eq(fps(60), 1.0 / 60.0));
+        assert!(approx_eq(fps(30), 1.0 / 30.0));
+        assert!(approx_eq(fps(120), 1.0 / 120.0));
+        assert!(approx_eq(fps(0), 0.0));
+    }
+
+    #[test]
+    fn test_identity_spring() {
+        // Zero angular frequency should return unchanged values
+        let spring = Spring::new(fps(60), 0.0, 0.5);
+
+        let (new_pos, new_vel) = spring.update(10.0, 5.0, 100.0);
+
+        assert!(approx_eq(new_pos, 10.0));
+        assert!(approx_eq(new_vel, 5.0));
+    }
+
+    #[test]
+    fn test_critically_damped_approaches_target() {
+        let spring = Spring::new(fps(60), 5.0, 1.0);
+        let mut pos = 0.0;
+        let mut vel = 0.0;
+        let target = 100.0;
+
+        // Run for 5 seconds at 60 FPS
+        for _ in 0..300 {
+            (pos, vel) = spring.update(pos, vel, target);
+        }
+
+        // Should be very close to target
+        assert!(
+            (pos - target).abs() < 0.01,
+            "Expected pos ≈ {target}, got {pos}"
+        );
+        assert!(vel.abs() < 0.01, "Expected vel ≈ 0, got {vel}");
+    }
+
+    #[test]
+    fn test_under_damped_oscillates() {
+        let spring = Spring::new(fps(60), 10.0, 0.1);
+        let mut pos = 0.0;
+        let mut vel = 0.0;
+        let target = 100.0;
+
+        let mut crossed_target = false;
+        let mut overshot = false;
+
+        // Run for 2 seconds
+        for _ in 0..120 {
+            let old_pos = pos;
+            (pos, vel) = spring.update(pos, vel, target);
+
+            // Check if we crossed the target
+            if old_pos < target && pos >= target {
+                crossed_target = true;
+            }
+
+            // Check if we overshot
+            if pos > target {
+                overshot = true;
+            }
+        }
+
+        assert!(crossed_target, "Under-damped spring should cross target");
+        assert!(overshot, "Under-damped spring should overshoot target");
+    }
+
+    #[test]
+    fn test_over_damped_no_oscillation() {
+        let spring = Spring::new(fps(60), 5.0, 2.0);
+        let mut pos = 0.0;
+        let mut vel = 0.0;
+        let target = 100.0;
+
+        let mut max_pos: f64 = 0.0;
+
+        // Run for 10 seconds
+        for _ in 0..600 {
+            (pos, vel) = spring.update(pos, vel, target);
+            max_pos = max_pos.max(pos);
+        }
+
+        // Should never overshoot
+        assert!(
+            max_pos <= target + TOLERANCE,
+            "Over-damped spring should not overshoot: max_pos={max_pos}, target={target}"
+        );
+
+        // Should eventually reach target
+        assert!(
+            (pos - target).abs() < 1.0,
+            "Over-damped spring should approach target"
+        );
+    }
+
+    #[test]
+    fn test_spring_is_copy() {
+        let spring = Spring::new(fps(60), 5.0, 0.5);
+        let spring2 = spring; // Copy
+        let _ = spring.update(0.0, 0.0, 100.0);
+        let _ = spring2.update(0.0, 0.0, 100.0);
+    }
+
+    #[test]
+    fn test_negative_values_clamped() {
+        // Negative angular frequency should be clamped to 0
+        let spring = Spring::new(fps(60), -5.0, 0.5);
+        let (new_pos, new_vel) = spring.update(10.0, 5.0, 100.0);
+
+        // Should act as identity
+        assert!(approx_eq(new_pos, 10.0));
+        assert!(approx_eq(new_vel, 5.0));
+    }
+
+    // =========================================================================
+    // bd-228s: Additional spring tests
+    // =========================================================================
+
+    #[test]
+    fn test_zero_damping_oscillates_indefinitely() {
+        // Zero damping should cause infinite oscillation (no energy loss)
+        let spring = Spring::new(fps(60), 5.0, 0.0);
+        let mut pos = 0.0;
+        let mut vel = 0.0;
+        let target = 100.0;
+
+        // Run for 10 seconds at 60 FPS
+        let mut oscillations = 0;
+        let mut last_sign = f64::signum(pos - target);
+
+        for _ in 0..600 {
+            (pos, vel) = spring.update(pos, vel, target);
+            let current_sign = f64::signum(pos - target);
+            #[allow(clippy::float_cmp)] // signum returns exactly -1.0, 0.0, or 1.0
+            if current_sign != last_sign && current_sign != 0.0 {
+                oscillations += 1;
+                last_sign = current_sign;
+            }
+        }
+
+        // With zero damping, should oscillate many times
+        assert!(
+            oscillations >= 5,
+            "Zero damping should oscillate indefinitely, got {oscillations} oscillations"
+        );
+    }
+
+    #[test]
+    fn test_very_high_stiffness_snaps() {
+        // Very high angular frequency should snap quickly to target
+        let spring = Spring::new(fps(60), 100.0, 1.0);
+        let mut pos = 0.0;
+        let mut vel = 0.0;
+        let target = 100.0;
+
+        // Run for just a few frames
+        for _ in 0..30 {
+            (pos, vel) = spring.update(pos, vel, target);
+        }
+
+        // Should be very close to target quickly
+        assert!(
+            (pos - target).abs() < 1.0,
+            "High stiffness should snap quickly, got pos={pos}"
+        );
+    }
+
+    #[test]
+    fn test_negative_target() {
+        let spring = Spring::new(fps(60), 5.0, 1.0);
+        let mut pos = 100.0;
+        let mut vel = 0.0;
+        let target = -50.0;
+
+        // Run for 5 seconds
+        for _ in 0..300 {
+            (pos, vel) = spring.update(pos, vel, target);
+        }
+
+        // Should approach negative target
+        assert!(
+            (pos - target).abs() < 0.1,
+            "Should approach negative target, got pos={pos}"
+        );
+    }
+
+    #[test]
+    fn test_very_small_movements() {
+        let spring = Spring::new(fps(60), 5.0, 1.0);
+        let mut pos = 0.0;
+        let mut vel = 0.0;
+        let target = 0.001; // Very small target
+
+        for _ in 0..300 {
+            (pos, vel) = spring.update(pos, vel, target);
+        }
+
+        // Should still converge to tiny target
+        assert!(
+            (pos - target).abs() < 0.0001,
+            "Should handle small movements, got pos={pos}, target={target}"
+        );
+    }
+
+    #[test]
+    fn test_large_time_delta() {
+        // Large time delta (low FPS)
+        let spring = Spring::new(1.0, 5.0, 1.0); // 1 FPS
+        let mut pos = 0.0;
+        let mut vel = 0.0;
+        let target = 100.0;
+
+        // Run for 10 "frames" (10 seconds)
+        for _ in 0..10 {
+            (pos, vel) = spring.update(pos, vel, target);
+        }
+
+        // Should still converge (though less accurately)
+        assert!(
+            (pos - target).abs() < 5.0,
+            "Large delta should still converge, got pos={pos}"
+        );
+    }
+
+    #[test]
+    fn test_accumulated_error_bounded() {
+        // Run for a long time and check error doesn't grow
+        let spring = Spring::new(fps(60), 5.0, 0.5);
+        let mut pos = 0.0;
+        let mut vel = 0.0;
+        let target = 100.0;
+
+        // Run for 60 seconds (3600 frames)
+        for _ in 0..3600 {
+            (pos, vel) = spring.update(pos, vel, target);
+        }
+
+        // After settling, error should be tiny
+        assert!(
+            (pos - target).abs() < 0.001,
+            "Accumulated error should be bounded, got pos={pos}"
+        );
+        assert!(
+            vel.abs() < 0.001,
+            "Velocity should decay completely, got vel={vel}"
+        );
+    }
+
+    #[test]
+    fn test_spring_default() {
+        let spring = Spring::default();
+        // Default spring has all coefficients = 0.0
+        // update() computes: new_pos = old_pos * 0 + old_vel * 0 + equilibrium
+        //                    new_vel = old_pos * 0 + old_vel * 0 = 0
+        let (new_pos, new_vel) = spring.update(10.0, 5.0, 100.0);
+        // With all-zero coefficients, position snaps to equilibrium
+        assert!(approx_eq(new_pos, 100.0));
+        assert!(approx_eq(new_vel, 0.0));
+    }
+
+    #[test]
+    fn test_spring_clone() {
+        let spring1 = Spring::new(fps(60), 5.0, 0.5);
+        let spring2 = spring1;
+
+        // Both should produce same results
+        let result1 = spring1.update(0.0, 0.0, 100.0);
+        let result2 = spring2.update(0.0, 0.0, 100.0);
+
+        assert!(approx_eq(result1.0, result2.0));
+        assert!(approx_eq(result1.1, result2.1));
+    }
+
+    #[test]
+    fn test_spring_equilibrium_at_target() {
+        // When pos == target and vel == 0, should stay at target
+        let spring = Spring::new(fps(60), 5.0, 0.5);
+        let target = 50.0;
+        let (new_pos, new_vel) = spring.update(target, 0.0, target);
+
+        assert!(approx_eq(new_pos, target));
+        assert!(approx_eq(new_vel, 0.0));
+    }
+
+    #[test]
+    fn test_fps_various_rates() {
+        // Common frame rates
+        assert!(approx_eq(fps(30), 1.0 / 30.0));
+        assert!(approx_eq(fps(60), 1.0 / 60.0));
+        assert!(approx_eq(fps(120), 1.0 / 120.0));
+        assert!(approx_eq(fps(144), 1.0 / 144.0));
+        assert!(approx_eq(fps(240), 1.0 / 240.0));
+        assert!(approx_eq(fps(1), 1.0));
+    }
+
+    #[test]
+    fn test_damping_ratio_boundary() {
+        // Test exactly at critical damping boundaries
+        let under = Spring::new(fps(60), 5.0, 0.999);
+        let critical = Spring::new(fps(60), 5.0, 1.0);
+        let over = Spring::new(fps(60), 5.0, 1.001);
+
+        // All should work without panicking
+        let _ = under.update(0.0, 0.0, 100.0);
+        let _ = critical.update(0.0, 0.0, 100.0);
+        let _ = over.update(0.0, 0.0, 100.0);
+    }
+
+    #[test]
+    fn test_initial_velocity() {
+        // Spring with initial velocity should still converge
+        let spring = Spring::new(fps(60), 5.0, 1.0);
+        let mut pos = 0.0;
+        let mut vel = 1000.0; // Large initial velocity
+        let target = 50.0;
+
+        for _ in 0..600 {
+            (pos, vel) = spring.update(pos, vel, target);
+        }
+
+        assert!(
+            (pos - target).abs() < 0.1,
+            "Should converge despite initial velocity"
+        );
+    }
+}
+
+// =============================================================================
+// bd-adw0: Property-based tests for spring physics
+// =============================================================================
+
+#[cfg(test)]
+mod property_tests {
+    use super::*;
+    use proptest::prelude::*;
+
+    /// Estimate sufficient simulation frames for a damped spring to converge.
+    ///
+    /// For under-damped/critical: τ = 1/(ω·ζ), need ~10τ (oscillations slow settling)
+    /// For over-damped: τ_slow = 1/(ω·(ζ - √(ζ²-1))), need ~8τ (slow monotonic decay)
+    /// Frames = multiplier · τ · 60fps, clamped to [600, 18000].
+    fn convergence_frames(angular_freq: f64, damping_ratio: f64) -> usize {
+        let (tau, multiplier) = if damping_ratio > 1.0 {
+            // Over-damped: slow mode dominates
+            let discriminant = (damping_ratio * damping_ratio - 1.0).sqrt();
+            (1.0 / (angular_freq * (damping_ratio - discriminant)), 8.0)
+        } else {
+            // Under-damped or critical: envelope decay
+            // Low damping needs more multiples due to oscillation
+            (1.0 / (angular_freq * damping_ratio.max(0.01)), 10.0)
+        };
+        #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+        { (tau * multiplier * 60.0) as usize }.clamp(600, 18000)
+    }
+
+    // -------------------------------------------------------------------------
+    // Stability: No NaN or Inf values for any input
+    // -------------------------------------------------------------------------
+
+    proptest! {
+        #[test]
+        fn spring_update_never_produces_nan_or_inf(
+            delta_time in 0.0001f64..1.0,
+            angular_freq in 0.0f64..500.0,
+            damping_ratio in 0.0f64..50.0,
+            pos in -1e6f64..1e6,
+            vel in -1e6f64..1e6,
+            target in -1e6f64..1e6,
+        ) {
+            let spring = Spring::new(delta_time, angular_freq, damping_ratio);
+            let (new_pos, new_vel) = spring.update(pos, vel, target);
+
+            prop_assert!(!new_pos.is_nan(), "position was NaN for dt={delta_time}, af={angular_freq}, dr={damping_ratio}, pos={pos}, vel={vel}, target={target}");
+            prop_assert!(!new_pos.is_infinite(), "position was Inf for dt={delta_time}, af={angular_freq}, dr={damping_ratio}, pos={pos}, vel={vel}, target={target}");
+            prop_assert!(!new_vel.is_nan(), "velocity was NaN for dt={delta_time}, af={angular_freq}, dr={damping_ratio}, pos={pos}, vel={vel}, target={target}");
+            prop_assert!(!new_vel.is_infinite(), "velocity was Inf for dt={delta_time}, af={angular_freq}, dr={damping_ratio}, pos={pos}, vel={vel}, target={target}");
+        }
+
+        #[test]
+        fn spring_multi_frame_never_produces_nan_or_inf(
+            angular_freq in 0.1f64..100.0,
+            damping_ratio in 0.01f64..10.0,
+            target in -1000.0f64..1000.0,
+        ) {
+            let spring = Spring::new(fps(60), angular_freq, damping_ratio);
+            let mut pos = 0.0;
+            let mut vel = 0.0;
+
+            for _ in 0..600 {
+                (pos, vel) = spring.update(pos, vel, target);
+                prop_assert!(!pos.is_nan(), "position became NaN during simulation");
+                prop_assert!(!pos.is_infinite(), "position became Inf during simulation");
+                prop_assert!(!vel.is_nan(), "velocity became NaN during simulation");
+                prop_assert!(!vel.is_infinite(), "velocity became Inf during simulation");
+            }
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Convergence: for any (stiffness > 0, damping > 0), animation converges
+    // -------------------------------------------------------------------------
+
+    proptest! {
+        #[test]
+        fn damped_spring_converges_to_target(
+            angular_freq in 1.0f64..50.0,
+            damping_ratio in 0.2f64..10.0,
+            target in -500.0f64..500.0,
+        ) {
+            let spring = Spring::new(fps(60), angular_freq, damping_ratio);
+            let mut pos = 0.0;
+            let mut vel = 0.0;
+
+            let frames = convergence_frames(angular_freq, damping_ratio);
+
+            for _ in 0..frames {
+                (pos, vel) = spring.update(pos, vel, target);
+            }
+
+            let error = (pos - target).abs();
+            // Use relative + absolute tolerance: max(1.0, 0.5% of target magnitude)
+            let tolerance = 1.0f64.max(target.abs() * 0.005);
+            prop_assert!(
+                error < tolerance,
+                "Spring did not converge: pos={pos}, target={target}, error={error}, tol={tolerance}, af={angular_freq}, dr={damping_ratio}, frames={frames}"
+            );
+        }
+
+        #[test]
+        fn spring_final_velocity_near_zero(
+            angular_freq in 1.0f64..50.0,
+            damping_ratio in 0.2f64..10.0,
+            target in -500.0f64..500.0,
+        ) {
+            let spring = Spring::new(fps(60), angular_freq, damping_ratio);
+            let mut pos = 0.0;
+            let mut vel = 0.0;
+
+            let frames = convergence_frames(angular_freq, damping_ratio);
+
+            for _ in 0..frames {
+                (pos, vel) = spring.update(pos, vel, target);
+            }
+
+            // Velocity tolerance scales with target distance (larger moves → larger residuals)
+            let tolerance = 1.0f64.max(target.abs() * 0.005);
+            prop_assert!(
+                vel.abs() < tolerance,
+                "Velocity did not decay: vel={vel}, tol={tolerance}, af={angular_freq}, dr={damping_ratio}, frames={frames}"
+            );
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Physical correctness
+    // -------------------------------------------------------------------------
+
+    proptest! {
+        #[test]
+        fn higher_stiffness_means_faster_initial_response(
+            low_freq in 1.0f64..10.0,
+            high_freq_add in 10.0f64..90.0,
+        ) {
+            let high_freq = low_freq + high_freq_add;
+            let damping = 1.0; // Critical damping for fair comparison
+            let target = 100.0;
+
+            let spring_low = Spring::new(fps(60), low_freq, damping);
+            let spring_high = Spring::new(fps(60), high_freq, damping);
+
+            let (pos_low, _) = spring_low.update(0.0, 0.0, target);
+            let (pos_high, _) = spring_high.update(0.0, 0.0, target);
+
+            // Higher stiffness should move further toward target in first frame
+            prop_assert!(
+                pos_high >= pos_low,
+                "Higher stiffness should respond faster: pos_high={pos_high}, pos_low={pos_low}"
+            );
+        }
+
+        #[test]
+        fn over_damped_does_not_overshoot(
+            angular_freq in 1.0f64..50.0,
+            damping_excess in 0.5f64..10.0,
+            target in 1.0f64..1000.0,
+        ) {
+            let damping_ratio = 1.0 + damping_excess; // Always > 1 (over-damped)
+            let spring = Spring::new(fps(60), angular_freq, damping_ratio);
+            let mut pos = 0.0;
+            let mut vel = 0.0;
+
+            for _ in 0..600 {
+                (pos, vel) = spring.update(pos, vel, target);
+                // Over-damped starting from 0 toward positive target should never exceed target
+                prop_assert!(
+                    pos <= target + 0.01,
+                    "Over-damped spring overshot: pos={pos}, target={target}, af={angular_freq}, dr={damping_ratio}"
+                );
+            }
+        }
+
+        #[test]
+        fn under_damped_oscillates(
+            angular_freq in 5.0f64..50.0,
+            damping_ratio in 0.01f64..0.3,
+        ) {
+            let spring = Spring::new(fps(60), angular_freq, damping_ratio);
+            let target = 100.0;
+            let mut pos = 0.0;
+            let mut vel = 0.0;
+            let mut overshot = false;
+
+            for _ in 0..300 {
+                (pos, vel) = spring.update(pos, vel, target);
+                if pos > target {
+                    overshot = true;
+                    break;
+                }
+            }
+
+            prop_assert!(
+                overshot,
+                "Under-damped spring should overshoot: af={angular_freq}, dr={damping_ratio}"
+            );
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Equilibrium invariance
+    // -------------------------------------------------------------------------
+
+    proptest! {
+        #[test]
+        fn at_equilibrium_stays_at_equilibrium(
+            angular_freq in 0.1f64..100.0,
+            damping_ratio in 0.0f64..10.0,
+            target in -1000.0f64..1000.0,
+        ) {
+            let spring = Spring::new(fps(60), angular_freq, damping_ratio);
+            let (new_pos, new_vel) = spring.update(target, 0.0, target);
+
+            let pos_error = (new_pos - target).abs();
+            prop_assert!(
+                pos_error < 1e-10,
+                "Position drifted from equilibrium: error={pos_error}"
+            );
+            prop_assert!(
+                new_vel.abs() < 1e-10,
+                "Velocity non-zero at equilibrium: vel={new_vel}"
+            );
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Frame independence (approximate)
+    // -------------------------------------------------------------------------
+
+    proptest! {
+        #[test]
+        fn frame_independence_approximate(
+            angular_freq in 1.0f64..20.0,
+            damping_ratio in 0.1f64..5.0,
+            target in 10.0f64..500.0,
+        ) {
+            // Compare: 60 frames at fps(60) vs. 120 frames at fps(120)
+            // Both represent 1 second of simulation
+            let spring_60 = Spring::new(fps(60), angular_freq, damping_ratio);
+            let spring_120 = Spring::new(fps(120), angular_freq, damping_ratio);
+
+            let mut pos_60 = 0.0;
+            let mut vel_60 = 0.0;
+            for _ in 0..60 {
+                (pos_60, vel_60) = spring_60.update(pos_60, vel_60, target);
+            }
+
+            let mut pos_120 = 0.0;
+            let mut vel_120 = 0.0;
+            for _ in 0..120 {
+                (pos_120, vel_120) = spring_120.update(pos_120, vel_120, target);
+            }
+
+            // Results should be similar (not exact due to discretization)
+            let pos_diff = (pos_60 - pos_120).abs();
+            let tolerance = target.abs() * 0.05; // 5% tolerance
+            prop_assert!(
+                pos_diff < tolerance,
+                "Frame rate independence violated: pos@60fps={pos_60}, pos@120fps={pos_120}, diff={pos_diff}, tol={tolerance}"
+            );
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Edge cases: zero/negative inputs clamped correctly
+    // -------------------------------------------------------------------------
+
+    proptest! {
+        #[test]
+        fn negative_angular_freq_acts_as_identity(
+            neg_freq in -100.0f64..0.0,
+            damping in 0.0f64..10.0,
+            pos in -1000.0f64..1000.0,
+            vel in -1000.0f64..1000.0,
+            target in -1000.0f64..1000.0,
+        ) {
+            let spring = Spring::new(fps(60), neg_freq, damping);
+            let (new_pos, new_vel) = spring.update(pos, vel, target);
+
+            // Negative freq is clamped to 0, which returns identity coefficients
+            let pos_error = (new_pos - pos).abs();
+            let vel_error = (new_vel - vel).abs();
+            prop_assert!(pos_error < 1e-10, "Identity spring changed position: {new_pos} != {pos}");
+            prop_assert!(vel_error < 1e-10, "Identity spring changed velocity: {new_vel} != {vel}");
+        }
+
+        #[test]
+        fn zero_delta_time_identity(
+            angular_freq in 0.1f64..100.0,
+            damping_ratio in 0.0f64..10.0,
+            pos in -1000.0f64..1000.0,
+            vel in -1000.0f64..1000.0,
+            target in -1000.0f64..1000.0,
+        ) {
+            let spring = Spring::new(0.0, angular_freq, damping_ratio);
+            let (new_pos, new_vel) = spring.update(pos, vel, target);
+
+            // With zero delta_time, exp(0) = 1, so coefficients should
+            // keep position and velocity close to unchanged
+            prop_assert!(!new_pos.is_nan(), "NaN with zero delta time");
+            prop_assert!(!new_vel.is_nan(), "NaN velocity with zero delta time");
+        }
+    }
+}

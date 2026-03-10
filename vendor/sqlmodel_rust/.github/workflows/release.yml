@@ -1,0 +1,287 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to release (e.g., v0.1.0)'
+        required: true
+        type: string
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false  # Never cancel releases
+
+env:
+  CARGO_TERM_COLOR: always
+
+permissions:
+  contents: write
+  id-token: write  # For SLSA provenance
+
+jobs:
+  validate:
+    name: Validate Release
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+
+      - name: Clone asupersync dependency
+        run: |
+          cd ..
+          git clone https://github.com/Dicklesworthstone/asupersync.git asupersync || true
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache cargo registry and build
+        uses: Swatinem/rust-cache@v2
+
+      - name: Run full validation
+        run: |
+          cargo fmt --all -- --check
+          cargo clippy --workspace --all-targets -- -D warnings
+          cargo test --workspace
+
+  publish:
+    name: Publish to crates.io
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    if: ${{ (startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch') && !contains(github.ref, '-') && !contains(github.event.inputs.tag, '-') }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@nightly
+
+      - name: Cache cargo registry and build
+        uses: Swatinem/rust-cache@v2
+
+      - name: Publish workspace crates
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        run: |
+          if [ -z "${CARGO_REGISTRY_TOKEN}" ]; then
+            echo "CARGO_REGISTRY_TOKEN is not set. Skipping publish."
+            exit 0
+          fi
+
+          crates=(sqlmodel-core sqlmodel-macros sqlmodel-query sqlmodel-schema sqlmodel-session sqlmodel-pool sqlmodel-console sqlmodel-postgres sqlmodel-mysql sqlmodel-sqlite sqlmodel)
+          for crate in "${crates[@]}"; do
+            echo "=== Publishing ${crate} ==="
+            while true; do
+              out=$(cargo publish -p "${crate}" 2>&1)
+              status=$?
+              echo "${out}"
+              if [ ${status} -eq 0 ]; then
+                echo "=== Published ${crate} ==="
+                break
+              fi
+              retry=$(echo "${out}" | sed -n "s/.*Please try again after \\(.*\\) GMT.*/\\1/p" | head -n1)
+              if [ -n "${retry}" ]; then
+                target=$(date -u -d "${retry} GMT" +%s)
+                now=$(date -u +%s)
+                wait=$((target-now+5))
+                if [ ${wait} -lt 5 ]; then wait=5; fi
+                echo "Rate limited. Sleeping ${wait}s until $(date -u -d "@$((${now}+${wait}))" +"%Y-%m-%dT%H:%M:%SZ")"
+                sleep ${wait}
+                continue
+              fi
+              echo "Publish failed without rate-limit. Aborting."
+              exit ${status}
+            done
+          done
+
+  build:
+    name: Build (${{ matrix.target }})
+    needs: validate
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+            artifact_name: sqlmodel_rust-linux-x64
+          - target: aarch64-unknown-linux-gnu
+            os: ubuntu-latest
+            artifact_name: sqlmodel_rust-linux-arm64
+            cross: true
+          - target: x86_64-apple-darwin
+            os: macos-13
+            artifact_name: sqlmodel_rust-macos-x64
+          - target: aarch64-apple-darwin
+            os: macos-14
+            artifact_name: sqlmodel_rust-macos-arm64
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
+            artifact_name: sqlmodel_rust-windows-x64
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+
+      - name: Clone asupersync dependency (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          cd ..
+          git clone https://github.com/Dicklesworthstone/asupersync.git asupersync || true
+
+      - name: Clone asupersync dependency (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          cd ..
+          git clone https://github.com/Dicklesworthstone/asupersync.git asupersync 2>$null
+          if (-not $?) { Write-Host "asupersync already exists or clone failed" }
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@nightly
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Install cross-compilation tools (Linux ARM64)
+        if: matrix.cross
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu
+
+      - name: Cache cargo registry and build
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: release-${{ matrix.target }}
+
+      - name: Build release
+        run: cargo build --workspace --release --target ${{ matrix.target }}
+        env:
+          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: ${{ matrix.cross && 'aarch64-linux-gnu-gcc' || '' }}
+
+      - name: Prepare artifact (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          mkdir -p dist
+          tar -czvf "dist/${{ matrix.artifact_name }}.tar.gz" -C "target/${{ matrix.target }}/release" \
+            --exclude='*.d' \
+            --exclude='build' \
+            --exclude='deps' \
+            --exclude='examples' \
+            --exclude='incremental' \
+            --exclude='.fingerprint' \
+            --exclude='.cargo-lock' \
+            . 2>/dev/null || true
+
+      - name: Prepare artifact (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist
+          $releaseDir = "target/${{ matrix.target }}/release"
+          $files = Get-ChildItem -Path $releaseDir -File | Where-Object { $_.Extension -notmatch '\.d$' -and $_.Extension -ne '' }
+          if ($files) {
+            Compress-Archive -Path $files.FullName -DestinationPath "dist/${{ matrix.artifact_name }}.zip" -Force
+          }
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: dist/*
+          if-no-files-found: warn
+
+  release:
+    name: Create Release
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Prepare release assets
+        run: |
+          mkdir -p release
+          find artifacts -type f \( -name "*.tar.gz" -o -name "*.zip" \) -exec mv {} release/ \;
+          ls -la release/
+
+      - name: Generate checksums
+        run: |
+          cd release
+          if ls * 1> /dev/null 2>&1; then
+            sha256sum * > SHA256SUMS.txt
+            cat SHA256SUMS.txt
+          else
+            echo "No release files found"
+          fi
+
+      - name: Extract version from tag
+        id: version
+        run: |
+          if [ -n "${{ github.event.inputs.tag }}" ]; then
+            echo "VERSION=${{ github.event.inputs.tag }}" >> $GITHUB_OUTPUT
+          else
+            echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Generate release notes
+        id: notes
+        run: |
+          cat << 'EOF' > release/RELEASE_NOTES.md
+          ## SQLModel Rust ${{ steps.version.outputs.VERSION }}
+
+          ### Installation
+
+          **Linux (x64)**:
+          ```bash
+          curl -LO https://github.com/sqlmodel/sqlmodel-rust/releases/download/${{ steps.version.outputs.VERSION }}/sqlmodel_rust-linux-x64.tar.gz
+          tar xzf sqlmodel_rust-linux-x64.tar.gz
+          ```
+
+          **macOS (Apple Silicon)**:
+          ```bash
+          curl -LO https://github.com/sqlmodel/sqlmodel-rust/releases/download/${{ steps.version.outputs.VERSION }}/sqlmodel_rust-macos-arm64.tar.gz
+          tar xzf sqlmodel_rust-macos-arm64.tar.gz
+          ```
+
+          **Windows**:
+          Download and extract `sqlmodel_rust-windows-x64.zip`
+
+          ### Verification
+
+          Verify checksums:
+          ```bash
+          sha256sum -c SHA256SUMS.txt
+          ```
+          EOF
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Release ${{ steps.version.outputs.VERSION }}
+          tag_name: ${{ steps.version.outputs.VERSION }}
+          draft: false
+          prerelease: ${{ contains(steps.version.outputs.VERSION, '-') }}
+          generate_release_notes: true
+          body_path: release/RELEASE_NOTES.md
+          files: |
+            release/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

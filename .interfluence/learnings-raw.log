@@ -1,0 +1,38 @@
+
+--- 2026-03-10T16:29:30Z | Cargo.toml | CONTEXT:unknown ---
+OLD: # ---------------------------------------------------------------------------
+# Local development with sibling crates
+# ---------------------------------------------------------------------------
+# This project depends on published crates.io versions of asupersync,
+# rich_rust, charmed-*, and sqlmodel-*. CI builds verify this (no sibling
+# repos are checked out).
+#
+# To develop against LOCAL checkouts of these crates, uncomment the
+[patch.crates-io] section below. Cargo will use the local paths when they
+# satisfy the version requirement and fall back to crates.io otherwise.
+#
+# IMPORTANT: Do NOT commit this section. To prevent accidental commits:
+#   git update-index --skip-worktree Cargo.toml
+# To re-enable tracking:
+#   git update-index --no-skip-worktree Cargo.toml
+#
+[patch.crates-io]
+NEW: # ---------------------------------------------------------------------------
+# Vendored dependencies
+# ---------------------------------------------------------------------------
+# Skaffen vendors custom crates from pi_agent_rust's author into vendor/.
+#
+[patch.crates-io]
+
+--- 2026-03-10T16:29:43Z | Cargo.toml | CONTEXT:unknown ---
+OLD:     "legacy_pi_mono_code/pi-mono/packages/ai/src/models.generated.ts",
+    "Cargo.toml",
+NEW:     "Cargo.toml",
+
+--- 2026-03-10T16:30:37Z | Cargo.toml | CONTEXT:unknown ---
+OLD: version = "=0.2.5", default-features = false, features = ["tls-native-roots", "sqlite"]
+NEW: version = "=0.2.7", default-features = false, features = ["tls-native-roots", "sqlite"]
+
+--- 2026-03-10T16:30:42Z | Cargo.toml | CONTEXT:unknown ---
+OLD: version = "=0.2.5", default-features = false, features = ["test-internals"]
+NEW: version = "=0.2.7", default-features = false, features = ["test-internals"]

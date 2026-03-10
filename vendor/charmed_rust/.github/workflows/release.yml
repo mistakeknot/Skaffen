@@ -1,0 +1,216 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Dry run (build only, no release)'
+        type: boolean
+        default: false
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false  # Never cancel releases
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  BINARY_NAME: glow
+
+jobs:
+  build:
+    name: Build (${{ matrix.target }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+            artifact_name: glow-linux-x64
+          - target: aarch64-unknown-linux-gnu
+            os: ubuntu-24.04-arm  # Native ARM runner (10x faster than QEMU)
+            artifact_name: glow-linux-arm64
+          - target: x86_64-apple-darwin
+            os: macos-15-intel
+            artifact_name: glow-macos-x64
+          - target: aarch64-apple-darwin
+            os: macos-14  # Apple Silicon native
+            artifact_name: glow-macos-arm64
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
+            artifact_name: glow-windows-x64
+
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@nightly
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Cache cargo registry and build
+        uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
+        with:
+          key: release-${{ matrix.target }}-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Build release binary
+        run: cargo build --release --package charmed-glow --target ${{ matrix.target }} --locked
+
+      - name: Prepare artifact (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          mkdir -p dist
+          cp target/${{ matrix.target }}/release/${{ env.BINARY_NAME }} dist/${{ matrix.artifact_name }}
+          chmod +x dist/${{ matrix.artifact_name }}
+
+      - name: Prepare artifact (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist
+          Copy-Item "target/${{ matrix.target }}/release/${{ env.BINARY_NAME }}.exe" "dist/${{ matrix.artifact_name }}.exe"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: dist/*
+          if-no-files-found: error
+
+  release:
+    name: Create Release
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    if: ${{ !inputs.dry_run }}
+    permissions:
+      contents: write
+      id-token: write  # For SLSA provenance attestation
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          path: artifacts
+
+      - name: Prepare release assets
+        run: |
+          mkdir -p release
+          find artifacts -type f -exec mv {} release/ \;
+          ls -la release/
+
+      - name: Generate checksums
+        run: |
+          cd release
+          sha256sum ./* > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+      - name: Extract version from tag
+        id: version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
+
+      - name: Generate SBOM
+        uses: anchore/sbom-action@28d71544de8eaf1b958d335707167c5f783590ad # v0.22.2
+        with:
+          path: release/
+          output-file: release/sbom.spdx.json
+
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@96278af6caaf10aea03fd8d33a09a777ca52d62f # v3.2.0
+        with:
+          subject-path: release/*
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@a06a81a03ee405af7f2048a818ed3f03bbf83c7b # v2.5.0
+        with:
+          name: Release ${{ steps.version.outputs.VERSION }}
+          draft: false
+          prerelease: ${{ contains(github.ref, '-') }}
+          generate_release_notes: true
+          files: |
+            release/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  publish-crates:
+    name: Publish to crates.io
+    needs: release
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    if: ${{ !inputs.dry_run && !contains(github.ref, '-') }}  # Skip pre-releases
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@nightly
+
+      - name: Cache cargo registry
+        uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
+        with:
+          key: publish
+
+      - name: Publish crates to crates.io
+        if: ${{ env.CARGO_REGISTRY_TOKEN != '' }}
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        run: |
+          set -e
+          # Publish crates in dependency order with delay between publishes
+          # to allow crates.io index to update
+
+          echo "Publishing charmed-harmonica..."
+          cargo publish -p charmed-harmonica --allow-dirty --locked || true
+          sleep 30
+
+          echo "Publishing charmed-lipgloss..."
+          cargo publish -p charmed-lipgloss --allow-dirty --locked || true
+          sleep 30
+
+          echo "Publishing charmed-log..."
+          cargo publish -p charmed-log --allow-dirty --locked || true
+          sleep 30
+
+          echo "Publishing charmed-bubbletea-macros..."
+          cargo publish -p charmed-bubbletea-macros --allow-dirty --locked || true
+          sleep 30
+
+          echo "Publishing charmed-bubbletea..."
+          cargo publish -p charmed-bubbletea --allow-dirty --locked || true
+          sleep 30
+
+          echo "Publishing charmed-glamour..."
+          cargo publish -p charmed-glamour --allow-dirty --locked || true
+          sleep 30
+
+          echo "Publishing charmed-bubbles..."
+          cargo publish -p charmed-bubbles --allow-dirty --locked || true
+          sleep 30
+
+          echo "Publishing charmed-huh..."
+          cargo publish -p charmed-huh --allow-dirty --locked || true
+          sleep 30
+
+          echo "Publishing charmed-wish..."
+          cargo publish -p charmed-wish --allow-dirty --locked || true
+          sleep 30
+
+          echo "Publishing charmed-wasm..."
+          cargo publish -p charmed-wasm --allow-dirty --locked || true
+          sleep 30
+
+          echo "Publishing charmed-glow..."
+          cargo publish -p charmed-glow --allow-dirty --locked || true
+          sleep 30
+
+          echo "Publishing charmed-demo-showcase..."
+          cargo publish -p charmed-demo-showcase --allow-dirty --locked || true
+
+          echo "All crates published successfully!"

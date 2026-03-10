@@ -1,0 +1,61 @@
+{
+  "name": "@asupersync/browser-core",
+  "version": "0.2.7",
+  "description": "Low-level Browser Edition runtime bindings for Asupersync.",
+  "homepage": "https://github.com/Dicklesworthstone/asupersync#readme",
+  "bugs": {
+    "url": "https://github.com/Dicklesworthstone/asupersync/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Dicklesworthstone/asupersync.git",
+    "directory": "packages/browser-core"
+  },
+  "type": "module",
+  "main": "./index.js",
+  "module": "./index.js",
+  "types": "./index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "import": "./index.js",
+      "default": "./index.js"
+    },
+    "./types": {
+      "types": "./types.d.ts",
+      "import": "./index.js",
+      "default": "./index.js"
+    },
+    "./asupersync.js": "./asupersync.js",
+    "./asupersync_bg.wasm": "./asupersync_bg.wasm",
+    "./abi-metadata.json": "./abi-metadata.json",
+    "./debug-metadata.json": "./debug-metadata.json",
+    "./asupersync.js.map": "./asupersync.js.map",
+    "./asupersync_bg.wasm.map": "./asupersync_bg.wasm.map"
+  },
+  "files": [
+    "index.js",
+    "index.d.ts",
+    "asupersync.js",
+    "asupersync.d.ts",
+    "types.d.ts",
+    "asupersync.js.map",
+    "asupersync_bg.wasm",
+    "asupersync_bg.wasm.d.ts",
+    "asupersync_bg.wasm.map",
+    "abi-metadata.json",
+    "debug-metadata.json",
+    "README.md"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "sideEffects": false,
+  "keywords": [
+    "asupersync",
+    "browser",
+    "runtime",
+    "structured-concurrency",
+    "wasm"
+  ]
+}

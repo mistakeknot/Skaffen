@@ -1,0 +1,48 @@
+[package]
+name = "charmed-glow"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+authors.workspace = true
+readme = "README.md"
+documentation = "https://docs.rs/charmed-glow"
+description = "Render markdown on the command line with style"
+keywords = ["markdown", "terminal", "tui", "cli", "reader"]
+categories = ["command-line-interface"]
+
+[lib]
+name = "glow"
+
+[[bin]]
+name = "glow"
+path = "src/main.rs"
+
+[features]
+default = ["syntax-highlighting"]
+syntax-highlighting = ["glamour/syntax-highlighting"]
+github = ["dep:reqwest", "dep:serde", "dep:serde_json", "dep:directories"]
+
+[dependencies]
+glamour = { workspace = true }
+bubbletea = { workspace = true }
+lipgloss = { workspace = true }
+bubbles = { workspace = true }
+clap = { version = "4.4", features = ["derive"] }
+thiserror.workspace = true
+unicode-width.workspace = true
+
+# GitHub feature dependencies
+reqwest = { version = "0.11", features = ["json", "blocking"], optional = true }
+serde = { version = "1.0", features = ["derive"], optional = true }
+serde_json = { version = "1.0", optional = true }
+directories = { version = "5.0", optional = true }
+
+[dev-dependencies]
+tempfile = "3.10"
+assert_cmd = "2.0"
+predicates = "3.1"
+
+[lints]
+workspace = true

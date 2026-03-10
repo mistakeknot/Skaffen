@@ -1,0 +1,67 @@
+[package]
+name = "charmed-lipgloss"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+authors.workspace = true
+readme = "README.md"
+documentation = "https://docs.rs/charmed-lipgloss"
+description = "Style definitions for terminal applications with support for colors, borders, and layout"
+keywords = ["tui", "terminal", "style", "ansi", "css"]
+categories = ["command-line-interface", "text-processing"]
+
+[lib]
+name = "lipgloss"
+
+[dependencies]
+# Core dependencies (always included)
+unicode-width.workspace = true
+unicode-segmentation.workspace = true
+bitflags = "2.4"
+serde = { workspace = true }
+serde_json = { workspace = true }
+toml = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+
+# Optional dependencies
+serde_yaml = { workspace = true, optional = true }
+tokio = { workspace = true, optional = true, features = ["sync"] }
+
+# Native-only dependencies (not needed for WASM)
+crossterm = { version = "0.29", optional = true }
+colored = { version = "3.0", optional = true }
+
+# WASM-only dependencies
+wasm-bindgen = { version = "0.2", optional = true }
+console_error_panic_hook = { version = "0.1", optional = true }
+js-sys = { version = "0.3", optional = true }
+
+[dev-dependencies]
+criterion.workspace = true
+proptest.workspace = true
+
+[[bench]]
+name = "lipgloss_benchmarks"
+harness = false
+
+[lints]
+workspace = true
+
+[features]
+# Default includes native terminal support
+default = ["native"]
+
+# Native terminal support (crossterm, colored, env vars, file I/O)
+native = ["dep:crossterm", "dep:colored"]
+
+# YAML serialization support
+yaml = ["serde_yaml"]
+
+# Async support with tokio
+tokio = ["dep:tokio"]
+
+# WebAssembly support with wasm-bindgen
+wasm = ["dep:wasm-bindgen", "dep:console_error_panic_hook", "dep:js-sys"]

@@ -1,0 +1,2806 @@
+//! Main application model and routing.
+//!
+//! The `App` struct is the top-level model that handles:
+//! - Global state (theme, toggles, current page)
+//! - Message routing to page models
+//! - App chrome rendering (header, sidebar, footer)
+
+use bubbletea::{
+    BlurMsg, Cmd, FocusMsg, KeyMsg, KeyType, Message, Model, WindowSizeMsg, batch, println, quit,
+    set_window_title,
+};
+use lipgloss::{Position, Style};
+
+use crate::components::{
+    CommandPalette, GuidedTour, NotesModal, NotesModalMsg, Sidebar, SidebarFocus, StatusLevel,
+    banner, key_hint,
+};
+use crate::config::Config;
+use crate::data::animation::Animator;
+use crate::keymap::{HELP_SECTIONS, help_total_lines};
+use crate::messages::{
+    AppMsg, ExportFormat, ExportMsg, Notification, NotificationMsg, Page, ShellOutMsg, WizardMsg,
+};
+use crate::pages::Pages;
+use crate::shell_action::{generate_diagnostics, open_diagnostics_in_pager};
+use crate::theme::{Theme, ThemePreset, spacing};
+use std::fmt::Write as _;
+
+/// Convert ANSI-styled terminal output to HTML with inline styles.
+///
+/// This function parses ANSI escape codes and converts them to HTML spans
+/// with appropriate CSS styling, preserving colors and text attributes.
+#[allow(clippy::too_many_lines, clippy::similar_names, clippy::collapsible_if)]
+#[must_use]
+pub fn ansi_to_html(input: &str) -> String {
+    let mut html = String::with_capacity(input.len() * 2);
+    html.push_str("<!DOCTYPE html>\n<html>\n<head>\n");
+    html.push_str("<meta charset=\"utf-8\">\n");
+    html.push_str("<title>Demo Showcase Export</title>\n");
+    html.push_str("<style>\n");
+    html.push_str("body { background: #1a1a2e; color: #eaeaea; font-family: 'Monaco', 'Menlo', 'Consolas', monospace; font-size: 14px; line-height: 1.4; padding: 20px; white-space: pre; }\n");
+    html.push_str(".bold { font-weight: bold; }\n");
+    html.push_str(".italic { font-style: italic; }\n");
+    html.push_str(".underline { text-decoration: underline; }\n");
+    html.push_str(".dim { opacity: 0.6; }\n");
+    html.push_str(".strikethrough { text-decoration: line-through; }\n");
+    html.push_str("</style>\n</head>\n<body>\n");
+
+    let mut in_escape = false;
+    let mut in_csi = false;
+    let mut escape_buf = String::new();
+    let mut current_styles: Vec<&str> = Vec::new();
+    let mut current_fg: Option<String> = None;
+    let mut current_bg: Option<String> = None;
+
+    for c in input.chars() {
+        if c == '\x1b' {
+            in_escape = true;
+            in_csi = false;
+            escape_buf.clear();
+            continue;
+        }
+
+        if in_escape {
+            if c == '[' && !in_csi {
+                in_csi = true;
+                escape_buf.push(c);
+                continue;
+            }
+            escape_buf.push(c);
+            // CSI sequences end with a byte in 0x40-0x7E ('@' through '~')
+            // Only process SGR sequences (ending in 'm') for styling
+            if in_csi && ('@'..='~').contains(&c) {
+                if c == 'm' {
+                    // Parse the escape sequence
+                    let seq = escape_buf.trim_start_matches('[').trim_end_matches('m');
+                    for code in seq.split(';') {
+                        match code {
+                            "0" => {
+                                // Reset
+                                if !current_styles.is_empty()
+                                    || current_fg.is_some()
+                                    || current_bg.is_some()
+                                {
+                                    html.push_str("</span>");
+                                }
+                                current_styles.clear();
+                                current_fg = None;
+                                current_bg = None;
+                            }
+                            "1" => current_styles.push("bold"),
+                            "2" => current_styles.push("dim"),
+                            "3" => current_styles.push("italic"),
+                            "4" => current_styles.push("underline"),
+                            "9" => current_styles.push("strikethrough"),
+                            // Basic foreground colors (30-37)
+                            "30" => current_fg = Some("#000000".to_string()),
+                            "31" => current_fg = Some("#cc0000".to_string()),
+                            "32" => current_fg = Some("#00cc00".to_string()),
+                            "33" => current_fg = Some("#cccc00".to_string()),
+                            "34" => current_fg = Some("#0000cc".to_string()),
+                            "35" => current_fg = Some("#cc00cc".to_string()),
+                            "36" => current_fg = Some("#00cccc".to_string()),
+                            "37" => current_fg = Some("#cccccc".to_string()),
+                            // Bright foreground colors (90-97)
+                            "90" => current_fg = Some("#666666".to_string()),
+                            "91" => current_fg = Some("#ff0000".to_string()),
+                            "92" => current_fg = Some("#00ff00".to_string()),
+                            "93" => current_fg = Some("#ffff00".to_string()),
+                            "94" => current_fg = Some("#0000ff".to_string()),
+                            "95" => current_fg = Some("#ff00ff".to_string()),
+                            "96" => current_fg = Some("#00ffff".to_string()),
+                            "97" => current_fg = Some("#ffffff".to_string()),
+                            // Basic background colors (40-47)
+                            "40" => current_bg = Some("#000000".to_string()),
+                            "41" => current_bg = Some("#cc0000".to_string()),
+                            "42" => current_bg = Some("#00cc00".to_string()),
+                            "43" => current_bg = Some("#cccc00".to_string()),
+                            "44" => current_bg = Some("#0000cc".to_string()),
+                            "45" => current_bg = Some("#cc00cc".to_string()),
+                            "46" => current_bg = Some("#00cccc".to_string()),
+                            "47" => current_bg = Some("#cccccc".to_string()),
+                            // 256-color and RGB handled via 38;5;N or 38;2;R;G;B
+                            _ => {
+                                // Handle 256-color: 38;5;N or 48;5;N
+                                if let Some(rest) = seq.strip_prefix("38;5;") {
+                                    if let Ok(n) = rest.parse::<u8>() {
+                                        current_fg = Some(ansi256_to_hex(n));
+                                    }
+                                } else if let Some(rest) = seq.strip_prefix("48;5;") {
+                                    if let Ok(n) = rest.parse::<u8>() {
+                                        current_bg = Some(ansi256_to_hex(n));
+                                    }
+                                }
+                                // Handle RGB: 38;2;R;G;B or 48;2;R;G;B
+                                else if let Some(rest) = seq.strip_prefix("38;2;") {
+                                    let parts: Vec<&str> = rest.split(';').collect();
+                                    if parts.len() == 3 {
+                                        if let (Ok(r), Ok(g), Ok(b)) = (
+                                            parts[0].parse::<u8>(),
+                                            parts[1].parse::<u8>(),
+                                            parts[2].parse::<u8>(),
+                                        ) {
+                                            current_fg = Some(format!("#{r:02x}{g:02x}{b:02x}"));
+                                        }
+                                    }
+                                } else if let Some(rest) = seq.strip_prefix("48;2;") {
+                                    let parts: Vec<&str> = rest.split(';').collect();
+                                    if parts.len() == 3 {
+                                        if let (Ok(r), Ok(g), Ok(b)) = (
+                                            parts[0].parse::<u8>(),
+                                            parts[1].parse::<u8>(),
+                                            parts[2].parse::<u8>(),
+                                        ) {
+                                            current_bg = Some(format!("#{r:02x}{g:02x}{b:02x}"));
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Open a new span if we have styles
+                    if !current_styles.is_empty() || current_fg.is_some() || current_bg.is_some() {
+                        html.push_str("<span");
+                        let mut style_parts = Vec::new();
+                        if let Some(ref fg) = current_fg {
+                            style_parts.push(format!("color:{fg}"));
+                        }
+                        if let Some(ref bg) = current_bg {
+                            style_parts.push(format!("background:{bg}"));
+                        }
+                        if !style_parts.is_empty() {
+                            let _ = write!(html, " style=\"{}\"", style_parts.join(";"));
+                        }
+                        if !current_styles.is_empty() {
+                            let _ = write!(html, " class=\"{}\"", current_styles.join(" "));
+                        }
+                        html.push('>');
+                    }
+                }
+                // Reset escape state for any CSI terminator (not just 'm')
+                in_escape = false;
+                in_csi = false;
+            } else if !in_csi {
+                // Non-CSI escape sequence (e.g., ESC M, ESC D, ESC 7, etc.)
+                // These are single-character sequences, so exit escape mode
+                in_escape = false;
+            }
+            continue;
+        }
+
+        // Escape HTML special characters
+        match c {
+            '&' => html.push_str("&amp;"),
+            '<' => html.push_str("&lt;"),
+            '>' => html.push_str("&gt;"),
+            '"' => html.push_str("&quot;"),
+            '\n' => html.push('\n'),
+            _ => html.push(c),
+        }
+    }
+
+    // Close any remaining span
+    if !current_styles.is_empty() || current_fg.is_some() || current_bg.is_some() {
+        html.push_str("</span>");
+    }
+
+    html.push_str("\n</body>\n</html>");
+    html
+}
+
+/// Convert ANSI 256-color index to hex color.
+fn ansi256_to_hex(n: u8) -> String {
+    match n {
+        // Standard colors (0-15)
+        0 => "#000000".to_string(),
+        1 => "#800000".to_string(),
+        2 => "#008000".to_string(),
+        3 => "#808000".to_string(),
+        4 => "#000080".to_string(),
+        5 => "#800080".to_string(),
+        6 => "#008080".to_string(),
+        7 => "#c0c0c0".to_string(),
+        8 => "#808080".to_string(),
+        9 => "#ff0000".to_string(),
+        10 => "#00ff00".to_string(),
+        11 => "#ffff00".to_string(),
+        12 => "#0000ff".to_string(),
+        13 => "#ff00ff".to_string(),
+        14 => "#00ffff".to_string(),
+        15 => "#ffffff".to_string(),
+        // 216 colors (16-231)
+        16..=231 => {
+            let n = n - 16;
+            let r = (n / 36) * 51;
+            let g = ((n % 36) / 6) * 51;
+            let b = (n % 6) * 51;
+            format!("#{r:02x}{g:02x}{b:02x}")
+        }
+        // Grayscale (232-255)
+        232..=255 => {
+            let gray = (n - 232) * 10 + 8;
+            format!("#{gray:02x}{gray:02x}{gray:02x}")
+        }
+    }
+}
+
+/// Strip ANSI escape codes from a string.
+///
+/// Handles all CSI (Control Sequence Introducer) sequences, not just SGR codes.
+/// CSI sequences start with ESC [ and end with a byte in the range 0x40-0x7E
+/// (characters '@' through '~'), which includes 'm' for SGR, 'H' for cursor
+/// positioning, 'J' for erase display, etc.
+#[must_use]
+pub fn strip_ansi(input: &str) -> String {
+    let mut result = String::with_capacity(input.len());
+    let mut in_escape = false;
+    let mut in_csi = false;
+    let mut in_str = false;
+    let mut chars = input.chars().peekable();
+
+    while let Some(c) = chars.next() {
+        if in_str {
+            // String-type escape sequences (OSC/DCS/SOS/PM/APC) terminate with
+            // BEL (\x07) or ST (ESC \).
+            if c == '\x07' {
+                in_str = false;
+                in_escape = false;
+            } else if c == '\x1b' && chars.peek() == Some(&'\\') {
+                let _ = chars.next();
+                in_str = false;
+                in_escape = false;
+            }
+            continue;
+        }
+
+        if c == '\x1b' {
+            in_escape = true;
+            in_csi = false;
+            continue;
+        }
+        if in_escape {
+            if c == '[' {
+                in_csi = true;
+                continue;
+            }
+            if matches!(c, ']' | 'P' | 'X' | '^' | '_') {
+                in_str = true;
+                continue;
+            }
+            if in_csi {
+                // CSI sequences end with a byte in 0x40-0x7E ('@' through '~')
+                if ('@'..='~').contains(&c) {
+                    in_escape = false;
+                    in_csi = false;
+                }
+                continue;
+            }
+            // Non-CSI escape sequence (e.g., ESC followed by single char)
+            // After one character, exit escape mode
+            in_escape = false;
+            continue;
+        }
+        result.push(c);
+    }
+
+    result
+}
+
+/// Application configuration.
+///
+/// This struct holds runtime settings that can be toggled during the session.
+/// For animation settings, the canonical source of truth is [`App::use_animations()`].
+#[derive(Debug, Clone)]
+#[allow(dead_code)] // Fields will be used as features are implemented
+pub struct AppConfig {
+    /// Initial theme preset.
+    pub theme: ThemePreset,
+    /// Whether animations are enabled.
+    ///
+    /// This controls all motion in the app. When disabled:
+    /// - Transitions are instant
+    /// - Progress bars don't animate
+    /// - Spinners show static state
+    ///
+    /// Can be toggled at runtime via `AppMsg::ToggleAnimations`.
+    /// Query via [`App::use_animations()`].
+    pub animations: bool,
+    /// Whether mouse support is enabled.
+    pub mouse: bool,
+    /// Maximum render width in columns.
+    /// If Some, caps the layout width regardless of terminal size.
+    pub max_width: Option<u16>,
+}
+
+impl Default for AppConfig {
+    fn default() -> Self {
+        Self {
+            theme: ThemePreset::Dark,
+            animations: true,
+            mouse: false,
+            max_width: None,
+        }
+    }
+}
+
+/// Maximum number of notifications to display at once.
+const MAX_NOTIFICATIONS: usize = 3;
+
+/// Main application state.
+#[allow(clippy::struct_excessive_bools)]
+pub struct App {
+    /// Application configuration.
+    config: AppConfig,
+    /// Current theme.
+    theme: Theme,
+    /// Current page.
+    current_page: Page,
+    /// Page models.
+    pages: Pages,
+    /// Layout width (capped by `max_width` / auto-cap when terminal is very wide).
+    width: usize,
+    height: usize,
+    /// Whether the app is ready (received window size).
+    ready: bool,
+    /// Whether help overlay is shown.
+    show_help: bool,
+    /// Scroll offset for help overlay content.
+    help_scroll_offset: usize,
+    /// Whether sidebar is visible.
+    sidebar_visible: bool,
+    /// Sidebar component with navigation and filtering.
+    sidebar: Sidebar,
+    /// Active notifications (newest at end).
+    notifications: Vec<Notification>,
+    /// Counter for generating unique notification IDs.
+    next_notification_id: u64,
+    /// Seed used for deterministic data generation.
+    ///
+    /// This is stored so pages can access it for generating domain data.
+    /// The same seed produces the same demo data across sessions.
+    seed: u64,
+    /// Whether syntax highlighting is enabled.
+    syntax_enabled: bool,
+    /// Whether ASCII mode is forced (no colors, ASCII borders).
+    force_ascii: bool,
+    /// Whether running in headless mode (for shell-out safety).
+    is_headless: bool,
+    /// Whether the terminal has focus (bd-1fxl).
+    ///
+    /// When false, animations may be paused and a visual indicator is shown.
+    /// Defaults to true (focused) until a `BlurMsg` is received.
+    focused: bool,
+    /// Command palette for quick action access (bd-3mtt).
+    command_palette: CommandPalette,
+    /// Notes scratchpad modal (bd-1xvj).
+    notes_modal: NotesModal,
+    /// Guided tour walkthrough (bd-2eky).
+    guided_tour: GuidedTour,
+    /// Animation coordinator for UI transitions (bd-30md).
+    animator: Animator,
+}
+
+impl App {
+    /// Create a new application with default configuration.
+    #[must_use]
+    pub fn new() -> Self {
+        Self::with_config(AppConfig::default())
+    }
+
+    /// Create a new application with the given configuration.
+    #[must_use]
+    pub fn with_config(config: AppConfig) -> Self {
+        Self::with_config_and_seed(config, Self::generate_seed())
+    }
+
+    /// Create a new application with configuration and explicit seed.
+    #[must_use]
+    fn with_config_and_seed(config: AppConfig, seed: u64) -> Self {
+        Self::with_config_seed_and_headless(config, seed, false)
+    }
+
+    /// Create a new application with full initialization parameters.
+    #[must_use]
+    fn with_config_seed_and_headless(config: AppConfig, seed: u64, is_headless: bool) -> Self {
+        let theme = Theme::from_preset(config.theme);
+        let animations = config.animations;
+        Self {
+            config,
+            theme,
+            current_page: Page::Dashboard,
+            pages: Pages::default(),
+            width: 80,
+            height: 24,
+            ready: false,
+            show_help: false,
+            help_scroll_offset: 0,
+            sidebar_visible: true,
+            sidebar: Sidebar::new(),
+            notifications: Vec::new(),
+            next_notification_id: 1,
+            seed,
+            syntax_enabled: true,
+            force_ascii: false,
+            is_headless,
+            focused: true, // Default to focused until BlurMsg received (bd-1fxl)
+            command_palette: CommandPalette::new(),
+            notes_modal: NotesModal::new(),
+            guided_tour: GuidedTour::new(),
+            animator: Animator::new(animations),
+        }
+    }
+
+    /// Create a new application from the full runtime configuration.
+    ///
+    /// This is the **canonical bootstrap path** for creating an App instance.
+    /// It initializes all app state from the `Config` struct:
+    ///
+    /// - Theme preset from `config.theme_preset`
+    /// - Animation mode from `config.use_animations()`
+    /// - Mouse support from `config.mouse`
+    /// - Deterministic seed from `config.effective_seed()`
+    ///
+    /// All entrypoints (CLI, self-check, SSH) should use this method
+    /// to ensure consistent initialization.
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// use demo_showcase::config::Config;
+    /// use demo_showcase::app::App;
+    ///
+    /// let config = Config::from_cli(&cli);
+    /// let app = App::from_config(&config);
+    /// ```
+    #[must_use]
+    pub fn from_config(config: &Config) -> Self {
+        let app_config = AppConfig {
+            theme: config.theme_preset,
+            animations: config.use_animations(),
+            mouse: config.mouse,
+            max_width: config.max_width,
+        };
+        let seed = config.effective_seed();
+        let is_headless = config.is_headless();
+        Self::with_config_seed_and_headless(app_config, seed, is_headless)
+    }
+
+    /// Generate a seed from current time.
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "Seed truncation is acceptable"
+    )]
+    fn generate_seed() -> u64 {
+        use std::time::{SystemTime, UNIX_EPOCH};
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map_or(42, |d| d.as_nanos() as u64)
+    }
+
+    /// Get the seed used for deterministic data generation.
+    ///
+    /// Pages can use this to initialize their domain data generators.
+    #[must_use]
+    #[allow(dead_code)] // Will be used by pages for data generation
+    pub const fn seed(&self) -> u64 {
+        self.seed
+    }
+
+    /// Show a notification to the user.
+    ///
+    /// This is the primary API for pages to emit notifications.
+    /// Notifications are displayed in the footer area and auto-trimmed
+    /// if there are too many.
+    #[allow(dead_code)] // Will be used by pages
+    pub fn notify(&mut self, message: impl Into<String>, level: StatusLevel) {
+        let id = self.next_notification_id;
+        self.next_notification_id += 1;
+        let notification = Notification::new(id, message, level);
+        self.notifications.push(notification);
+
+        // Keep only the most recent notifications
+        while self.notifications.len() > MAX_NOTIFICATIONS {
+            self.notifications.remove(0);
+        }
+    }
+
+    /// Get the next notification ID (useful for pages that want to track notifications).
+    #[must_use]
+    #[allow(dead_code)]
+    #[allow(clippy::missing_const_for_fn)] // Mutates self.next_notification_id
+    pub fn next_id(&mut self) -> u64 {
+        let id = self.next_notification_id;
+        self.next_notification_id += 1;
+        id
+    }
+
+    /// Get the current page.
+    ///
+    /// Used primarily by E2E tests for assertions.
+    #[must_use]
+    pub const fn current_page(&self) -> Page {
+        self.current_page
+    }
+
+    /// Dismiss a notification by ID.
+    fn dismiss_notification(&mut self, id: u64) {
+        self.notifications.retain(|n| n.id != id);
+    }
+
+    /// Dismiss the oldest notification.
+    fn dismiss_oldest_notification(&mut self) {
+        if !self.notifications.is_empty() {
+            self.notifications.remove(0);
+        }
+    }
+
+    /// Clear all notifications.
+    fn clear_notifications(&mut self) {
+        self.notifications.clear();
+    }
+
+    // =========================================================================
+    // Animation Control (bd-2szb)
+    // =========================================================================
+
+    /// Check if animations should be used.
+    ///
+    /// This is the **canonical source of truth** for all animation decisions.
+    /// All code that performs animations must consult this method.
+    ///
+    /// Returns `false` when:
+    /// - `--no-animations` CLI flag was passed
+    /// - `REDUCE_MOTION` environment variable is set (returns false for full disable)
+    /// - User toggled animations off via Settings
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// if app.use_animations() {
+    ///     // Perform smooth transition
+    ///     spring.animate_to(target);
+    /// } else {
+    ///     // Instant snap to target
+    ///     value = target;
+    /// }
+    /// ```
+    #[must_use]
+    #[allow(dead_code)] // Will be used by components, pages, and animations
+    pub const fn use_animations(&self) -> bool {
+        self.config.animations
+    }
+
+    /// Toggle animations on/off.
+    ///
+    /// This is typically called from the Settings page or via keyboard shortcut.
+    pub const fn toggle_animations(&mut self) {
+        self.config.animations = !self.config.animations;
+    }
+
+    /// Set animations enabled state directly.
+    ///
+    /// Useful for tests that need deterministic rendering.
+    #[allow(dead_code)] // Used by tests for deterministic rendering
+    pub const fn set_animations(&mut self, enabled: bool) {
+        self.config.animations = enabled;
+    }
+
+    // =========================================================================
+    // Theme Switching (bd-k52c)
+    // =========================================================================
+
+    /// Get the current theme.
+    #[must_use]
+    #[allow(dead_code)] // Used by pages and components
+    pub const fn theme(&self) -> &Theme {
+        &self.theme
+    }
+
+    /// Get the current theme preset.
+    #[must_use]
+    #[allow(dead_code)] // Used by pages and tests
+    pub const fn theme_preset(&self) -> ThemePreset {
+        self.theme.preset
+    }
+
+    /// Get whether mouse input is enabled.
+    #[must_use]
+    #[allow(dead_code)] // Used by E2E tests
+    pub const fn mouse_enabled(&self) -> bool {
+        self.config.mouse
+    }
+
+    /// Get whether ASCII mode is forced.
+    #[must_use]
+    #[allow(dead_code)] // Used by E2E tests
+    pub const fn is_force_ascii(&self) -> bool {
+        self.force_ascii
+    }
+
+    /// Get whether syntax highlighting is enabled.
+    #[must_use]
+    #[allow(dead_code)] // Used by E2E tests
+    pub const fn is_syntax_enabled(&self) -> bool {
+        self.syntax_enabled
+    }
+
+    /// Set the application theme.
+    ///
+    /// This instantly updates the theme across the entire application.
+    /// All rendered content will use the new theme colors on next `view()`.
+    pub const fn set_theme(&mut self, preset: ThemePreset) {
+        self.theme = Theme::from_preset(preset);
+        self.config.theme = preset;
+    }
+
+    /// Cycle to the next theme preset.
+    ///
+    /// Useful for quick theme switching via keyboard shortcut.
+    pub fn cycle_theme(&mut self) {
+        let presets = ThemePreset::all();
+        let current_idx = presets
+            .iter()
+            .position(|&p| p == self.theme.preset)
+            .unwrap_or(0);
+        let next_idx = (current_idx + 1) % presets.len();
+        self.set_theme(presets[next_idx]);
+    }
+
+    // =========================================================================
+    // Navigation
+    // =========================================================================
+
+    /// Navigate to a new page.
+    fn navigate(&mut self, page: Page) -> Option<Cmd> {
+        if page == self.current_page {
+            return None;
+        }
+
+        // Leave current page
+        let leave_cmd = self.pages.get_mut(self.current_page).on_leave();
+
+        // Sync settings page state before entering
+        if page == Page::Settings {
+            self.pages.settings.sync_states(
+                self.config.mouse,
+                self.config.animations,
+                self.force_ascii,
+                self.syntax_enabled,
+                self.theme.preset,
+            );
+        }
+
+        // Trigger page transition animation (bd-30md)
+        // Start from 0 and animate to 1 for a fade-in effect
+        self.animator.set("page_transition", 0.0);
+        self.animator.animate("page_transition", 1.0);
+
+        // Enter new page
+        self.current_page = page;
+        self.sidebar.set_current_page(page);
+        let enter_cmd = self.pages.get_mut(page).on_enter();
+
+        // Combine commands
+        batch(vec![leave_cmd, enter_cmd])
+    }
+
+    /// Handle global keyboard shortcuts.
+    fn handle_global_key(&mut self, key: &KeyMsg) -> Option<Cmd> {
+        // Handle notes modal input (highest priority when open)
+        if self.notes_modal.is_open() {
+            return self.notes_modal.update(Message::new(key.clone()));
+        }
+
+        // Handle command palette input (highest priority after overlays)
+        if self.command_palette.visible {
+            return self.command_palette.handle_key(key);
+        }
+
+        // Handle guided tour input (bd-2eky)
+        if self.guided_tour.is_active() {
+            return self.guided_tour.update(&Message::new(key.clone()));
+        }
+
+        // Handle help overlay scrolling
+        if self.show_help {
+            return self.handle_help_key(key);
+        }
+
+        // Ctrl+C always quits
+        if key.key_type == KeyType::CtrlC {
+            return Some(quit());
+        }
+
+        // Tab handling for sidebar focus
+        if key.key_type == KeyType::Tab && self.sidebar_visible {
+            if self.sidebar.is_focused() {
+                // Unfocus sidebar
+                self.sidebar.toggle_focus();
+                // Animate focus indicator out (bd-30md)
+                self.animator.animate("sidebar_focus", 0.0);
+                return None;
+            } else if self.current_page != Page::Settings {
+                // Focus sidebar (but NOT on Settings page where Tab switches sections)
+                self.sidebar.toggle_focus();
+                // Animate focus indicator in (bd-30md)
+                self.animator.animate("sidebar_focus", 1.0);
+                return None;
+            }
+            // On Settings page with sidebar not focused: Tab falls through to page
+        }
+
+        // When sidebar is focused, pass keys to it (except global shortcuts)
+        if self.sidebar.is_focused() && self.sidebar_visible {
+            // Allow Escape to unfocus sidebar
+            if key.key_type == KeyType::Esc {
+                self.sidebar.set_focus(SidebarFocus::Inactive);
+                // Animate focus indicator out (bd-30md)
+                self.animator.animate("sidebar_focus", 0.0);
+                return None;
+            }
+            // Pass to sidebar
+            return self.sidebar.update(&Message::new(key.clone()));
+        }
+
+        match key.key_type {
+            KeyType::Esc => return Some(quit()),
+            KeyType::Runes => match key.runes.as_slice() {
+                ['q'] => return Some(quit()),
+                ['?'] => {
+                    self.show_help = true;
+                    self.help_scroll_offset = 0;
+                    return None;
+                }
+                ['/'] => {
+                    // Show command palette (bd-3mtt)
+                    self.command_palette.show();
+                    return None;
+                }
+                ['N'] => {
+                    // Open notes scratchpad (bd-1xvj)
+                    self.notes_modal.open();
+                    return None;
+                }
+                ['['] => {
+                    self.sidebar_visible = !self.sidebar_visible;
+                    return None;
+                }
+                ['t'] => {
+                    // Cycle through themes
+                    self.cycle_theme();
+                    return None;
+                }
+                ['e'] => {
+                    // Export current view as plain text
+                    return Some(Cmd::new(|| {
+                        ExportMsg::Export(ExportFormat::PlainText).into_message()
+                    }));
+                }
+                ['E'] => {
+                    // Export current view as HTML
+                    return Some(Cmd::new(|| {
+                        ExportMsg::Export(ExportFormat::Html).into_message()
+                    }));
+                }
+                ['D'] => {
+                    // Open diagnostics in external pager (bd-194c)
+                    let diagnostics = generate_diagnostics();
+                    if let Some(cmd) = open_diagnostics_in_pager(diagnostics, self.is_headless) {
+                        return Some(cmd);
+                    }
+                    // In headless mode, show notification instead
+                    let id = self.next_notification_id;
+                    self.next_notification_id += 1;
+                    self.notifications.push(Notification::info(
+                        id,
+                        "Diagnostics unavailable in headless mode",
+                    ));
+                    return None;
+                }
+                ['`'] => {
+                    // Start guided tour (bd-2eky)
+                    return self.guided_tour.start();
+                }
+                [c] => {
+                    if let Some(page) = Page::from_shortcut(*c) {
+                        return self.navigate(page);
+                    }
+                }
+                _ => {}
+            },
+            _ => {}
+        }
+        None
+    }
+
+    /// Handle keyboard input when help overlay is shown.
+    fn handle_help_key(&mut self, key: &KeyMsg) -> Option<Cmd> {
+        let total_lines = help_total_lines();
+        let visible_lines = self.help_visible_lines();
+        let max_scroll = total_lines.saturating_sub(visible_lines);
+
+        match key.key_type {
+            KeyType::Esc => {
+                self.show_help = false;
+                return None;
+            }
+            KeyType::Up => {
+                self.help_scroll_offset = self.help_scroll_offset.saturating_sub(1);
+                return None;
+            }
+            KeyType::Down => {
+                self.help_scroll_offset = (self.help_scroll_offset + 1).min(max_scroll);
+                return None;
+            }
+            KeyType::Home => {
+                self.help_scroll_offset = 0;
+                return None;
+            }
+            KeyType::End => {
+                self.help_scroll_offset = max_scroll;
+                return None;
+            }
+            KeyType::PgUp => {
+                self.help_scroll_offset = self
+                    .help_scroll_offset
+                    .saturating_sub(visible_lines.saturating_sub(2));
+                return None;
+            }
+            KeyType::PgDown => {
+                self.help_scroll_offset =
+                    (self.help_scroll_offset + visible_lines.saturating_sub(2)).min(max_scroll);
+                return None;
+            }
+            KeyType::CtrlU => {
+                self.help_scroll_offset = self.help_scroll_offset.saturating_sub(visible_lines / 2);
+                return None;
+            }
+            KeyType::CtrlD => {
+                self.help_scroll_offset =
+                    (self.help_scroll_offset + visible_lines / 2).min(max_scroll);
+                return None;
+            }
+            KeyType::Runes => match key.runes.as_slice() {
+                ['?' | 'q'] => {
+                    self.show_help = false;
+                    return None;
+                }
+                ['j'] => {
+                    self.help_scroll_offset = (self.help_scroll_offset + 1).min(max_scroll);
+                    return None;
+                }
+                ['k'] => {
+                    self.help_scroll_offset = self.help_scroll_offset.saturating_sub(1);
+                    return None;
+                }
+                ['g'] => {
+                    self.help_scroll_offset = 0;
+                    return None;
+                }
+                ['G'] => {
+                    self.help_scroll_offset = max_scroll;
+                    return None;
+                }
+                _ => {}
+            },
+            _ => {}
+        }
+        None
+    }
+
+    /// Calculate the number of visible lines in the help overlay.
+    const fn help_visible_lines(&self) -> usize {
+        // Help modal uses most of the screen with some padding
+        // Header (1) + title bar (1) + footer hint (1) + border padding (4)
+        self.height.saturating_sub(8)
+    }
+
+    /// Render the sidebar.
+    fn render_sidebar(&self, height: usize) -> String {
+        // Get animated focus intensity for smooth transitions (bd-30md)
+        let focus_intensity = self.animator.get_or("sidebar_focus", 0.0);
+        self.sidebar.view(height, &self.theme, focus_intensity)
+    }
+
+    /// Render the header.
+    fn render_header(&self) -> String {
+        let title = self.theme.title_style().render(" Charmed Control Center ");
+
+        let status = self.theme.success_style().render("Connected");
+
+        // Focus indicator (bd-1fxl): show subtle unfocused state
+        let focus_indicator = if self.focused {
+            String::new()
+        } else {
+            format!("  {}", self.theme.muted_style().render("[unfocused]"))
+        };
+
+        // Add theme name indicator
+        let theme_name = self
+            .theme
+            .muted_style()
+            .render(&format!("[{}]", self.theme.preset.name()));
+
+        // Calculate spacing to right-align theme name
+        // Use width-1 to prevent edge-case terminal wrapping (bd-pty1)
+        let safe_width = self.width.saturating_sub(1).max(1);
+        let left_content = format!("{title}  {status}{focus_indicator}");
+        let left_len = strip_ansi_len(&left_content);
+        let right_len = strip_ansi_len(&theme_name);
+        let gap = safe_width.saturating_sub(left_len + right_len + 2);
+        let spacer = " ".repeat(gap);
+
+        let header_content = format!("{left_content}{spacer}{theme_name} ");
+
+        #[expect(clippy::cast_possible_truncation)]
+        let width_u16 = safe_width as u16;
+
+        self.theme
+            .header_style()
+            .width(width_u16)
+            .render(&header_content)
+    }
+
+    /// Render the footer.
+    fn render_footer(&self) -> String {
+        let page_hints = self.pages.get(self.current_page).hints();
+
+        let global_hints = "1-7 pages  [ sidebar  ? help  q quit";
+
+        let hints = format!("  {page_hints}  |  {global_hints}");
+
+        // Use width-1 to prevent edge-case terminal wrapping (bd-pty1)
+        let safe_width = self.width.saturating_sub(1).max(1);
+        #[expect(clippy::cast_possible_truncation)]
+        let width_u16 = safe_width as u16;
+
+        self.theme.footer_style().width(width_u16).render(&hints)
+    }
+
+    /// Render notifications as a stack above the footer.
+    fn render_notifications(&self) -> String {
+        if self.notifications.is_empty() {
+            return String::new();
+        }
+
+        self.notifications
+            .iter()
+            .map(|notif| {
+                banner(
+                    &self.theme,
+                    notif.level,
+                    &notif.message,
+                    notif.action_hint.as_deref(),
+                )
+            })
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+
+    /// Render the help overlay.
+    #[expect(
+        clippy::too_many_lines,
+        reason = "Complex render function with detailed formatting"
+    )]
+    fn render_help(&self) -> String {
+        // Calculate dimensions - wider box for better readability
+        let box_width: usize = 52.min(self.width.saturating_sub(4));
+        let box_height = self.height.saturating_sub(4);
+        let start_x = self.width.saturating_sub(box_width) / 2;
+        let start_y = 2; // Small top margin
+
+        let content_width = box_width.saturating_sub(6); // Padding on sides
+        let visible_lines = self.help_visible_lines();
+
+        // Build all content lines
+        let mut content_lines: Vec<String> = Vec::new();
+
+        // Add current page context at top
+        let page_name = self.current_page.name();
+        let page_hints = self.pages.get(self.current_page).hints();
+        content_lines.push(format!("Current Page: {page_name}"));
+        content_lines.push(format!("  {page_hints}"));
+        content_lines.push(String::new());
+
+        // Add sections from keymap
+        for section in HELP_SECTIONS {
+            // Section title (bold styling applied in render)
+            content_lines.push(format!("[ {} ]", section.title));
+
+            // Entries with aligned columns
+            for entry in section.entries {
+                let key_col = format!("{:>12}", entry.key);
+                let line = format!("  {key_col}  {}", entry.action);
+                content_lines.push(line);
+            }
+            content_lines.push(String::new()); // Blank line after section
+        }
+
+        // Calculate total and apply scroll offset
+        let total_lines = content_lines.len();
+        let max_scroll = total_lines.saturating_sub(visible_lines);
+        let skip = self.help_scroll_offset.min(max_scroll);
+        let visible_content: Vec<&String> = content_lines
+            .iter()
+            .skip(skip)
+            .take(visible_lines)
+            .collect();
+
+        // Build output
+        let mut lines: Vec<String> = Vec::new();
+
+        // Top padding
+        for _ in 0..start_y {
+            lines.push(String::new());
+        }
+
+        #[expect(clippy::cast_possible_truncation)]
+        let box_width_u16 = box_width as u16;
+
+        // Title bar with modal style
+        let title = " Keyboard Shortcuts ";
+        let title_padding = (box_width.saturating_sub(title.len())) / 2;
+        let title_line = format!(
+            "{}{}{}",
+            " ".repeat(title_padding),
+            title,
+            " ".repeat(box_width.saturating_sub(title_padding + title.len()))
+        );
+        // Modal style renders with a border, which creates multiple lines.
+        // We need to indent EACH line, not just prepend to the entire string.
+        let title_rendered = self
+            .theme
+            .modal_style()
+            .bold()
+            .width(box_width_u16)
+            .render(&title_line);
+        let indent = " ".repeat(start_x);
+        for title_line in title_rendered.lines() {
+            lines.push(format!("{indent}{title_line}"));
+        }
+
+        // Content area styling
+        let content_style = Style::new()
+            .foreground(self.theme.text)
+            .background(self.theme.bg_highlight);
+        let section_style = Style::new()
+            .foreground(self.theme.primary)
+            .background(self.theme.bg_highlight)
+            .bold();
+
+        for line in &visible_content {
+            // Truncate long lines gracefully (char-aware to avoid mid-codepoint panic)
+            let truncated = if lipgloss::width(line) > content_width {
+                let max_chars = content_width.saturating_sub(3);
+                let prefix: String = line.chars().take(max_chars).collect();
+                format!("{prefix}...")
+            } else {
+                (*line).clone()
+            };
+            let padded = format!("{truncated:content_width$}");
+
+            // Apply section title styling if this is a section header
+            let styled_content = if line.starts_with("[ ") && line.ends_with(" ]") {
+                section_style.render(&format!("   {padded}   "))
+            } else {
+                content_style.render(&format!("   {padded}   "))
+            };
+
+            lines.push(format!("{}{}", " ".repeat(start_x), styled_content));
+        }
+
+        // Pad to fill box height
+        let content_rows = visible_content.len();
+        let remaining_height = box_height.saturating_sub(content_rows + 3); // title + footer + spacing
+        let empty_line = " ".repeat(box_width);
+        for _ in 0..remaining_height {
+            lines.push(format!(
+                "{}{}",
+                " ".repeat(start_x),
+                content_style
+                    .clone()
+                    .width(box_width_u16)
+                    .render(&empty_line)
+            ));
+        }
+
+        // Scroll indicator
+        let scroll_info = if total_lines > visible_lines {
+            let percent = (skip * 100).checked_div(max_scroll).unwrap_or(100).min(100);
+            format!("[{percent:>3}%]")
+        } else {
+            String::new()
+        };
+
+        // Footer with hints and scroll indicator
+        let hints_text = key_hint(&self.theme, "j/k", "scroll");
+        let close_text = key_hint(&self.theme, "q/?/Esc", "close");
+        let footer_hints = format!("{hints_text}  {close_text}  {scroll_info}");
+        let footer_padded = format!("{footer_hints:^box_width$}");
+        lines.push(format!(
+            "{}{}",
+            " ".repeat(start_x),
+            self.theme
+                .footer_style()
+                .width(box_width_u16)
+                .render(&footer_padded)
+        ));
+
+        lines.join("\n")
+    }
+
+    /// Get the current content dimensions.
+    #[must_use]
+    #[allow(dead_code)] // Will be used by pages
+    pub fn content_dimensions(&self) -> (usize, usize) {
+        let header_height = usize::from(spacing::HEADER_HEIGHT);
+        let footer_height = usize::from(spacing::FOOTER_HEIGHT);
+        let content_height = self.height.saturating_sub(header_height + footer_height);
+
+        let content_width = if self.sidebar_visible {
+            self.width
+                .saturating_sub(usize::from(spacing::SIDEBAR_WIDTH))
+        } else {
+            self.width
+        };
+
+        (content_width, content_height)
+    }
+
+    /// Check if the terminal has focus (bd-1fxl).
+    ///
+    /// Returns true if the terminal window is focused, false if blurred.
+    /// Used for UI rendering (shows unfocused indicator) and can be used
+    /// to pause animations when unfocused.
+    #[must_use]
+    pub const fn focused(&self) -> bool {
+        self.focused
+    }
+}
+
+impl Default for App {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Model for App {
+    fn init(&self) -> Option<Cmd> {
+        // Set window title and request initial window size
+        batch(vec![
+            Some(set_window_title("Charmed Control Center")),
+            Some(bubbletea::window_size()),
+        ])
+    }
+
+    #[allow(
+        clippy::too_many_lines,
+        clippy::items_after_statements,
+        clippy::option_if_let_else
+    )]
+    fn update(&mut self, msg: Message) -> Option<Cmd> {
+        // Handle window resize.
+        // Cap width at max_width (explicit CLI flag) or AUTO_MAX_WIDTH (200)
+        // to prevent layout issues on ultra-wide terminals. The PTY width is
+        // also capped at startup via apply_pty_width_cap() so that the terminal
+        // driver's line-wrapping agrees with our layout width.
+        if let Some(size) = msg.downcast_ref::<WindowSizeMsg>() {
+            let actual_width = size.width as usize;
+
+            const AUTO_MAX_WIDTH: usize = 200;
+            self.width = match self.config.max_width {
+                Some(max) => actual_width.min(max as usize),
+                None => actual_width.min(AUTO_MAX_WIDTH),
+            };
+            self.height = size.height as usize;
+            self.ready = true;
+            return None;
+        }
+
+        // Handle focus/blur events (bd-1fxl)
+        if msg.is::<FocusMsg>() {
+            self.focused = true;
+            return None;
+        }
+        if msg.is::<BlurMsg>() {
+            self.focused = false;
+            return None;
+        }
+
+        // Handle app-level messages
+        if let Some(app_msg) = msg.downcast_ref::<AppMsg>() {
+            return match app_msg {
+                AppMsg::Navigate(page) => self.navigate(*page),
+                AppMsg::ToggleSidebar => {
+                    self.sidebar_visible = !self.sidebar_visible;
+                    None
+                }
+                AppMsg::ToggleAnimations => {
+                    self.toggle_animations();
+                    None
+                }
+                AppMsg::SetTheme(preset) => {
+                    self.set_theme(*preset);
+                    None
+                }
+                AppMsg::CycleTheme => {
+                    self.cycle_theme();
+                    None
+                }
+                AppMsg::ShowHelp => {
+                    self.show_help = true;
+                    None
+                }
+                AppMsg::HideHelp => {
+                    self.show_help = false;
+                    None
+                }
+                AppMsg::ToggleMouse => {
+                    self.config.mouse = !self.config.mouse;
+                    None
+                }
+                AppMsg::ToggleSyntax => {
+                    self.syntax_enabled = !self.syntax_enabled;
+                    None
+                }
+                AppMsg::ForceAscii(enable) => {
+                    self.force_ascii = *enable;
+                    None
+                }
+                AppMsg::Quit => Some(quit()),
+            };
+        }
+
+        // Handle notification messages
+        if let Some(notif_msg) = msg.downcast_ref::<NotificationMsg>() {
+            match notif_msg {
+                NotificationMsg::Show(notification) => {
+                    self.notifications.push(notification.clone());
+                    while self.notifications.len() > MAX_NOTIFICATIONS {
+                        self.notifications.remove(0);
+                    }
+                }
+                NotificationMsg::Dismiss(id) => {
+                    self.dismiss_notification(*id);
+                }
+                NotificationMsg::DismissOldest => {
+                    self.dismiss_oldest_notification();
+                }
+                NotificationMsg::ClearAll => {
+                    self.clear_notifications();
+                }
+            }
+            return None;
+        }
+
+        // Handle export messages
+        if let Some(export_msg) = msg.downcast_ref::<ExportMsg>() {
+            match export_msg {
+                ExportMsg::Export(format) => {
+                    // Render the current view
+                    let ansi_content = self.view();
+
+                    // Convert to requested format
+                    let (content, ext) = match format {
+                        ExportFormat::PlainText => (strip_ansi(&ansi_content), "txt"),
+                        ExportFormat::Html => (ansi_to_html(&ansi_content), "html"),
+                    };
+
+                    // Generate filename with timestamp
+                    let timestamp = std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .map_or(0, |d| d.as_secs());
+                    let page_name = self.current_page.name().to_lowercase();
+                    let filename = format!("demo_{page_name}_{timestamp}.{ext}");
+
+                    // Write to file (blocking I/O)
+                    return Some(Cmd::blocking(move || {
+                        match std::fs::write(&filename, content) {
+                            Ok(()) => ExportMsg::ExportCompleted(filename).into_message(),
+                            Err(e) => ExportMsg::ExportFailed(e.to_string()).into_message(),
+                        }
+                    }));
+                }
+                ExportMsg::ExportCompleted(filename) => {
+                    let id = self.next_notification_id;
+                    self.next_notification_id += 1;
+                    self.notifications
+                        .push(Notification::success(id, format!("Exported to {filename}")));
+                    while self.notifications.len() > MAX_NOTIFICATIONS {
+                        self.notifications.remove(0);
+                    }
+                }
+                ExportMsg::ExportFailed(error) => {
+                    let id = self.next_notification_id;
+                    self.next_notification_id += 1;
+                    self.notifications
+                        .push(Notification::error(id, format!("Export failed: {error}")));
+                    while self.notifications.len() > MAX_NOTIFICATIONS {
+                        self.notifications.remove(0);
+                    }
+                }
+            }
+            return None;
+        }
+
+        // Handle shell-out messages (bd-194c)
+        if let Some(shell_msg) = msg.downcast_ref::<ShellOutMsg>() {
+            match shell_msg {
+                ShellOutMsg::OpenDiagnostics => {
+                    // This is handled via keyboard shortcut 'd', but can also be
+                    // triggered programmatically
+                    let diagnostics = generate_diagnostics();
+                    return open_diagnostics_in_pager(diagnostics, self.is_headless);
+                }
+                ShellOutMsg::PagerCompleted(error) => {
+                    // Pager finished, show notification if there was an error
+                    if let Some(err) = error {
+                        let id = self.next_notification_id;
+                        self.next_notification_id += 1;
+                        self.notifications
+                            .push(Notification::warning(id, format!("Pager: {err}")));
+                        while self.notifications.len() > MAX_NOTIFICATIONS {
+                            self.notifications.remove(0);
+                        }
+                    }
+                }
+                ShellOutMsg::TerminalReleased | ShellOutMsg::TerminalRestored => {
+                    // These are informational; no action needed
+                }
+            }
+            return None;
+        }
+
+        // Handle wizard messages (bd-2qq7)
+        if let Some(wizard_msg) = msg.downcast_ref::<WizardMsg>() {
+            match wizard_msg {
+                WizardMsg::DeploymentStarted(config) => {
+                    let id = self.next_notification_id;
+                    self.next_notification_id += 1;
+                    let msg = format!(
+                        "Deploying '{}' ({}) to {}...",
+                        config.service_name, config.service_type, config.environment
+                    );
+                    self.notifications.push(Notification::info(id, msg.clone()));
+                    while self.notifications.len() > MAX_NOTIFICATIONS {
+                        self.notifications.remove(0);
+                    }
+                    // bd-7iul: Emit println for lifecycle event (visible in no-alt-screen mode)
+                    return Some(println(format!("[deploy] {msg}")));
+                }
+                WizardMsg::DeploymentProgress(_step) => {
+                    // Progress updates don't need notifications (UI shows progress)
+                }
+                WizardMsg::DeploymentCompleted(config) => {
+                    let id = self.next_notification_id;
+                    self.next_notification_id += 1;
+                    let msg = format!(
+                        "Deployed '{}' to {} successfully!",
+                        config.service_name, config.environment
+                    );
+                    self.notifications
+                        .push(Notification::success(id, msg.clone()));
+                    while self.notifications.len() > MAX_NOTIFICATIONS {
+                        self.notifications.remove(0);
+                    }
+                    // bd-7iul: Emit println for lifecycle event (visible in no-alt-screen mode)
+                    return Some(println(format!("[deploy] {msg}")));
+                }
+                WizardMsg::DeploymentFailed(error) => {
+                    let id = self.next_notification_id;
+                    self.next_notification_id += 1;
+                    let msg = format!("Deployment failed: {error}");
+                    self.notifications
+                        .push(Notification::error(id, msg.clone()));
+                    while self.notifications.len() > MAX_NOTIFICATIONS {
+                        self.notifications.remove(0);
+                    }
+                    // bd-7iul: Emit println for lifecycle event (visible in no-alt-screen mode)
+                    return Some(println(format!("[deploy] {msg}")));
+                }
+            }
+            return None;
+        }
+
+        // Handle notes modal messages (bd-1xvj)
+        if let Some(notes_msg) = msg.downcast_ref::<NotesModalMsg>() {
+            match notes_msg {
+                NotesModalMsg::Saved(content) => {
+                    // Emit log entry + toast notification
+                    let id = self.next_notification_id;
+                    self.next_notification_id += 1;
+                    let preview = if content.chars().count() > 30 {
+                        let truncated: String = content.chars().take(30).collect();
+                        format!("{truncated}...")
+                    } else {
+                        content.clone()
+                    };
+                    self.notifications
+                        .push(Notification::success(id, format!("Note saved: {preview}")));
+                    while self.notifications.len() > MAX_NOTIFICATIONS {
+                        self.notifications.remove(0);
+                    }
+                    // Also emit println for logging
+                    return Some(println(format!(
+                        "[notes] Saved: {}",
+                        content.lines().next().unwrap_or("")
+                    )));
+                }
+                NotesModalMsg::Copied(content) => {
+                    let id = self.next_notification_id;
+                    self.next_notification_id += 1;
+                    let chars = content.len();
+                    self.notifications.push(Notification::info(
+                        id,
+                        format!("Copied {chars} chars to clipboard"),
+                    ));
+                    while self.notifications.len() > MAX_NOTIFICATIONS {
+                        self.notifications.remove(0);
+                    }
+                }
+                NotesModalMsg::Cleared => {
+                    let id = self.next_notification_id;
+                    self.next_notification_id += 1;
+                    self.notifications
+                        .push(Notification::info(id, "Note cleared"));
+                    while self.notifications.len() > MAX_NOTIFICATIONS {
+                        self.notifications.remove(0);
+                    }
+                }
+                NotesModalMsg::Closed => {
+                    // Modal closed without saving - no notification needed
+                }
+            }
+            return None;
+        }
+
+        // Handle keyboard input
+        if let Some(key) = msg.downcast_ref::<KeyMsg>()
+            && let Some(cmd) = self.handle_global_key(key)
+        {
+            return Some(cmd);
+        }
+
+        // Delegate to current page if not in help mode
+        if !self.show_help {
+            return self.pages.get_mut(self.current_page).update(&msg);
+        }
+
+        None
+    }
+
+    #[allow(clippy::option_if_let_else)]
+    fn view(&self) -> String {
+        if !self.ready {
+            return "Loading...".to_string();
+        }
+
+        // If help is shown, render help overlay
+        if self.show_help {
+            return self.render_help();
+        }
+
+        let header = self.render_header();
+        let footer = self.render_footer();
+        let notifications = self.render_notifications();
+
+        // Calculate content area using spacing constants
+        let header_height = usize::from(spacing::HEADER_HEIGHT);
+        let footer_height = usize::from(spacing::FOOTER_HEIGHT);
+        let notification_height = self.notifications.len();
+        let content_height = self
+            .height
+            .saturating_sub(header_height + footer_height + notification_height);
+
+        let (sidebar, content_width) = if self.sidebar_visible {
+            let sidebar = self.render_sidebar(content_height);
+            let sidebar_width = usize::from(spacing::SIDEBAR_WIDTH);
+            (Some(sidebar), self.width.saturating_sub(sidebar_width))
+        } else {
+            (None, self.width)
+        };
+
+        // Render current page
+        let page_content =
+            self.pages
+                .get(self.current_page)
+                .view(content_width, content_height, &self.theme);
+
+        // Compose layout
+        // Truncate main_area to prevent exceeding terminal width (bd-pty1)
+        let safe_width = self.width.saturating_sub(1).max(1);
+        let main_area = if let Some(sb) = sidebar {
+            let joined = lipgloss::join_horizontal(Position::Top, &[&sb, &page_content]);
+            truncate_to_width(&joined, safe_width)
+        } else {
+            truncate_to_width(&page_content, safe_width)
+        };
+
+        // Build final layout: header, content, notifications (if any), footer
+        let base_view = if notifications.is_empty() {
+            lipgloss::join_vertical(Position::Left, &[&header, &main_area, &footer])
+        } else {
+            lipgloss::join_vertical(
+                Position::Left,
+                &[&header, &main_area, &notifications, &footer],
+            )
+        };
+
+        // Render command palette overlay if visible (bd-3mtt)
+        if self.command_palette.visible {
+            return self
+                .command_palette
+                .view(self.width, self.height, &self.theme);
+        }
+
+        // Render guided tour overlay if active (bd-2eky)
+        if self.guided_tour.is_active() {
+            return self.guided_tour.view(&self.theme, self.width, self.height);
+        }
+
+        // Render notes modal overlay if visible (bd-1xvj)
+        if self.notes_modal.is_open() {
+            return self
+                .notes_modal
+                .view_centered(&self.theme, self.width, self.height);
+        }
+
+        // Truncate all lines to layout width to prevent wrapping/scrolling (bd-pty1)
+        // Use width-1 to avoid edge cases where exactly-width lines trigger autowrap
+        let safe_width = self.width.saturating_sub(1).max(1);
+        let truncated = truncate_to_width(&base_view, safe_width);
+
+        // Pad every line to uniform width so the background fills evenly
+        // (prevents the "slanted" ragged-right look)
+        pad_lines_to_width(&truncated, safe_width)
+    }
+}
+
+/// Pad each line with spaces so every line has the same visible width.
+///
+/// This prevents the "slanted" ragged-right appearance where shorter lines
+/// leave the terminal background visible at different offsets per row.
+fn pad_lines_to_width(s: &str, target_width: usize) -> String {
+    s.lines()
+        .map(|line| {
+            let visible_len = lipgloss::width(line);
+            if visible_len < target_width {
+                format!("{}{}", line, " ".repeat(target_width - visible_len))
+            } else {
+                line.to_string()
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+/// Truncate each line of a string to `max_width`, handling ANSI escape sequences.
+///
+/// This ensures the output fits within the terminal width and prevents unwanted
+/// line wrapping that can cause scrolling artifacts.
+fn truncate_to_width(s: &str, max_width: usize) -> String {
+    if max_width == 0 {
+        return String::new();
+    }
+
+    s.lines()
+        .map(|line| {
+            let visible_len = lipgloss::width(line);
+            if visible_len <= max_width {
+                line.to_string()
+            } else {
+                truncate_line_ansi_aware(line, max_width)
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+/// Truncate a single line to `max_width`, preserving ANSI escape sequences.
+fn truncate_line_ansi_aware(line: &str, max_width: usize) -> String {
+    let mut result = String::new();
+    let mut visible_count = 0;
+    let mut chars = line.chars().peekable();
+
+    while let Some(c) = chars.next() {
+        if c == '\x1b' {
+            // Start of escape sequence - include the whole sequence
+            result.push(c);
+
+            if let Some(next) = chars.next() {
+                result.push(next);
+
+                match next {
+                    '[' => {
+                        // CSI sequence: ESC [ params final_byte
+                        while let Some(&ch) = chars.peek() {
+                            if let Some(consumed) = chars.next() {
+                                result.push(consumed);
+                            }
+                            // CSI ends with a final byte (0x40-0x7E)
+                            if (0x40..=0x7E).contains(&(ch as u32)) {
+                                break;
+                            }
+                        }
+                    }
+                    ']' | 'P' | 'X' | '^' | '_' => {
+                        // String-type sequences (OSC, DCS, SOS, PM, APC)
+                        // terminated by BEL or ST (ESC \)
+                        let mut prev_was_esc = false;
+                        for ch in chars.by_ref() {
+                            result.push(ch);
+                            if ch == '\x07' || (prev_was_esc && ch == '\\') {
+                                break;
+                            }
+                            prev_was_esc = ch == '\x1b';
+                        }
+                    }
+                    _ => {
+                        // Simple two-char escape already captured above.
+                    }
+                }
+            }
+        } else {
+            // Regular character - count its width
+            let char_width = unicode_width::UnicodeWidthChar::width(c).unwrap_or(0);
+            if visible_count + char_width > max_width {
+                break;
+            }
+            result.push(c);
+            visible_count += char_width;
+        }
+    }
+
+    // Add reset if we truncated mid-style
+    if visible_count > 0 && visible_count < lipgloss::width(line) {
+        result.push_str("\x1b[0m");
+    }
+
+    result
+}
+
+/// Calculate the visible length of a string (excluding ANSI escape sequences).
+fn strip_ansi_len(s: &str) -> usize {
+    // Prefer lipgloss's canonical ANSI-aware width implementation.
+    lipgloss::visible_width(s)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn app_default_config() {
+        let config = AppConfig::default();
+        assert_eq!(config.theme, ThemePreset::Dark);
+        assert!(config.animations);
+        assert!(!config.mouse);
+    }
+
+    #[test]
+    fn app_with_config_uses_theme() {
+        let config = AppConfig {
+            theme: ThemePreset::Dracula,
+            animations: false,
+            mouse: true,
+            max_width: None,
+        };
+        let app = App::with_config(config);
+        assert_eq!(app.theme.preset, ThemePreset::Dracula);
+    }
+
+    #[test]
+    fn strip_ansi_len_basic() {
+        assert_eq!(strip_ansi_len("hello"), 5);
+        assert_eq!(strip_ansi_len("\x1b[31mred\x1b[0m"), 3);
+        assert_eq!(strip_ansi_len("no escapes here"), 15);
+    }
+
+    #[test]
+    fn strip_ansi_removes_osc_bel_sequences() {
+        let input = "a\x1b]0;window-title\x07b";
+        assert_eq!(strip_ansi(input), "ab");
+    }
+
+    #[test]
+    fn strip_ansi_removes_osc_st_hyperlink_sequences() {
+        let input = "a\x1b]8;;https://example.com\x1b\\link\x1b]8;;\x1b\\b";
+        assert_eq!(strip_ansi(input), "alinkb");
+    }
+
+    #[test]
+    fn strip_ansi_removes_dcs_and_apc_sequences() {
+        let input = "x\x1bP123\x1b\\y\x1b_message\x1b\\z";
+        assert_eq!(strip_ansi(input), "xyz");
+    }
+
+    #[test]
+    fn truncate_line_ansi_aware_handles_trailing_escape() {
+        let input = "ab\x1b";
+        let output = truncate_line_ansi_aware(input, 2);
+        assert_eq!(output, input);
+    }
+
+    #[test]
+    fn truncate_line_ansi_aware_handles_incomplete_csi_sequence() {
+        let input = "ab\x1b[31";
+        let output = truncate_line_ansi_aware(input, 2);
+        assert_eq!(output, input);
+    }
+
+    #[test]
+    fn truncate_line_ansi_aware_handles_unterminated_string_escape() {
+        let input = "a\x1b]title";
+        let output = truncate_line_ansi_aware(input, 1);
+        assert_eq!(output, input);
+    }
+
+    #[test]
+    fn content_dimensions_with_sidebar() {
+        let mut app = App::new();
+        app.width = 100;
+        app.height = 30;
+        app.sidebar_visible = true;
+        let (w, h) = app.content_dimensions();
+        assert_eq!(w, 100 - usize::from(spacing::SIDEBAR_WIDTH));
+        assert_eq!(
+            h,
+            30 - usize::from(spacing::HEADER_HEIGHT) - usize::from(spacing::FOOTER_HEIGHT)
+        );
+    }
+
+    #[test]
+    fn content_dimensions_without_sidebar() {
+        let mut app = App::new();
+        app.width = 100;
+        app.height = 30;
+        app.sidebar_visible = false;
+        let (w, h) = app.content_dimensions();
+        assert_eq!(w, 100);
+        assert_eq!(
+            h,
+            30 - usize::from(spacing::HEADER_HEIGHT) - usize::from(spacing::FOOTER_HEIGHT)
+        );
+    }
+
+    #[test]
+    fn notify_adds_notification() {
+        let mut app = App::new();
+        assert!(app.notifications.is_empty());
+        app.notify("Test message", StatusLevel::Info);
+        assert_eq!(app.notifications.len(), 1);
+        assert_eq!(app.notifications[0].message, "Test message");
+    }
+
+    #[test]
+    fn notify_trims_to_max() {
+        let mut app = App::new();
+        for i in 0..10 {
+            app.notify(format!("Message {i}"), StatusLevel::Info);
+        }
+        assert_eq!(app.notifications.len(), MAX_NOTIFICATIONS);
+        // Should have the most recent notifications
+        assert!(app.notifications.last().unwrap().message.contains('9'));
+    }
+
+    #[test]
+    fn dismiss_notification_removes_by_id() {
+        let mut app = App::new();
+        app.notify("First", StatusLevel::Info);
+        app.notify("Second", StatusLevel::Warning);
+        let first_id = app.notifications[0].id;
+        app.dismiss_notification(first_id);
+        assert_eq!(app.notifications.len(), 1);
+        assert_eq!(app.notifications[0].message, "Second");
+    }
+
+    #[test]
+    fn clear_notifications_removes_all() {
+        let mut app = App::new();
+        app.notify("One", StatusLevel::Info);
+        app.notify("Two", StatusLevel::Success);
+        app.clear_notifications();
+        assert!(app.notifications.is_empty());
+    }
+
+    #[test]
+    fn notification_constructors() {
+        let notif = Notification::success(1, "Success!");
+        assert_eq!(notif.level, StatusLevel::Success);
+
+        let notif = Notification::warning(2, "Warning!");
+        assert_eq!(notif.level, StatusLevel::Warning);
+
+        let notif = Notification::error(3, "Error!");
+        assert_eq!(notif.level, StatusLevel::Error);
+
+        let notif = Notification::info(4, "Info!").with_action_hint("Press Enter");
+        assert_eq!(notif.level, StatusLevel::Info);
+        assert_eq!(notif.action_hint, Some("Press Enter".to_string()));
+    }
+
+    // =========================================================================
+    // Animation Control tests (bd-2szb)
+    // =========================================================================
+
+    #[test]
+    fn app_use_animations_default_enabled() {
+        let app = App::new();
+        assert!(app.use_animations());
+    }
+
+    #[test]
+    fn app_use_animations_respects_config() {
+        let config = AppConfig {
+            animations: false,
+            ..Default::default()
+        };
+        let app = App::with_config(config);
+        assert!(!app.use_animations());
+    }
+
+    #[test]
+    fn app_toggle_animations() {
+        let mut app = App::new();
+        assert!(app.use_animations());
+
+        app.toggle_animations();
+        assert!(!app.use_animations());
+
+        app.toggle_animations();
+        assert!(app.use_animations());
+    }
+
+    #[test]
+    fn app_set_animations() {
+        let mut app = App::new();
+
+        app.set_animations(false);
+        assert!(!app.use_animations());
+
+        app.set_animations(true);
+        assert!(app.use_animations());
+    }
+
+    #[test]
+    fn app_animations_for_deterministic_tests() {
+        // Tests can disable animations for deterministic rendering
+        let config = AppConfig {
+            animations: false,
+            ..Default::default()
+        };
+        let app = App::with_config(config);
+
+        // All animation checks should return false
+        assert!(!app.use_animations());
+        // Layout should still work (not tested here, but this is the contract)
+    }
+
+    // =========================================================================
+    // Theme Switching tests (bd-k52c)
+    // =========================================================================
+
+    #[test]
+    fn app_default_theme_is_dark() {
+        let app = App::new();
+        assert_eq!(app.theme_preset(), ThemePreset::Dark);
+    }
+
+    #[test]
+    fn app_set_theme_changes_preset() {
+        let mut app = App::new();
+        assert_eq!(app.theme_preset(), ThemePreset::Dark);
+
+        app.set_theme(ThemePreset::Light);
+        assert_eq!(app.theme_preset(), ThemePreset::Light);
+
+        app.set_theme(ThemePreset::Dracula);
+        assert_eq!(app.theme_preset(), ThemePreset::Dracula);
+    }
+
+    #[test]
+    fn app_set_theme_updates_colors() {
+        let mut app = App::new();
+        let dark_bg = app.theme().bg;
+
+        app.set_theme(ThemePreset::Light);
+        let light_bg = app.theme().bg;
+
+        // Background colors should differ between themes
+        assert_ne!(dark_bg, light_bg);
+    }
+
+    #[test]
+    fn app_cycle_theme_cycles_through_presets() {
+        let mut app = App::new();
+        assert_eq!(app.theme_preset(), ThemePreset::Dark);
+
+        app.cycle_theme();
+        assert_eq!(app.theme_preset(), ThemePreset::Light);
+
+        app.cycle_theme();
+        assert_eq!(app.theme_preset(), ThemePreset::Dracula);
+
+        app.cycle_theme();
+        assert_eq!(app.theme_preset(), ThemePreset::Dark); // Wraps around
+    }
+
+    #[test]
+    fn app_config_theme_is_updated() {
+        let mut app = App::new();
+        assert_eq!(app.config.theme, ThemePreset::Dark);
+
+        app.set_theme(ThemePreset::Light);
+        assert_eq!(app.config.theme, ThemePreset::Light);
+    }
+
+    #[test]
+    fn app_with_config_respects_theme() {
+        let config = AppConfig {
+            theme: ThemePreset::Dracula,
+            ..Default::default()
+        };
+        let app = App::with_config(config);
+        assert_eq!(app.theme_preset(), ThemePreset::Dracula);
+    }
+
+    // =========================================================================
+    // Bootstrap from Config tests (bd-13np)
+    // =========================================================================
+
+    #[test]
+    fn app_from_config_uses_theme_preset() {
+        use crate::config::Config;
+
+        let config = Config {
+            theme_preset: ThemePreset::Light,
+            ..Default::default()
+        };
+        let app = App::from_config(&config);
+        assert_eq!(app.theme_preset(), ThemePreset::Light);
+    }
+
+    #[test]
+    fn app_from_config_uses_animations() {
+        use crate::config::{AnimationMode, Config};
+
+        // Enabled
+        let config = Config {
+            animations: AnimationMode::Enabled,
+            ..Default::default()
+        };
+        let app = App::from_config(&config);
+        assert!(app.use_animations());
+
+        // Disabled
+        let config = Config {
+            animations: AnimationMode::Disabled,
+            ..Default::default()
+        };
+        let app = App::from_config(&config);
+        assert!(!app.use_animations());
+    }
+
+    #[test]
+    fn app_from_config_uses_mouse() {
+        use crate::config::Config;
+
+        let config = Config {
+            mouse: true,
+            ..Default::default()
+        };
+        let app = App::from_config(&config);
+        assert!(app.config.mouse);
+
+        let config = Config {
+            mouse: false,
+            ..Default::default()
+        };
+        let app = App::from_config(&config);
+        assert!(!app.config.mouse);
+    }
+
+    #[test]
+    fn app_from_config_uses_seed() {
+        use crate::config::Config;
+
+        let config = Config {
+            seed: Some(12345),
+            ..Default::default()
+        };
+        let app = App::from_config(&config);
+        assert_eq!(app.seed(), 12345);
+    }
+
+    #[test]
+    fn app_from_config_generates_seed_when_none() {
+        use crate::config::Config;
+
+        let config = Config {
+            seed: None,
+            ..Default::default()
+        };
+        let app = App::from_config(&config);
+        // Seed should be non-zero (generated from time)
+        assert!(app.seed() > 0);
+    }
+
+    #[test]
+    fn app_seed_is_deterministic() {
+        use crate::config::Config;
+
+        // Same seed should produce same value
+        let config = Config {
+            seed: Some(42),
+            ..Default::default()
+        };
+        let app1 = App::from_config(&config);
+        let app2 = App::from_config(&config);
+        assert_eq!(app1.seed(), app2.seed());
+    }
+
+    #[test]
+    fn app_from_config_is_canonical_path() {
+        use crate::config::{AnimationMode, Config};
+
+        // This test verifies that from_config produces equivalent results
+        // to with_config when given the same settings
+        let config = Config {
+            theme_preset: ThemePreset::Dracula,
+            animations: AnimationMode::Disabled,
+            mouse: true,
+            seed: Some(999),
+            ..Default::default()
+        };
+
+        let app = App::from_config(&config);
+
+        assert_eq!(app.theme_preset(), ThemePreset::Dracula);
+        assert!(!app.use_animations());
+        assert!(app.config.mouse);
+        assert_eq!(app.seed(), 999);
+    }
+
+    // =========================================================================
+    // Routing and Navigation tests (bd-247o)
+    // =========================================================================
+
+    #[test]
+    fn navigate_changes_current_page() {
+        let mut app = App::new();
+        assert_eq!(app.current_page(), Page::Dashboard);
+
+        app.navigate(Page::Jobs);
+        assert_eq!(app.current_page(), Page::Jobs);
+
+        app.navigate(Page::Settings);
+        assert_eq!(app.current_page(), Page::Settings);
+    }
+
+    #[test]
+    fn navigate_to_same_page_is_noop() {
+        let mut app = App::new();
+        assert_eq!(app.current_page(), Page::Dashboard);
+
+        // Navigate to same page should not change anything
+        let cmd = app.navigate(Page::Dashboard);
+        assert!(cmd.is_none());
+        assert_eq!(app.current_page(), Page::Dashboard);
+    }
+
+    #[test]
+    fn navigate_via_appmsg() {
+        use bubbletea::{Message, Model};
+
+        let mut app = App::new();
+        assert_eq!(app.current_page(), Page::Dashboard);
+
+        // Send Navigate message
+        let msg = Message::new(AppMsg::Navigate(Page::Logs));
+        app.update(msg);
+        assert_eq!(app.current_page(), Page::Logs);
+    }
+
+    #[test]
+    fn navigate_triggers_page_transition_animation() {
+        // bd-30md: Page transitions trigger animation
+        let mut app = App::new();
+        assert_eq!(app.current_page(), Page::Dashboard);
+
+        // Navigate to a different page
+        app.navigate(Page::Jobs);
+
+        // Page transition animation should be triggered (starts at 0, animates to 1)
+        let transition = app.animator.get("page_transition");
+        assert!(transition.is_some(), "page_transition should be tracked");
+
+        // If animations enabled, value starts near 0 and animates toward 1
+        if app.use_animations() {
+            assert!(
+                app.animator.is_animating(),
+                "animator should be animating after navigation"
+            );
+        }
+    }
+
+    #[test]
+    fn navigate_transition_respects_reduce_motion() {
+        // bd-30md: Reduce motion disables page transition animation
+        let config = AppConfig {
+            animations: false,
+            ..Default::default()
+        };
+        let mut app = App::with_config(config);
+
+        // Navigate to a different page
+        app.navigate(Page::Jobs);
+
+        // When animations disabled, value snaps to target immediately
+        let transition = app.animator.get_or("page_transition", 0.0);
+        assert!(
+            (transition - 1.0).abs() < f64::EPSILON,
+            "page_transition should snap to 1.0 when animations disabled"
+        );
+        assert!(
+            !app.animator.is_animating(),
+            "animator should not be animating when reduce motion"
+        );
+    }
+
+    // =========================================================================
+    // Global Toggle tests (bd-247o)
+    // =========================================================================
+
+    #[test]
+    fn toggle_sidebar_visibility() {
+        use bubbletea::{Message, Model};
+
+        let mut app = App::new();
+        let initial = app.sidebar_visible;
+
+        // Toggle via message
+        let msg = Message::new(AppMsg::ToggleSidebar);
+        app.update(msg);
+        assert_eq!(app.sidebar_visible, !initial);
+
+        // Toggle again
+        let msg = Message::new(AppMsg::ToggleSidebar);
+        app.update(msg);
+        assert_eq!(app.sidebar_visible, initial);
+    }
+
+    #[test]
+    fn show_help_overlay() {
+        use bubbletea::{Message, Model};
+
+        let mut app = App::new();
+        assert!(!app.show_help);
+
+        // Show help
+        let msg = Message::new(AppMsg::ShowHelp);
+        app.update(msg);
+        assert!(app.show_help);
+
+        // Hide help
+        let msg = Message::new(AppMsg::HideHelp);
+        app.update(msg);
+        assert!(!app.show_help);
+    }
+
+    #[test]
+    fn toggle_mouse_via_appmsg() {
+        use bubbletea::{Message, Model};
+
+        let mut app = App::new();
+        let initial = app.config.mouse;
+
+        let msg = Message::new(AppMsg::ToggleMouse);
+        app.update(msg);
+        assert_eq!(app.config.mouse, !initial);
+    }
+
+    // =========================================================================
+    // Keybinding tests (bd-247o)
+    // =========================================================================
+
+    #[test]
+    fn key_q_triggers_quit() {
+        use bubbletea::{KeyMsg, Message, Model};
+
+        let mut app = App::new();
+        // Set ready state so keybindings work
+        app.ready = true;
+
+        let msg = Message::new(KeyMsg::from_char('q'));
+        let cmd = app.update(msg);
+
+        // Should return a quit command
+        assert!(cmd.is_some());
+    }
+
+    #[test]
+    fn key_question_shows_help() {
+        use bubbletea::{KeyMsg, Message, Model};
+
+        let mut app = App::new();
+        app.ready = true;
+        assert!(!app.show_help);
+
+        let msg = Message::new(KeyMsg::from_char('?'));
+        app.update(msg);
+        assert!(app.show_help);
+    }
+
+    #[test]
+    fn key_escape_hides_help() {
+        use bubbletea::{KeyMsg, KeyType, Message, Model};
+
+        let mut app = App::new();
+        app.ready = true;
+        app.show_help = true;
+
+        let msg = Message::new(KeyMsg::from_type(KeyType::Esc));
+        app.update(msg);
+        assert!(!app.show_help);
+    }
+
+    #[test]
+    fn key_bracket_toggles_sidebar() {
+        use bubbletea::{KeyMsg, Message, Model};
+
+        let mut app = App::new();
+        app.ready = true;
+        let initial = app.sidebar_visible;
+
+        let msg = Message::new(KeyMsg::from_char('['));
+        app.update(msg);
+        assert_eq!(app.sidebar_visible, !initial);
+    }
+
+    #[test]
+    fn key_t_cycles_theme() {
+        use bubbletea::{KeyMsg, Message, Model};
+
+        let mut app = App::new();
+        app.ready = true;
+        assert_eq!(app.theme_preset(), ThemePreset::Dark);
+
+        let msg = Message::new(KeyMsg::from_char('t'));
+        app.update(msg);
+        assert_eq!(app.theme_preset(), ThemePreset::Light);
+    }
+
+    #[test]
+    fn number_keys_navigate_pages() {
+        use bubbletea::{KeyMsg, Message, Model};
+
+        let mut app = App::new();
+        app.ready = true;
+        assert_eq!(app.current_page(), Page::Dashboard);
+
+        // Key '3' should navigate to Jobs (page 3)
+        let msg = Message::new(KeyMsg::from_char('3'));
+        app.update(msg);
+        assert_eq!(app.current_page(), Page::Jobs);
+
+        // Key '5' should navigate to Docs (page 5)
+        let msg = Message::new(KeyMsg::from_char('5'));
+        app.update(msg);
+        assert_eq!(app.current_page(), Page::Docs);
+    }
+
+    #[test]
+    fn view_shows_loading_when_not_ready() {
+        use bubbletea::Model;
+
+        let app = App::new();
+        assert!(!app.ready);
+
+        // View should show loading message
+        let view = app.view();
+        assert!(view.contains("Loading"));
+    }
+
+    #[test]
+    fn debug_view_output() {
+        use bubbletea::message::WindowSizeMsg;
+        use bubbletea::{Message, Model};
+
+        let mut app = App::new();
+        assert!(!app.ready);
+
+        // Simulate receiving window size
+        let size_msg = Message::new(WindowSizeMsg {
+            width: 120,
+            height: 40,
+        });
+        app.update(size_msg);
+        assert!(app.ready);
+
+        // Get the full view
+        let view = app.view();
+
+        // Print for debugging
+        eprintln!("=== View Output ({} chars) ===", view.len());
+        for (i, line) in view.lines().enumerate() {
+            eprintln!("{:3}: {}", i + 1, line);
+        }
+        eprintln!("=== End View ===");
+
+        // Basic assertions
+        assert!(view.len() > 100, "View should have substantial content");
+        assert!(
+            view.contains("Charmed") || view.contains("Dashboard"),
+            "View should contain expected UI elements"
+        );
+    }
+
+    #[test]
+    fn keybindings_work_even_before_ready() {
+        use bubbletea::{KeyMsg, Message, Model};
+
+        let mut app = App::new();
+        // App starts not ready, but keybindings should still work
+        // (they prepare state for when we become ready)
+        assert!(!app.ready);
+        assert!(!app.show_help);
+
+        // Key '?' should still toggle help state
+        let msg = Message::new(KeyMsg::from_char('?'));
+        app.update(msg);
+        // Help state is set (will be visible once ready)
+        assert!(app.show_help);
+    }
+
+    #[test]
+    fn set_theme_message_works() {
+        use crate::messages::AppMsg;
+        use crate::theme::ThemePreset;
+        use bubbletea::{Message, Model};
+
+        let mut app = App::new();
+        assert_eq!(app.theme_preset(), ThemePreset::Dark);
+
+        // Send SetTheme message directly
+        let msg = Message::new(AppMsg::SetTheme(ThemePreset::Light));
+        app.update(msg);
+        assert_eq!(app.theme_preset(), ThemePreset::Light);
+    }
+
+    #[test]
+    fn batch_set_theme_works_via_simulator() {
+        use crate::messages::AppMsg;
+        use crate::theme::ThemePreset;
+        use bubbletea::{Cmd, Message, batch, simulator::ProgramSimulator};
+
+        let app = App::new();
+        let mut sim = ProgramSimulator::new(app);
+        sim.init();
+
+        // Make app ready
+        sim.send(Message::new(bubbletea::WindowSizeMsg {
+            width: 120,
+            height: 40,
+        }));
+        sim.run_until_empty();
+
+        assert_eq!(sim.model().theme_preset(), ThemePreset::Dark);
+
+        // Create a batch command that sets theme
+        let batch_cmd = batch(vec![Some(Cmd::new(|| {
+            Message::new(AppMsg::SetTheme(ThemePreset::Light))
+        }))]);
+
+        // Execute the batch command to get BatchMsg
+        if let Some(batch_msg) = batch_cmd.and_then(bubbletea::Cmd::execute) {
+            // Send the BatchMsg (or the SetTheme message directly for single command)
+            sim.send(batch_msg);
+            sim.run_until_empty();
+        }
+
+        assert_eq!(sim.model().theme_preset(), ThemePreset::Light);
+    }
+
+    #[test]
+    fn batch_two_commands_works_via_simulator() {
+        use crate::messages::{AppMsg, Notification, NotificationMsg};
+        use crate::theme::ThemePreset;
+        use bubbletea::{Cmd, Message, batch, simulator::ProgramSimulator};
+
+        let app = App::new();
+        let mut sim = ProgramSimulator::new(app);
+        sim.init();
+
+        // Make app ready
+        sim.send(Message::new(bubbletea::WindowSizeMsg {
+            width: 120,
+            height: 40,
+        }));
+        sim.run_until_empty();
+
+        assert_eq!(sim.model().theme_preset(), ThemePreset::Dark);
+        assert_eq!(sim.model().notifications.len(), 0);
+
+        // Create a batch command with TWO commands (like SettingsPage does)
+        let batch_cmd = batch(vec![
+            Some(Cmd::new(|| {
+                Message::new(AppMsg::SetTheme(ThemePreset::Light))
+            })),
+            Some(Cmd::new(|| {
+                Message::new(NotificationMsg::Show(Notification::success(
+                    0,
+                    "Theme changed".to_string(),
+                )))
+            })),
+        ]);
+
+        // Execute the batch command to get BatchMsg
+        if let Some(batch_msg) = batch_cmd.and_then(bubbletea::Cmd::execute) {
+            // BatchMsg contains the two commands
+            sim.send(batch_msg);
+            sim.run_until_empty();
+        }
+
+        // Both should have been processed
+        assert_eq!(
+            sim.model().theme_preset(),
+            ThemePreset::Light,
+            "Theme should be Light after batch processing"
+        );
+        assert_eq!(
+            sim.model().notifications.len(),
+            1,
+            "Should have one notification after batch processing"
+        );
+    }
+
+    #[test]
+    fn settings_theme_change_via_keys() {
+        use crate::theme::ThemePreset;
+        use bubbletea::{KeyMsg, KeyType, Message, simulator::ProgramSimulator};
+
+        let app = App::new();
+        let mut sim = ProgramSimulator::new(app);
+        sim.init();
+
+        // Make app ready
+        sim.send(Message::new(bubbletea::WindowSizeMsg {
+            width: 120,
+            height: 40,
+        }));
+        let init_processed = sim.run_until_empty();
+        eprintln!("After init: processed {init_processed} messages");
+
+        assert_eq!(sim.model().theme_preset(), ThemePreset::Dark);
+
+        // Navigate to Settings page with '8' key
+        sim.send(Message::new(KeyMsg::from_char('8')));
+        let nav_processed = sim.run_until_empty();
+        eprintln!("After nav to Settings: processed {nav_processed} messages");
+        assert_eq!(sim.model().current_page(), Page::Settings);
+
+        // Tab to switch to Themes section
+        sim.send(Message::new(KeyMsg {
+            key_type: KeyType::Tab,
+            runes: vec![],
+            alt: false,
+            paste: false,
+        }));
+        let tab_processed = sim.run_until_empty();
+        eprintln!("After Tab: processed {tab_processed} messages");
+
+        // 'j' to move down to Light theme
+        sim.send(Message::new(KeyMsg::from_char('j')));
+        let j_processed = sim.run_until_empty();
+        eprintln!("After j: processed {j_processed} messages");
+
+        // Enter to apply theme - this returns a batch command!
+        sim.send(Message::new(KeyMsg {
+            key_type: KeyType::Enter,
+            runes: vec![],
+            alt: false,
+            paste: false,
+        }));
+
+        // Process the Enter key, which should return a batch command
+        let cmd = sim.step();
+        eprintln!("After Enter step: cmd is {:?}", cmd.is_some());
+        if let Some(batch_cmd) = cmd {
+            // Execute the batch command
+            if let Some(batch_msg) = batch_cmd.execute() {
+                eprintln!("Batch command executed, sending batch_msg");
+                // Send the batch message
+                sim.send(batch_msg);
+            }
+        }
+
+        // Process all remaining messages
+        let final_processed = sim.run_until_empty();
+        eprintln!("After run_until_empty: processed {final_processed} messages");
+
+        // Theme should now be Light
+        assert_eq!(
+            sim.model().theme_preset(),
+            ThemePreset::Light,
+            "Theme should be Light after Enter on Settings page"
+        );
+    }
+
+    // =========================================================================
+    // Focus/Blur Awareness Tests (bd-1fxl)
+    // =========================================================================
+
+    #[test]
+    fn app_default_focused() {
+        let app = App::new();
+        assert!(app.focused(), "app should default to focused");
+    }
+
+    #[test]
+    fn focus_msg_sets_focused() {
+        let mut app = App::new();
+        // First blur to unfocus
+        app.update(Message::new(BlurMsg));
+        assert!(!app.focused(), "app should be unfocused after BlurMsg");
+
+        // Then focus
+        app.update(Message::new(FocusMsg));
+        assert!(app.focused(), "app should be focused after FocusMsg");
+    }
+
+    #[test]
+    fn blur_msg_sets_unfocused() {
+        let mut app = App::new();
+        assert!(app.focused(), "app should start focused");
+
+        app.update(Message::new(BlurMsg));
+        assert!(!app.focused(), "app should be unfocused after BlurMsg");
+    }
+
+    #[test]
+    fn header_shows_unfocused_indicator() {
+        let mut app = App::new();
+        app.width = 120;
+        app.height = 40;
+        app.ready = true;
+
+        // Focused - no indicator
+        let focused_header = app.render_header();
+        assert!(
+            !focused_header.contains("unfocused"),
+            "focused header should not show unfocused indicator"
+        );
+
+        // Unfocused - shows indicator
+        app.update(Message::new(BlurMsg));
+        let unfocused_header = app.render_header();
+        assert!(
+            unfocused_header.contains("unfocused"),
+            "unfocused header should show unfocused indicator"
+        );
+
+        // Refocused - indicator gone
+        app.update(Message::new(FocusMsg));
+        let refocused_header = app.render_header();
+        assert!(
+            !refocused_header.contains("unfocused"),
+            "refocused header should not show unfocused indicator"
+        );
+    }
+
+    /// Diagnostic test: Check that view output fits within terminal bounds (bd-pty1)
+    #[test]
+    fn view_output_fits_terminal_width() {
+        // Create app with specific terminal size
+        let mut app = App::new();
+        app.width = 120;
+        app.height = 40;
+        app.ready = true; // Mark as ready so we get the full view
+        app.sidebar_visible = true;
+
+        // Get the view output
+        let view = app.view();
+
+        println!("=== VIEW OUTPUT ANALYSIS (120x40) ===\n");
+
+        // Check each line
+        let mut max_visible_width = 0;
+        let mut problematic_lines = Vec::new();
+
+        for (line_num, line) in view.lines().enumerate() {
+            let visible_width = lipgloss::width(line);
+            max_visible_width = max_visible_width.max(visible_width);
+
+            // Width-1 is the truncation target (119)
+            if visible_width > 119 {
+                problematic_lines.push((line_num, visible_width, line.to_string()));
+            }
+        }
+
+        let total_lines = view.lines().count();
+        println!("Total lines: {total_lines}");
+        println!("Max visible width: {max_visible_width}");
+
+        if !problematic_lines.is_empty() {
+            println!("\n!!! LINES EXCEEDING 119 COLUMNS !!!\n");
+            for (line_num, width, line) in &problematic_lines {
+                println!(
+                    "Line {} (width {}): {:?}",
+                    line_num,
+                    width,
+                    line.chars()
+                        .take(80)
+                        .collect::<String>()
+                        .replace('\x1b', "ESC")
+                );
+            }
+        }
+        assert!(
+            problematic_lines.is_empty(),
+            "Found {} lines exceeding safe width (119)",
+            problematic_lines.len()
+        );
+
+        // Also verify the view has the expected structure
+        assert!(
+            view.contains("Charmed Control Center"),
+            "Header should be visible"
+        );
+        assert!(view.contains("Dashboard"), "Sidebar should be visible");
+
+        println!("✓ All {total_lines} lines fit within 119 columns (max: {max_visible_width})");
+
+        // Check for trailing newline
+        let has_trailing_newline = view.ends_with('\n');
+        println!("Has trailing newline: {has_trailing_newline}");
+
+        // Count actual newlines in the view
+        let newline_count = view.chars().filter(|&c| c == '\n').count();
+        println!(
+            "Newline count in view: {} (should be {} for {} lines)",
+            newline_count,
+            total_lines - 1,
+            total_lines
+        );
+
+        // If there's a trailing newline, that's an extra newline that could cause scroll
+        if has_trailing_newline {
+            println!("WARNING: Trailing newline may cause extra row in terminal");
+        }
+    }
+
+    /// Debug test: Analyze the internal components of `view()` (bd-pty1)
+    #[test]
+    #[allow(clippy::too_many_lines)]
+    fn debug_view_component_widths() {
+        let mut app = App::new();
+        app.width = 120;
+        app.height = 40;
+        app.ready = true;
+        app.sidebar_visible = true;
+
+        // Manually call the component rendering to check their dimensions
+        let header = app.render_header();
+        let footer = app.render_footer();
+
+        let header_height = usize::from(spacing::HEADER_HEIGHT);
+        let footer_height = usize::from(spacing::FOOTER_HEIGHT);
+        let content_height = app.height.saturating_sub(header_height + footer_height);
+
+        let sidebar_width = usize::from(spacing::SIDEBAR_WIDTH);
+        let content_width = app.width.saturating_sub(sidebar_width);
+        let sidebar = app.render_sidebar(content_height);
+
+        let page_content =
+            app.pages
+                .get(app.current_page)
+                .view(content_width, content_height, &app.theme);
+
+        // Check each component
+        println!("=== COMPONENT WIDTH ANALYSIS ===\n");
+
+        // Header
+        let header_max_width = header.lines().map(lipgloss::width).max().unwrap_or(0);
+        println!(
+            "Header: {} lines, max width = {} (expected ~{})",
+            header.lines().count(),
+            header_max_width,
+            app.width - 1
+        );
+
+        // Footer
+        let footer_max_width = footer.lines().map(lipgloss::width).max().unwrap_or(0);
+        println!(
+            "Footer: {} lines, max width = {} (expected ~{})",
+            footer.lines().count(),
+            footer_max_width,
+            app.width
+        );
+
+        // Sidebar
+        let sidebar_max_width = sidebar.lines().map(lipgloss::width).max().unwrap_or(0);
+        println!(
+            "Sidebar: {} lines, max width = {} (expected {})",
+            sidebar.lines().count(),
+            sidebar_max_width,
+            sidebar_width
+        );
+
+        // Page content
+        let page_max_width = page_content.lines().map(lipgloss::width).max().unwrap_or(0);
+        println!(
+            "Page content: {} lines, max width = {} (expected {})",
+            page_content.lines().count(),
+            page_max_width,
+            content_width
+        );
+
+        // Join horizontal: sidebar + page_content
+        let main_area = lipgloss::join_horizontal(Position::Top, &[&sidebar, &page_content]);
+        let main_area_max_width = main_area.lines().map(lipgloss::width).max().unwrap_or(0);
+        println!(
+            "Main area (sidebar + content): {} lines, max width = {} (expected {})",
+            main_area.lines().count(),
+            main_area_max_width,
+            app.width
+        );
+
+        // Check for overflow
+        let safe_width = app.width.saturating_sub(1);
+        if main_area_max_width > safe_width {
+            println!(
+                "\n!!! MAIN AREA EXCEEDS SAFE WIDTH ({main_area_max_width} > {safe_width}) !!!"
+            );
+
+            // Find offending lines
+            for (i, line) in main_area.lines().enumerate() {
+                let w = lipgloss::width(line);
+                if w > safe_width {
+                    println!("  Line {}: width {} (excess {})", i, w, w - safe_width);
+                }
+            }
+        }
+
+        // Final join
+        let base_view = lipgloss::join_vertical(Position::Left, &[&header, &main_area, &footer]);
+        let base_max_width = base_view.lines().map(lipgloss::width).max().unwrap_or(0);
+        println!(
+            "\nBefore truncation: {} lines, max width = {}",
+            base_view.lines().count(),
+            base_max_width
+        );
+
+        // After truncation
+        let final_view = truncate_to_width(&base_view, safe_width);
+        let final_max_width = final_view.lines().map(lipgloss::width).max().unwrap_or(0);
+        println!("After truncation to {safe_width}: max width = {final_max_width}");
+
+        // Assertions
+        assert!(
+            final_max_width <= safe_width,
+            "Final view width {final_max_width} exceeds safe width {safe_width}"
+        );
+    }
+}

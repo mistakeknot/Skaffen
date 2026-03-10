@@ -1,0 +1,45 @@
+[package]
+name = "charmed-bubbles"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+authors.workspace = true
+readme = "README.md"
+documentation = "https://docs.rs/charmed-bubbles"
+description = "Common TUI components for bubbletea applications"
+keywords = ["tui", "terminal", "widgets", "components", "cli"]
+categories = ["command-line-interface"]
+autoexamples = false
+
+[lib]
+name = "bubbles"
+
+[dependencies]
+bubbletea = { workspace = true }
+lipgloss = { workspace = true }
+harmonica = { workspace = true }
+unicode-segmentation.workspace = true
+unicode-width.workspace = true
+parking_lot = "0.12"
+
+[dev-dependencies]
+criterion.workspace = true
+regex.workspace = true
+proptest.workspace = true
+
+[[bench]]
+name = "bubbles_benchmarks"
+harness = false
+
+[[example]]
+name = "bubbles_spinner"
+path = "examples/spinner.rs"
+
+[[example]]
+name = "bubbles_textinput"
+path = "examples/textinput.rs"
+
+[lints]
+workspace = true

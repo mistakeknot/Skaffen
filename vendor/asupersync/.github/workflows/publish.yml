@@ -1,0 +1,761 @@
+name: Publish
+
+on:
+  push:
+    tags:
+      - 'v[0-9]+.*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag (e.g., v0.1.0)'
+        required: true
+        type: string
+      publish_wasm:
+        description: 'Run WASM release gates, build artifacts, and upload provenance bundle'
+        required: false
+        default: true
+        type: boolean
+      publish_npm:
+        description: 'Publish Browser Edition npm packages when package manifests exist'
+        required: false
+        default: true
+        type: boolean
+      npm_tag:
+        description: 'npm dist-tag to publish under (for example: latest, canary)'
+        required: false
+        default: latest
+        type: string
+      rollback_npm_to_version:
+        description: 'Optional rollback target version for npm dist-tag reassignment (workflow_dispatch only)'
+        required: false
+        default: ''
+        type: string
+      rollback_reason:
+        description: 'Reason for rollback when rollback_npm_to_version is set'
+        required: false
+        default: ''
+        type: string
+      allow_missing_changelog:
+        description: 'Permit release without CHANGELOG.md entry for the target version'
+        required: false
+        default: false
+        type: boolean
+
+concurrency:
+  group: publish
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_TOOLCHAIN: nightly-2026-02-05
+  WASM_RELEASE_CONTRACT_ID: wasm-release-channel-strategy-v1
+  WASM_RELEASE_BEAD_ID: asupersync-umelq.15.2
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
+      version: ${{ steps.tag.outputs.version }}
+      prerelease: ${{ steps.tag.outputs.prerelease }}
+      publish_wasm: ${{ steps.flags.outputs.publish_wasm }}
+      publish_npm: ${{ steps.flags.outputs.publish_npm }}
+      npm_tag: ${{ steps.flags.outputs.npm_tag }}
+      rollback_npm_to_version: ${{ steps.flags.outputs.rollback_npm_to_version }}
+      rollback_reason: ${{ steps.flags.outputs.rollback_reason }}
+      allow_missing_changelog: ${{ steps.flags.outputs.allow_missing_changelog }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Determine and validate tag
+        id: tag
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG="${{ inputs.tag }}"
+          else
+            TAG="${GITHUB_REF#refs/tags/}"
+          fi
+          VERSION="${TAG#v}"
+
+          if ! echo "$VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?$'; then
+            echo "Error: Version '$VERSION' does not match semver format"
+            exit 1
+          fi
+
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          if [[ "$VERSION" == *-* ]]; then
+            echo "prerelease=true" >> $GITHUB_OUTPUT
+          else
+            echo "prerelease=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Resolve publish flags
+        id: flags
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "publish_wasm=${{ inputs.publish_wasm }}" >> "$GITHUB_OUTPUT"
+            echo "publish_npm=${{ inputs.publish_npm }}" >> "$GITHUB_OUTPUT"
+            echo "npm_tag=${{ inputs.npm_tag }}" >> "$GITHUB_OUTPUT"
+            echo "rollback_npm_to_version=${{ inputs.rollback_npm_to_version }}" >> "$GITHUB_OUTPUT"
+            echo "rollback_reason=${{ inputs.rollback_reason }}" >> "$GITHUB_OUTPUT"
+            echo "allow_missing_changelog=${{ inputs.allow_missing_changelog }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "publish_wasm=true" >> "$GITHUB_OUTPUT"
+            echo "publish_npm=true" >> "$GITHUB_OUTPUT"
+            echo "npm_tag=latest" >> "$GITHUB_OUTPUT"
+            echo "rollback_npm_to_version=" >> "$GITHUB_OUTPUT"
+            echo "rollback_reason=" >> "$GITHUB_OUTPUT"
+            echo "allow_missing_changelog=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Validate changelog entry
+        if: ${{ steps.flags.outputs.allow_missing_changelog != 'true' }}
+        run: |
+          version="${{ steps.tag.outputs.version }}"
+          if ! grep -Eq "^##[[:space:]]+(\[)?v?${version}(\])?([[:space:]]|$|-)" CHANGELOG.md; then
+            echo "Missing CHANGELOG entry for ${version}. Re-run with allow_missing_changelog=true only when justified."
+            exit 1
+          fi
+
+  publish:
+    name: Publish to crates.io
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    if: ${{ !contains(needs.plan.outputs.tag, '-') }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+
+      - name: Verify version matches tag
+        run: |
+          cargo_version=$(grep '^version' Cargo.toml | head -1 | cut -d'"' -f2)
+          tag_version="${{ needs.plan.outputs.version }}"
+          if [[ "$cargo_version" != "$tag_version" ]]; then
+            echo "Version mismatch: Cargo.toml=$cargo_version, tag=$tag_version"
+            exit 1
+          fi
+          echo "Version verified: $cargo_version"
+
+      - name: Dry run publish (root crate)
+        run: cargo publish --dry-run --locked
+
+      - name: Publish crates to crates.io
+        if: ${{ secrets.CARGO_REGISTRY_TOKEN != '' }}
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        run: |
+          set -e
+          publish_if_needed() {
+            local crate="$1"
+            echo "Publishing $crate..."
+            cargo publish -p "$crate" --locked || {
+              if cargo search "$crate" | grep -q "^$crate"; then
+                echo "$crate already published"
+              else
+                exit 1
+              fi
+            }
+          }
+
+          publish_if_needed asupersync-macros
+          sleep 30
+          publish_if_needed asupersync-conformance
+          sleep 30
+          publish_if_needed asupersync
+
+      - name: Summary
+        run: |
+          echo "## Crates.io Publish" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [[ -n "${{ secrets.CARGO_REGISTRY_TOKEN }}" ]]; then
+            echo "Published asupersync v${{ needs.plan.outputs.version }} (+ macros/conformance) to crates.io" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "Skipped - CARGO_REGISTRY_TOKEN not configured" >> $GITHUB_STEP_SUMMARY
+          fi
+
+  wasm_release:
+    name: Build WASM release artifacts and provenance bundle
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    if: ${{ needs.plan.outputs.publish_wasm == 'true' }}
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate release traceability artifact
+        run: |
+          mkdir -p artifacts/wasm/release
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          security_policy = Path(".github/security_release_policy.json")
+          if not security_policy.exists():
+              raise SystemExit("missing .github/security_release_policy.json")
+
+          data = json.loads(security_policy.read_text(encoding="utf-8"))
+          criteria = [item.get("id", "") for item in data.get("release_blocking_criteria", []) if isinstance(item, dict)]
+          report = {
+              "schema_version": "wasm-release-traceability-v1",
+              "contract_id": "${{ env.WASM_RELEASE_CONTRACT_ID }}",
+              "bead_id": "${{ env.WASM_RELEASE_BEAD_ID }}",
+              "workflow": ".github/workflows/publish.yml",
+              "version": "${{ needs.plan.outputs.version }}",
+              "tag": "${{ needs.plan.outputs.tag }}",
+              "security_policy_file": str(security_policy),
+              "release_blocking_criteria": criteria,
+              "required_gate_reports": [
+                  "artifacts/wasm_optimization_pipeline_summary.json",
+                  "artifacts/wasm_dependency_audit_summary.json",
+                  "artifacts/security_release_gate_report.json",
+              ],
+          }
+          Path("artifacts/wasm/release/release_traceability.json").write_text(
+              json.dumps(report, indent=2) + "\n", encoding="utf-8"
+          )
+          PY
+
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+          targets: wasm32-unknown-unknown
+
+      - name: Run WASM optimization policy gate
+        run: |
+          mkdir -p artifacts
+          python3 scripts/check_wasm_optimization_policy.py \
+            --policy .github/wasm_optimization_policy.json
+
+      - name: Run WASM dependency policy gate
+        run: |
+          python3 scripts/check_wasm_dependency_policy.py \
+            --policy .github/wasm_dependency_policy.json
+
+      - name: Run security release gate (dependency checks enabled)
+        run: |
+          python3 scripts/check_security_release_gate.py \
+            --policy .github/security_release_policy.json \
+            --check-deps \
+            --dep-policy .github/wasm_dependency_policy.json
+
+      - name: Build WASM profile checks (dev/prod/deterministic)
+        run: |
+          cargo check --target wasm32-unknown-unknown \
+            --no-default-features --features wasm-browser-dev
+          cargo check --target wasm32-unknown-unknown \
+            --no-default-features --features wasm-browser-prod
+          cargo check --target wasm32-unknown-unknown \
+            --no-default-features --features wasm-browser-deterministic
+
+      - name: Build release-grade WASM artifacts
+        run: |
+          mkdir -p artifacts/wasm/release
+
+          cargo build --target wasm32-unknown-unknown --release \
+            --no-default-features --features wasm-browser-prod
+          cp target/wasm32-unknown-unknown/release/asupersync.wasm \
+            artifacts/wasm/release/asupersync.release.wasm
+
+          cargo build --target wasm32-unknown-unknown --release \
+            --no-default-features --features wasm-browser-deterministic
+          cp target/wasm32-unknown-unknown/release/asupersync.wasm \
+            artifacts/wasm/release/asupersync.deterministic.wasm
+
+          cargo build --target wasm32-unknown-unknown --release \
+            --no-default-features --features wasm-browser-minimal
+          cp target/wasm32-unknown-unknown/release/asupersync.wasm \
+            artifacts/wasm/release/asupersync.minimal.wasm
+
+      - name: Generate WASM release manifest
+        run: |
+          python3 - <<'PY'
+          import hashlib
+          import json
+          from pathlib import Path
+
+          out = Path("artifacts/wasm/release")
+          out.mkdir(parents=True, exist_ok=True)
+          files = sorted(
+              [p for p in out.glob("*.wasm")] +
+              [Path("artifacts/wasm_optimization_pipeline_summary.json"),
+               Path("artifacts/wasm_dependency_audit_summary.json"),
+               Path("artifacts/wasm_dependency_audit_log.ndjson"),
+               Path("artifacts/security_release_gate_report.json"),
+               Path("artifacts/security_release_gate_events.ndjson")]
+          )
+          entries = []
+          for path in files:
+              if not path.exists():
+                  continue
+              data = path.read_bytes()
+              entries.append({
+                  "path": str(path),
+                  "sha256": hashlib.sha256(data).hexdigest(),
+                  "size_bytes": len(data),
+              })
+          manifest = {
+              "schema_version": "wasm-release-manifest-v1",
+              "tag": "${{ needs.plan.outputs.tag }}",
+              "version": "${{ needs.plan.outputs.version }}",
+              "prerelease": "${{ needs.plan.outputs.prerelease }}" == "true",
+              "entries": entries,
+              "required_gate_reports": [
+                  "artifacts/wasm_optimization_pipeline_summary.json",
+                  "artifacts/wasm_dependency_audit_summary.json",
+                  "artifacts/security_release_gate_report.json"
+              ]
+          }
+          (out / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+          PY
+
+      - name: Upload WASM release bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: wasm-release-bundle
+          path: |
+            artifacts/wasm/release/
+            artifacts/wasm/release/release_traceability.json
+            artifacts/wasm_optimization_pipeline_summary.json
+            artifacts/wasm_dependency_audit_summary.json
+            artifacts/wasm_dependency_audit_log.ndjson
+            artifacts/security_release_gate_report.json
+            artifacts/security_release_gate_events.ndjson
+
+      - name: Attest WASM release bundle provenance
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: artifacts/wasm/release/*
+
+      - name: Emit rollback guidance artifact on failure
+        if: ${{ failure() }}
+        run: |
+          mkdir -p artifacts/wasm/release
+          cat > artifacts/wasm/release/rollback_instructions.md <<'EOF'
+          # WASM Release Rollback Guidance
+
+          Triggered because a WASM release gate failed.
+
+          Suggested rollback sequence:
+          1. Keep current stable channel frozen.
+          2. Demote promotion candidate (`stable -> canary` or `canary -> nightly`) per docs/wasm_release_channel_strategy.md.
+          3. Capture failing gate reports:
+             - artifacts/security_release_gate_report.json
+             - artifacts/wasm_dependency_audit_summary.json
+             - artifacts/wasm_optimization_pipeline_summary.json
+          4. Open remediation bead and attach this artifact set before re-promotion.
+          EOF
+
+      - name: Emit rollback safety report and incident response packet
+        if: ${{ always() }}
+        run: |
+          mkdir -p artifacts/wasm/release
+          python3 - <<'PY'
+          import datetime as dt
+          import json
+          from pathlib import Path
+
+          gate_reports = [
+              "artifacts/wasm_optimization_pipeline_summary.json",
+              "artifacts/wasm_dependency_audit_summary.json",
+              "artifacts/security_release_gate_report.json",
+          ]
+          missing = [path for path in gate_reports if not Path(path).exists()]
+          generated_at = dt.datetime.now(dt.timezone.utc).isoformat()
+
+          rollback_safety_report = {
+              "schema_version": "wasm-rollback-safety-v1",
+              "generated_at_utc": generated_at,
+              "contract_id": "${{ env.WASM_RELEASE_CONTRACT_ID }}",
+              "bead_id": "${{ env.WASM_RELEASE_BEAD_ID }}",
+              "tag": "${{ needs.plan.outputs.tag }}",
+              "version": "${{ needs.plan.outputs.version }}",
+              "gate_status": "pass" if not missing else "fail",
+              "required_gate_reports": gate_reports,
+              "missing_gate_reports": missing,
+              "rollback_safety_checks": [
+                  "rollback_reason_required_when_rollback_version_set",
+                  "npm_rollback_actions_artifactized",
+                  "wasm_gate_reports_captured_for_triage",
+                  "deterministic_replay_commands_published",
+              ],
+              "deterministic_repro_commands": [
+                  "bash ./scripts/run_all_e2e.sh --suite wasm-incident-forensics",
+                  "TEST_SEED=4242 bash ./scripts/test_wasm_incident_forensics_e2e.sh",
+                  "python3 ./scripts/check_incident_forensics_playbook.py",
+              ],
+              "artifact_pointers": {
+                  "traceability": "artifacts/wasm/release/release_traceability.json",
+                  "rollback_guidance": "artifacts/wasm/release/rollback_instructions.md",
+                  "npm_rollback_outcome": "artifacts/npm/rollback_outcome.json",
+              },
+          }
+
+          incident_response_packet = {
+              "schema_version": "wasm-release-incident-response-v1",
+              "generated_at_utc": generated_at,
+              "contract_id": "${{ env.WASM_RELEASE_CONTRACT_ID }}",
+              "bead_id": "asupersync-umelq.15.5",
+              "communication_protocol": {
+                  "sev_1": {
+                      "initial_ack_sla_minutes": 5,
+                      "update_interval_minutes": 15,
+                      "required_roles": ["release-captain", "security-oncall", "runtime-owner"],
+                  },
+                  "sev_2": {
+                      "initial_ack_sla_minutes": 15,
+                      "update_interval_minutes": 30,
+                      "required_roles": ["release-captain", "runtime-owner"],
+                  },
+              },
+              "artifact_revocation_strategy": {
+                  "npm_dist_tag_rollback_command_template": "npm dist-tag add <package>@<known-good-version> <tag>",
+                  "required_artifacts": [
+                      "artifacts/npm/rollback_actions.txt",
+                      "artifacts/npm/rollback_outcome.json",
+                  ],
+                  "stable_channel_action": "demote stable->canary and freeze promotion until remediation bead is active",
+              },
+              "postmortem_requirements": [
+                  "incident_timeline_utc",
+                  "triggering_gate_and_evidence_links",
+                  "exact_repro_commands",
+                  "rollback_actions_and_verification_results",
+                  "owner_assigned_follow_up_bead",
+              ],
+          }
+
+          Path("artifacts/wasm/release/rollback_safety_report.json").write_text(
+              json.dumps(rollback_safety_report, indent=2) + "\n",
+              encoding="utf-8",
+          )
+          Path("artifacts/wasm/release/incident_response_packet.json").write_text(
+              json.dumps(incident_response_packet, indent=2) + "\n",
+              encoding="utf-8",
+          )
+          PY
+
+  npm_publish:
+    name: Publish Browser Edition npm packages
+    needs: [plan, wasm_release]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    if: ${{ needs.plan.outputs.publish_npm == 'true' && !contains(needs.plan.outputs.version, '-') && (needs.plan.outputs.publish_wasm != 'true' || needs.wasm_release.result == 'success') }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Resolve required Browser Edition packages
+        id: discover
+        run: |
+          mkdir -p artifacts/npm
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          policy_path = Path(".github/wasm_typescript_package_policy.json")
+          policy = json.loads(policy_path.read_text(encoding="utf-8"))
+          required_packages = policy.get("required_packages", [])
+
+          package_paths = []
+          missing_packages = []
+          discovered_packages = []
+          for manifest_path in sorted(Path("packages").glob("*/package.json")):
+              manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+              discovered_packages.append(
+                  {
+                      "package": manifest.get("name", "<unknown>"),
+                      "path": str(manifest_path),
+                  }
+              )
+
+          unexpected_packages = sorted(
+              entry for entry in discovered_packages if entry["package"] not in required_packages
+          )
+
+          for package_name in required_packages:
+              dir_name = package_name.split("/")[-1]
+              manifest_path = Path("packages") / dir_name / "package.json"
+              if manifest_path.exists():
+                  package_paths.append(str(manifest_path))
+              else:
+                  missing_packages.append(
+                      {
+                          "package": package_name,
+                          "expected_path": str(manifest_path),
+                      }
+                  )
+
+          pkg_path_file = Path("artifacts/npm/package_json_paths.txt")
+          pkg_path_file.write_text(
+              "\n".join(package_paths) + ("\n" if package_paths else ""),
+              encoding="utf-8",
+          )
+
+          payload = {
+              "schema_version": "npm-release-assumptions-v1",
+              "contract_id": "${{ env.WASM_RELEASE_CONTRACT_ID }}",
+              "bead_id": "asupersync-3qv04.7.1",
+              "required_package_policy": str(policy_path),
+              "required_packages": required_packages,
+              "package_discovery_glob": "packages/*/package.json",
+              "discovered_packages": discovered_packages,
+              "discovered_package_manifests": package_paths,
+              "discovered_package_count": len(package_paths),
+              "missing_packages": missing_packages,
+              "unexpected_packages": unexpected_packages,
+              "publish_enabled": "${{ needs.plan.outputs.publish_npm }}" == "true",
+              "npm_tag": "${{ needs.plan.outputs.npm_tag }}",
+          }
+          Path("artifacts/npm/npm_release_assumptions.json").write_text(
+              json.dumps(payload, indent=2) + "\n",
+              encoding="utf-8",
+          )
+
+          if missing_packages or unexpected_packages:
+              print("Browser Edition package release validation failed.")
+              if missing_packages:
+                  print(f"Missing required packages: {missing_packages}")
+              if unexpected_packages:
+                  print(f"Unexpected package manifests: {unexpected_packages}")
+              raise SystemExit(1)
+
+          Path("artifacts/npm/package_count.txt").write_text(
+              str(len(package_paths)) + "\n",
+              encoding="utf-8",
+          )
+          PY
+
+          echo "package_count=$(cat artifacts/npm/package_count.txt)" >> "$GITHUB_OUTPUT"
+
+      - name: Enable pnpm via corepack
+        if: ${{ needs.plan.outputs.rollback_npm_to_version == '' }}
+        run: |
+          package_manager="$(node -p "require('./package.json').packageManager")"
+          corepack enable
+          corepack prepare "${package_manager}" --activate
+
+      - name: Install Browser Edition workspace dependencies
+        if: ${{ needs.plan.outputs.rollback_npm_to_version == '' }}
+        run: corepack pnpm install --no-frozen-lockfile
+
+      - name: Build Browser Edition packages from real outputs
+        if: ${{ needs.plan.outputs.rollback_npm_to_version == '' }}
+        run: corepack pnpm run build
+
+      - name: Validate Browser Edition package outputs
+        if: ${{ needs.plan.outputs.rollback_npm_to_version == '' }}
+        run: |
+          bash scripts/validate_package_build.sh
+          bash scripts/validate_npm_pack_smoke.sh
+
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          required_packages = json.loads(
+              Path(".github/wasm_typescript_package_policy.json").read_text(encoding="utf-8")
+          )["required_packages"]
+          package_paths = [
+              line.strip()
+              for line in Path("artifacts/npm/package_json_paths.txt")
+              .read_text(encoding="utf-8")
+              .splitlines()
+              if line.strip()
+          ]
+
+          report = {
+              "schema_version": "npm-package-release-validation-v1",
+              "contract_id": "${{ env.WASM_RELEASE_CONTRACT_ID }}",
+              "bead_id": "asupersync-3qv04.7.1",
+              "required_package_policy": ".github/wasm_typescript_package_policy.json",
+              "required_packages": required_packages,
+              "discovered_package_manifests": package_paths,
+              "build_command": "corepack pnpm run build",
+              "validation_commands": [
+                  "bash scripts/validate_package_build.sh",
+                  "bash scripts/validate_npm_pack_smoke.sh",
+              ],
+          }
+          Path("artifacts/npm/package_release_validation.json").write_text(
+              json.dumps(report, indent=2) + "\n",
+              encoding="utf-8",
+          )
+          PY
+
+      - name: Capture npm pack dry-run evidence
+        if: ${{ needs.plan.outputs.rollback_npm_to_version == '' }}
+        run: |
+          mkdir -p artifacts/npm/pack
+          while IFS= read -r pkg_json; do
+            pkg_dir="$(dirname "$pkg_json")"
+            pkg_name="$(node -p "require('./${pkg_json}').name")"
+            pack_id="${pkg_name#@asupersync/}"
+            npm pack --json --dry-run --pack-destination /tmp "${pkg_dir}" \
+              > "artifacts/npm/pack/${pack_id}.json"
+          done < artifacts/npm/package_json_paths.txt
+
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          summary = []
+          for pack_file in sorted(Path("artifacts/npm/pack").glob("*.json")):
+              payload = json.loads(pack_file.read_text(encoding="utf-8"))
+              if not isinstance(payload, list) or not payload:
+                  raise SystemExit(f"unexpected npm pack payload in {pack_file}")
+              pack = payload[0]
+              summary.append(
+                  {
+                      "package": pack.get("name"),
+                      "version": pack.get("version"),
+                      "filename": pack.get("filename"),
+                      "entry_count": len(pack.get("files", [])),
+                      "files": [entry.get("path") for entry in pack.get("files", [])],
+                      "evidence_path": str(pack_file),
+                  }
+              )
+
+          report = {
+              "schema_version": "npm-pack-dry-run-summary-v1",
+              "contract_id": "${{ env.WASM_RELEASE_CONTRACT_ID }}",
+              "bead_id": "asupersync-3qv04.7.1",
+              "package_count": len(summary),
+              "packages": summary,
+              "repro_command": "npm pack --json --dry-run --pack-destination /tmp <package-dir>",
+          }
+          Path("artifacts/npm/package_pack_dry_run_summary.json").write_text(
+              json.dumps(report, indent=2) + "\n",
+              encoding="utf-8",
+          )
+          PY
+
+      - name: Validate rollback controls
+        if: ${{ needs.plan.outputs.rollback_npm_to_version != '' }}
+        run: |
+          if [[ -z "${{ needs.plan.outputs.rollback_reason }}" ]]; then
+            echo "rollback_reason is required when rollback_npm_to_version is set."
+            exit 1
+          fi
+
+      - name: Publish packages to npm
+        if: ${{ needs.plan.outputs.rollback_npm_to_version == '' }}
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          if [[ -z "${NODE_AUTH_TOKEN}" ]]; then
+            echo "NPM_TOKEN is not configured; skipping npm publish."
+            cat > artifacts/npm/publish_outcome.json <<'EOF'
+            {
+              "schema_version": "npm-publish-outcome-v1",
+              "published": false,
+              "reason": "NPM_TOKEN missing"
+            }
+            EOF
+            exit 0
+          fi
+
+          : > artifacts/npm/published_packages.txt
+          npm_tag="${{ needs.plan.outputs.npm_tag }}"
+          while IFS= read -r pkg_json; do
+            pkg_dir="$(dirname "$pkg_json")"
+            pkg_name="$(node -p "require('./${pkg_json}').name")"
+            echo "Publishing ${pkg_name} from ${pkg_dir} with tag ${npm_tag}"
+            (
+              cd "$pkg_dir"
+              npm publish --access public --provenance --tag "${npm_tag}"
+            )
+            echo "${pkg_name}" >> artifacts/npm/published_packages.txt
+          done < artifacts/npm/package_json_paths.txt
+
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          published = [line.strip() for line in Path("artifacts/npm/published_packages.txt").read_text(encoding="utf-8").splitlines() if line.strip()]
+          payload = {
+              "schema_version": "npm-publish-outcome-v1",
+              "published": True,
+              "published_packages": published,
+              "published_count": len(published),
+              "npm_tag": "${{ needs.plan.outputs.npm_tag }}",
+          }
+          Path("artifacts/npm/publish_outcome.json").write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+          PY
+
+      - name: Execute npm dist-tag rollback
+        if: ${{ needs.plan.outputs.rollback_npm_to_version != '' }}
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          if [[ -z "${NODE_AUTH_TOKEN}" ]]; then
+            echo "NPM_TOKEN is required for rollback but is not configured."
+            exit 1
+          fi
+
+          rollback_version="${{ needs.plan.outputs.rollback_npm_to_version }}"
+          npm_tag="${{ needs.plan.outputs.npm_tag }}"
+          : > artifacts/npm/rollback_actions.txt
+          while IFS= read -r pkg_json; do
+            pkg_name="$(node -p "require('./${pkg_json}').name")"
+            cmd="npm dist-tag add ${pkg_name}@${rollback_version} ${npm_tag}"
+            echo "$cmd" | tee -a artifacts/npm/rollback_actions.txt
+            bash -lc "$cmd"
+          done < artifacts/npm/package_json_paths.txt
+
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          actions = [line.strip() for line in Path("artifacts/npm/rollback_actions.txt").read_text(encoding="utf-8").splitlines() if line.strip()]
+          payload = {
+              "schema_version": "npm-rollback-outcome-v1",
+              "rollback_version": "${{ needs.plan.outputs.rollback_npm_to_version }}",
+              "rollback_reason": "${{ needs.plan.outputs.rollback_reason }}",
+              "npm_tag": "${{ needs.plan.outputs.npm_tag }}",
+              "actions_executed": actions,
+              "action_count": len(actions),
+          }
+          Path("artifacts/npm/rollback_outcome.json").write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+          PY
+
+      - name: Upload npm publish/rollback artifacts
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: npm-release-controls
+          path: artifacts/npm/
+
+      - name: Emit npm rollback guidance on failure
+        if: ${{ failure() }}
+        run: |
+          mkdir -p artifacts/npm
+          cat > artifacts/npm/rollback_instructions.md <<'EOF'
+          # npm Rollback Guidance
+
+          If publish partially succeeded, reassign dist-tags to a known good version:
+
+          npm dist-tag add <package>@<known-good-version> latest
+
+          Repeat for each package in artifacts/npm/published_packages.txt.
+          EOF

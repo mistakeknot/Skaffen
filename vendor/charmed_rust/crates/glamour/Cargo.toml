@@ -1,0 +1,62 @@
+[package]
+name = "charmed-glamour"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+authors.workspace = true
+readme = "README.md"
+documentation = "https://docs.rs/charmed-glamour"
+description = "Stylesheet-based markdown rendering for terminal applications"
+keywords = ["markdown", "terminal", "tui", "rendering", "cli"]
+categories = ["command-line-interface", "text-processing"]
+
+[lib]
+name = "glamour"
+
+[dependencies]
+lipgloss = { workspace = true }
+lru = "0.12"  # O(1) LRU cache for StyleCache (bd-cnqe, bd-2oct)
+pulldown-cmark = "0.13"
+tracing.workspace = true
+unicode-width.workspace = true
+
+# Optional: syntax highlighting
+# Uses fancy-regex (pure Rust) instead of onig for WASM compatibility
+# See docs/SYNTAX_HIGHLIGHTING_RESEARCH.md for rationale
+syntect = { version = "5", optional = true, default-features = false, features = [
+    "default-fancy",  # Pure Rust regex engine (WASM compatible)
+] }
+
+# Optional: serialization support
+serde = { version = "1.0", features = ["derive"], optional = true }
+
+[features]
+default = []
+# Enable syntax highlighting for code blocks. Adds ~2MB to binary size
+# due to embedded syntax definitions.
+syntax-highlighting = ["dep:syntect"]
+# Enable serde serialization for configuration types
+serde = ["dep:serde"]
+
+[dev-dependencies]
+criterion.workspace = true
+lipgloss = { workspace = true }
+proptest.workspace = true
+stats_alloc = "0.1.10"
+
+[[bench]]
+name = "glamour_benchmarks"
+harness = false
+
+[[example]]
+name = "syntax_highlighting"
+required-features = ["syntax-highlighting"]
+
+[[example]]
+name = "theme_gallery"
+required-features = ["syntax-highlighting"]
+
+[lints]
+workspace = true

@@ -1,0 +1,63 @@
+[package]
+name = "charmed-bubbletea"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+authors.workspace = true
+readme = "README.md"
+documentation = "https://docs.rs/charmed-bubbletea"
+description = "A powerful TUI framework based on The Elm Architecture"
+keywords = ["tui", "terminal", "elm", "framework", "cli"]
+categories = ["command-line-interface", "asynchronous"]
+
+[lib]
+name = "bubbletea"
+
+[dependencies]
+crossterm = "0.29"
+parking_lot = "0.12"
+thiserror.workspace = true
+tracing.workspace = true
+
+# Async runtime (optional)
+tokio = { version = "1", features = ["rt-multi-thread", "sync", "time", "macros"], optional = true }
+tokio-util = { version = "0.7", features = ["rt"], optional = true }
+futures = { version = "0.3", optional = true }
+
+# Thread pool for batch commands (optional)
+rayon = { workspace = true, optional = true }
+
+# Optional: derive macros for Model trait
+bubbletea-macros = { workspace = true, optional = true }
+
+[features]
+default = ["macros"]
+macros = ["dep:bubbletea-macros"]
+async = ["dep:tokio", "dep:tokio-util", "dep:futures"]
+thread-pool = ["dep:rayon"]
+
+[dev-dependencies]
+criterion.workspace = true
+lipgloss = { workspace = true }
+bubbles = { workspace = true }
+tokio = { version = "1", features = ["rt-multi-thread", "sync", "time", "macros"] }
+tokio-util = { version = "0.7", features = ["rt"] }
+proptest.workspace = true
+
+[[example]]
+name = "async_fetch"
+required-features = ["async"]
+
+[[bench]]
+name = "bubbletea_benchmarks"
+harness = false
+
+[[bench]]
+name = "async_vs_threads"
+harness = false
+required-features = ["async"]
+
+[lints]
+workspace = true

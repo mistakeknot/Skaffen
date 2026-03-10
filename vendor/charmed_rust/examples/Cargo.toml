@@ -1,0 +1,39 @@
+[workspace]
+resolver = "2"
+members = [
+    "basic/counter",
+    "basic/spinner",
+    "basic/textinput",
+    "basic/error-handling",
+    "intermediate/todo-list",
+    "intermediate/viewport",
+    "intermediate/progress",
+    "advanced/form",
+    "advanced/markdown-viewer",
+    "advanced/multi-component",
+    "themes/theme-switcher",
+    "themes/theme-preview",
+    "themes/themed-counter",
+    "e2e-tests",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+license = "MIT"
+publish = false
+
+[workspace.dependencies]
+# Internal crates from parent project
+bubbletea = { package = "charmed-bubbletea", path = "../crates/bubbletea" }
+bubbles = { package = "charmed-bubbles", path = "../crates/bubbles" }
+lipgloss = { package = "charmed-lipgloss", path = "../crates/lipgloss" }
+glamour = { package = "charmed-glamour", path = "../crates/glamour" }
+huh = { package = "charmed-huh", path = "../crates/huh" }
+wish = { package = "charmed-wish", path = "../crates/wish" }
+harmonica = { package = "charmed-harmonica", path = "../crates/harmonica" }
+
+# Common dependencies
+anyhow = "1.0"
+thiserror = "2.0"

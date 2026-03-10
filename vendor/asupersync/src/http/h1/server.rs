@@ -1,0 +1,932 @@
+//! HTTP/1.1 server connection handler.
+//!
+//! [`Http1Server`] wraps a service and drives an HTTP/1.1 connection,
+//! reading requests and writing responses using [`Http1Codec`] over a
+//! framed transport. Supports keep-alive, request limits, idle timeouts,
+//! and graceful shutdown.
+
+use crate::codec::Framed;
+use crate::cx::Cx;
+use crate::http::h1::codec::{Http1Codec, HttpError};
+use crate::http::h1::types::{Request, Response, Version, default_reason};
+use crate::io::{AsyncRead, AsyncWrite, AsyncWriteExt};
+use crate::server::shutdown::ShutdownSignal;
+use crate::stream::Stream;
+use crate::time::{timeout, wall_now};
+use std::future::{Future, poll_fn};
+use std::net::SocketAddr;
+use std::pin::Pin;
+use std::task::Poll;
+use std::time::Duration;
+
+/// Configuration for HTTP/1.1 server connections.
+#[derive(Debug, Clone)]
+pub struct Http1Config {
+    /// Maximum header block size in bytes.
+    pub max_headers_size: usize,
+    /// Maximum body size in bytes.
+    pub max_body_size: usize,
+    /// Whether to support HTTP/1.1 keep-alive.
+    pub keep_alive: bool,
+    /// Maximum requests allowed on a single keep-alive connection.
+    /// `None` means unlimited.
+    pub max_requests_per_connection: Option<u64>,
+    /// Idle timeout between requests on a keep-alive connection.
+    /// `None` means no timeout (wait forever).
+    pub idle_timeout: Option<Duration>,
+}
+
+impl Default for Http1Config {
+    fn default() -> Self {
+        Self {
+            max_headers_size: 64 * 1024,
+            max_body_size: 16 * 1024 * 1024,
+            keep_alive: true,
+            max_requests_per_connection: Some(1000),
+            idle_timeout: Some(Duration::from_mins(1)),
+        }
+    }
+}
+
+impl Http1Config {
+    /// Set the maximum header block size.
+    #[must_use]
+    pub fn max_headers_size(mut self, size: usize) -> Self {
+        self.max_headers_size = size;
+        self
+    }
+
+    /// Set the maximum body size.
+    #[must_use]
+    pub fn max_body_size(mut self, size: usize) -> Self {
+        self.max_body_size = size;
+        self
+    }
+
+    /// Enable or disable keep-alive.
+    #[must_use]
+    pub fn keep_alive(mut self, enabled: bool) -> Self {
+        self.keep_alive = enabled;
+        self
+    }
+
+    /// Set the maximum number of requests per connection.
+    #[must_use]
+    pub fn max_requests(mut self, max: Option<u64>) -> Self {
+        self.max_requests_per_connection = max;
+        self
+    }
+
+    /// Set the idle timeout between requests.
+    #[must_use]
+    pub fn idle_timeout(mut self, timeout: Option<Duration>) -> Self {
+        self.idle_timeout = timeout;
+        self
+    }
+}
+
+/// Per-connection state tracking for HTTP/1.1 lifecycle.
+#[derive(Debug)]
+pub struct ConnectionState {
+    /// Number of requests processed on this connection.
+    pub requests_served: u64,
+    /// When the connection was established.
+    pub connected_at: crate::types::Time,
+    /// When the last request completed.
+    pub last_request_at: crate::types::Time,
+    /// Current phase of the connection.
+    pub phase: ConnectionPhase,
+}
+
+/// Connection lifecycle phases.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ConnectionPhase {
+    /// Waiting for the first or next request.
+    Idle,
+    /// Currently reading a request.
+    Reading,
+    /// Executing the handler.
+    Processing,
+    /// Writing the response.
+    Writing,
+    /// Connection is shutting down gracefully.
+    Closing,
+}
+
+#[derive(Debug)]
+enum ReadOutcome {
+    Read(Option<Result<Request, HttpError>>),
+    Shutdown,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ExpectationAction {
+    None,
+    Continue,
+    Reject,
+}
+
+impl ConnectionState {
+    fn new(now: crate::types::Time) -> Self {
+        Self {
+            requests_served: 0,
+            connected_at: now,
+            last_request_at: now,
+            phase: ConnectionPhase::Idle,
+        }
+    }
+
+    /// Returns the duration since the last request completed (or since connect).
+    #[must_use]
+    pub fn idle_duration(&self, now: crate::types::Time) -> Duration {
+        Duration::from_nanos(
+            now.as_nanos()
+                .saturating_sub(self.last_request_at.as_nanos()),
+        )
+    }
+
+    /// Returns the total connection lifetime.
+    #[must_use]
+    pub fn connection_age(&self, now: crate::types::Time) -> Duration {
+        Duration::from_nanos(now.as_nanos().saturating_sub(self.connected_at.as_nanos()))
+    }
+
+    /// Returns whether the connection has exceeded the request limit.
+    fn exceeded_request_limit(&self, max: Option<u64>) -> bool {
+        max.is_some_and(|max| self.requests_served >= max)
+    }
+
+    /// Returns whether the connection has exceeded the idle timeout.
+    fn exceeded_idle_timeout(&self, timeout: Option<Duration>, now: crate::types::Time) -> bool {
+        timeout.is_some_and(|timeout| self.idle_duration(now) > timeout)
+    }
+}
+
+/// HTTP/1.1 server that processes requests using a service function.
+///
+/// Reads requests from the transport, passes them to the service, and
+/// writes responses back. Tracks connection lifecycle with configurable
+/// keep-alive, request limits, and idle timeouts.
+///
+/// # Example
+///
+/// ```ignore
+/// let server = Http1Server::new(|req| async move {
+///     Response::new(200, "OK", b"Hello".to_vec())
+/// });
+/// server.serve(tcp_stream).await?;
+/// ```
+pub struct Http1Server<F> {
+    handler: F,
+    config: Http1Config,
+    shutdown_signal: Option<ShutdownSignal>,
+}
+
+impl<F, Fut> Http1Server<F>
+where
+    F: Fn(Request) -> Fut + Send + Sync,
+    Fut: Future<Output = Response> + Send,
+{
+    /// Create a new server with the given handler function.
+    pub fn new(handler: F) -> Self {
+        Self {
+            handler,
+            config: Http1Config::default(),
+            shutdown_signal: None,
+        }
+    }
+
+    /// Create a new server with custom configuration.
+    pub fn with_config(handler: F, config: Http1Config) -> Self {
+        Self {
+            handler,
+            config,
+            shutdown_signal: None,
+        }
+    }
+
+    /// Attach a shutdown signal for graceful drain / force-close coordination.
+    #[must_use]
+    pub fn with_shutdown_signal(mut self, signal: ShutdownSignal) -> Self {
+        self.shutdown_signal = Some(signal);
+        self
+    }
+
+    async fn read_next<T>(
+        &self,
+        framed: &mut Framed<T, Http1Codec>,
+        _state: &ConnectionState,
+    ) -> Option<ReadOutcome>
+    where
+        T: AsyncRead + AsyncWrite + Unpin,
+    {
+        let read_future = Box::pin(async {
+            if let Some(signal) = &self.shutdown_signal {
+                if signal.is_shutting_down() {
+                    return ReadOutcome::Shutdown;
+                }
+
+                let mut read_fut = std::pin::pin!(framed.poll_next_ready());
+                let mut shutdown_fut = std::pin::pin!(
+                    signal.wait_for_phase(crate::server::shutdown::ShutdownPhase::Draining)
+                );
+
+                poll_fn(|cx| {
+                    if signal.is_shutting_down() {
+                        return Poll::Ready(ReadOutcome::Shutdown);
+                    }
+                    if shutdown_fut.as_mut().poll(cx).is_ready() {
+                        return Poll::Ready(ReadOutcome::Shutdown);
+                    }
+                    if let Poll::Ready(r) = read_fut.as_mut().poll(cx) {
+                        return Poll::Ready(ReadOutcome::Read(r));
+                    }
+                    Poll::Pending
+                })
+                .await
+            } else {
+                ReadOutcome::Read(framed.poll_next_ready().await)
+            }
+        });
+
+        if let Some(idle_timeout) = self.config.idle_timeout {
+            let now = Cx::current()
+                .and_then(|cx| cx.timer_driver())
+                .map_or_else(wall_now, |timer| timer.now());
+            timeout(now, idle_timeout, read_future).await.ok()
+        } else {
+            Some(read_future.await)
+        }
+    }
+
+    /// Serve a single connection, processing requests until the connection
+    /// closes, an error occurs, or a lifecycle limit is reached.
+    ///
+    /// Returns the final connection state along with the result.
+    pub async fn serve<T>(self, io: T) -> Result<ConnectionState, HttpError>
+    where
+        T: AsyncRead + AsyncWrite + Unpin + Send,
+    {
+        self.serve_with_peer_addr(io, None).await
+    }
+
+    /// Serve a single connection with an optional peer address.
+    ///
+    /// When provided, the peer address is attached to each request.
+    #[allow(clippy::too_many_lines)]
+    pub async fn serve_with_peer_addr<T>(
+        self,
+        io: T,
+        peer_addr: Option<SocketAddr>,
+    ) -> Result<ConnectionState, HttpError>
+    where
+        T: AsyncRead + AsyncWrite + Unpin + Send,
+    {
+        let codec = Http1Codec::new()
+            .max_headers_size(self.config.max_headers_size)
+            .max_body_size(self.config.max_body_size);
+        let mut framed = Framed::new(io, codec);
+        let mut state = ConnectionState::new(
+            Cx::current()
+                .and_then(|cx| cx.timer_driver())
+                .map_or_else(wall_now, |timer| timer.now()),
+        );
+
+        loop {
+            state.phase = ConnectionPhase::Idle;
+
+            if self
+                .shutdown_signal
+                .as_ref()
+                .is_some_and(ShutdownSignal::is_shutting_down)
+            {
+                state.phase = ConnectionPhase::Closing;
+                break;
+            }
+
+            if Cx::current().is_some_and(|cx| cx.is_cancel_requested()) {
+                state.phase = ConnectionPhase::Closing;
+                break;
+            }
+
+            // Check request limit before reading next request
+            if state.exceeded_request_limit(self.config.max_requests_per_connection) {
+                state.phase = ConnectionPhase::Closing;
+                break;
+            }
+
+            let now = Cx::current()
+                .and_then(|cx| cx.timer_driver())
+                .map_or_else(wall_now, |timer| timer.now());
+
+            // Check idle timeout
+            if state.exceeded_idle_timeout(self.config.idle_timeout, now) {
+                state.phase = ConnectionPhase::Closing;
+                break;
+            }
+
+            state.phase = ConnectionPhase::Reading;
+
+            let Some(read_outcome) = self.read_next(&mut framed, &state).await else {
+                state.phase = ConnectionPhase::Closing;
+                break;
+            };
+
+            let req = match read_outcome {
+                ReadOutcome::Shutdown => {
+                    state.phase = ConnectionPhase::Closing;
+                    break;
+                }
+                ReadOutcome::Read(r) => r,
+            };
+
+            // Read next request
+            let mut req = match req {
+                Some(Ok(req)) => req,
+                Some(Err(e)) => return Err(e),
+                None => {
+                    // Clean EOF - connection closed by client
+                    state.phase = ConnectionPhase::Closing;
+                    break;
+                }
+            };
+            req.peer_addr = peer_addr;
+
+            let expectation_action = classify_expectation(&req);
+            if expectation_action == ExpectationAction::Reject {
+                state.phase = ConnectionPhase::Writing;
+                let mut reject = Response::new(417, default_reason(417), Vec::new());
+                finalize_response_persistence(req.version, &mut reject, true);
+                framed.send(reject)?;
+                poll_fn(|cx| framed.poll_flush(cx))
+                    .await
+                    .map_err(HttpError::Io)?;
+                state.requests_served += 1;
+                state.last_request_at = Cx::current()
+                    .and_then(|cx| cx.timer_driver())
+                    .map_or_else(wall_now, |timer| timer.now());
+                state.phase = ConnectionPhase::Closing;
+                break;
+            }
+
+            if expectation_action == ExpectationAction::Continue && request_expects_body(&req) {
+                let mut continue_response = Response::new(100, default_reason(100), Vec::new());
+                finalize_response_persistence(req.version, &mut continue_response, false);
+                framed.send(continue_response)?;
+                poll_fn(|cx| framed.poll_flush(cx))
+                    .await
+                    .map_err(HttpError::Io)?;
+            }
+
+            // Determine if we should close after this request
+            let close_after = should_close_connection(&req, &self.config, &state);
+            let request_version = req.version;
+
+            state.phase = ConnectionPhase::Processing;
+
+            // Process request through handler
+            let mut resp = (self.handler)(req).await;
+
+            let close_after =
+                finalize_response_persistence(request_version, &mut resp, close_after);
+
+            state.phase = ConnectionPhase::Writing;
+
+            // Write response
+            framed.send(resp)?;
+            // `Framed::send` only encodes into the internal write buffer; flush to the socket.
+            poll_fn(|cx| framed.poll_flush(cx))
+                .await
+                .map_err(HttpError::Io)?;
+
+            state.requests_served += 1;
+            state.last_request_at = Cx::current()
+                .and_then(|cx| cx.timer_driver())
+                .map_or_else(wall_now, |timer| timer.now());
+
+            if close_after {
+                state.phase = ConnectionPhase::Closing;
+                break;
+            }
+        }
+
+        // Gracefully shutdown the connection
+        let mut io = framed.into_inner();
+        let _ = io.shutdown().await;
+
+        Ok(state)
+    }
+}
+
+fn classify_expectation(req: &Request) -> ExpectationAction {
+    let mut saw_expect = false;
+    let mut saw_continue = false;
+    let mut saw_unsupported = false;
+
+    for (name, value) in &req.headers {
+        if !name.eq_ignore_ascii_case("expect") {
+            continue;
+        }
+        saw_expect = true;
+        for token in value
+            .split(',')
+            .map(str::trim)
+            .filter(|token| !token.is_empty())
+        {
+            if token.eq_ignore_ascii_case("100-continue") {
+                saw_continue = true;
+            } else {
+                saw_unsupported = true;
+            }
+        }
+    }
+
+    if !saw_expect {
+        return ExpectationAction::None;
+    }
+
+    if saw_unsupported || req.version != Version::Http11 {
+        return ExpectationAction::Reject;
+    }
+
+    if saw_continue {
+        return ExpectationAction::Continue;
+    }
+
+    // Expect header present but no token content: treat as unsupported.
+    ExpectationAction::Reject
+}
+
+fn request_expects_body(req: &Request) -> bool {
+    for (name, value) in &req.headers {
+        if name.eq_ignore_ascii_case("content-length") {
+            if let Ok(len) = value.trim().parse::<usize>() {
+                if len > 0 {
+                    return true;
+                }
+            }
+            continue;
+        }
+        if name.eq_ignore_ascii_case("transfer-encoding") {
+            return value
+                .split(',')
+                .map(str::trim)
+                .any(|token| token.eq_ignore_ascii_case("chunked"));
+        }
+    }
+    !req.body.is_empty()
+}
+
+/// Determine whether the connection should close after this request.
+///
+/// Considers: explicit Connection header, HTTP version defaults,
+/// server keep-alive config, and request limits.
+fn should_close_connection(req: &Request, config: &Http1Config, state: &ConnectionState) -> bool {
+    // If keep-alive is disabled server-wide, always close
+    if !config.keep_alive {
+        return true;
+    }
+
+    // If we'll hit the request limit after this request, close
+    if let Some(max) = config.max_requests_per_connection {
+        if state.requests_served + 1 >= max {
+            return true;
+        }
+    }
+
+    let mut has_keep_alive = false;
+    let mut has_close = false;
+
+    // Check explicit Connection header from client (RFC 9110 §7.6.1: comma-separated tokens)
+    for (name, value) in &req.headers {
+        if name.eq_ignore_ascii_case("connection") {
+            for token in value.split(',').map(str::trim) {
+                if token.eq_ignore_ascii_case("close") {
+                    has_close = true;
+                } else if token.eq_ignore_ascii_case("keep-alive") {
+                    has_keep_alive = true;
+                }
+            }
+        }
+    }
+
+    if has_close {
+        return true;
+    }
+
+    if has_keep_alive {
+        return false;
+    }
+
+    // HTTP/1.0 defaults to close; HTTP/1.1 defaults to keep-alive
+    req.version == Version::Http10
+}
+
+/// Add a `Connection: close` header to the response if not already present.
+fn add_connection_close(resp: &mut Response) {
+    let mut replaced = false;
+    resp.headers.retain_mut(|(name, value)| {
+        if name.eq_ignore_ascii_case("connection") {
+            if replaced {
+                false
+            } else {
+                "close".clone_into(value);
+                replaced = true;
+                true
+            }
+        } else {
+            true
+        }
+    });
+    if !replaced {
+        resp.headers
+            .push(("Connection".to_owned(), "close".to_owned()));
+    }
+}
+
+/// Add a `Connection: keep-alive` header to the response if not already present.
+fn add_connection_keep_alive(resp: &mut Response) {
+    let mut replaced = false;
+    resp.headers.retain_mut(|(name, value)| {
+        if name.eq_ignore_ascii_case("connection") {
+            if replaced {
+                false
+            } else {
+                "keep-alive".clone_into(value);
+                replaced = true;
+                true
+            }
+        } else {
+            true
+        }
+    });
+    if !replaced {
+        resp.headers
+            .push(("Connection".to_owned(), "keep-alive".to_owned()));
+    }
+}
+
+/// Check if the response explicitly requests closing the connection.
+fn response_requests_close(resp: &Response) -> bool {
+    for (name, value) in &resp.headers {
+        if name.eq_ignore_ascii_case("connection") {
+            for token in value.split(',').map(str::trim) {
+                if token.eq_ignore_ascii_case("close") {
+                    return true;
+                }
+            }
+        }
+    }
+    false
+}
+
+/// Align the response version/connection headers with the actual socket policy.
+fn finalize_response_persistence(
+    request_version: Version,
+    resp: &mut Response,
+    close_after: bool,
+) -> bool {
+    if request_version == Version::Http10 {
+        resp.version = Version::Http10;
+    }
+
+    let close_after = close_after || response_requests_close(resp);
+    if close_after {
+        add_connection_close(resp);
+        return true;
+    }
+
+    if request_version == Version::Http10 {
+        add_connection_keep_alive(resp);
+    }
+
+    false
+}
+
+/// Helper trait to await the next item from a `Stream` (since `Stream`
+/// provides `poll_next`, not an async method).
+trait StreamNextExt: Stream {
+    async fn poll_next_ready(&mut self) -> Option<Self::Item>
+    where
+        Self: Unpin,
+    {
+        std::future::poll_fn(|cx| Pin::new(&mut *self).poll_next(cx)).await
+    }
+}
+
+impl<T: Stream + Unpin> StreamNextExt for T {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::http::h1::types::Method;
+
+    fn make_request(version: Version, headers: Vec<(String, String)>) -> Request {
+        Request {
+            method: Method::Get,
+            uri: "/".into(),
+            version,
+            headers,
+            body: Vec::new(),
+            trailers: Vec::new(),
+            peer_addr: None,
+        }
+    }
+
+    #[test]
+    fn should_close_connection_header_close() {
+        let config = Http1Config::default();
+        let state = ConnectionState::new(crate::types::Time::ZERO);
+        let req = make_request(Version::Http11, vec![("Connection".into(), "close".into())]);
+        assert!(should_close_connection(&req, &config, &state));
+    }
+
+    #[test]
+    fn should_close_connection_header_keepalive() {
+        let config = Http1Config::default();
+        let state = ConnectionState::new(crate::types::Time::ZERO);
+        let req = make_request(
+            Version::Http11,
+            vec![("Connection".into(), "keep-alive".into())],
+        );
+        assert!(!should_close_connection(&req, &config, &state));
+    }
+
+    #[test]
+    fn should_close_http10_default() {
+        let config = Http1Config::default();
+        let state = ConnectionState::new(crate::types::Time::ZERO);
+        let req = make_request(Version::Http10, vec![]);
+        assert!(should_close_connection(&req, &config, &state));
+    }
+
+    #[test]
+    fn should_close_http10_with_keepalive() {
+        let config = Http1Config::default();
+        let state = ConnectionState::new(crate::types::Time::ZERO);
+        let req = make_request(
+            Version::Http10,
+            vec![("Connection".into(), "keep-alive".into())],
+        );
+        assert!(!should_close_connection(&req, &config, &state));
+    }
+
+    #[test]
+    fn should_close_http11_default() {
+        let config = Http1Config::default();
+        let state = ConnectionState::new(crate::types::Time::ZERO);
+        let req = make_request(Version::Http11, vec![]);
+        assert!(!should_close_connection(&req, &config, &state));
+    }
+
+    #[test]
+    fn should_close_keepalive_disabled() {
+        let config = Http1Config {
+            keep_alive: false,
+            ..Default::default()
+        };
+        let state = ConnectionState::new(crate::types::Time::ZERO);
+        let req = make_request(Version::Http11, vec![]);
+        assert!(should_close_connection(&req, &config, &state));
+    }
+
+    #[test]
+    fn should_close_at_request_limit() {
+        let config = Http1Config {
+            max_requests_per_connection: Some(5),
+            ..Default::default()
+        };
+        let mut state = ConnectionState::new(crate::types::Time::ZERO);
+        let req = make_request(Version::Http11, vec![]);
+
+        // At 4 served (next will be 5th = limit), should close
+        state.requests_served = 4;
+        assert!(should_close_connection(&req, &config, &state));
+
+        // At 3 served, should not close
+        state.requests_served = 3;
+        assert!(!should_close_connection(&req, &config, &state));
+    }
+
+    #[test]
+    fn should_close_unlimited_requests() {
+        let config = Http1Config {
+            max_requests_per_connection: None,
+            ..Default::default()
+        };
+        let mut state = ConnectionState::new(crate::types::Time::ZERO);
+        let req = make_request(Version::Http11, vec![]);
+
+        state.requests_served = 1_000_000;
+        assert!(!should_close_connection(&req, &config, &state));
+    }
+
+    #[test]
+    fn connection_state_tracking() {
+        let state = ConnectionState::new(crate::types::Time::ZERO);
+        assert_eq!(state.requests_served, 0);
+        assert_eq!(state.phase, ConnectionPhase::Idle);
+        assert!(!state.exceeded_request_limit(Some(10)));
+        assert!(!state.exceeded_request_limit(None));
+    }
+
+    #[test]
+    fn connection_state_request_limit() {
+        let mut state = ConnectionState::new(crate::types::Time::ZERO);
+        state.requests_served = 10;
+        assert!(state.exceeded_request_limit(Some(10)));
+        assert!(state.exceeded_request_limit(Some(5)));
+        assert!(!state.exceeded_request_limit(Some(11)));
+        assert!(!state.exceeded_request_limit(None));
+    }
+
+    #[test]
+    fn add_connection_close_header() {
+        let mut resp = Response::new(200, "OK", Vec::new());
+        assert!(resp.headers.is_empty());
+        add_connection_close(&mut resp);
+        assert_eq!(resp.headers.len(), 1);
+        assert_eq!(resp.headers[0].0, "Connection");
+        assert_eq!(resp.headers[0].1, "close");
+    }
+
+    #[test]
+    fn add_connection_close_header_already_present() {
+        let mut resp = Response::new(200, "OK", Vec::new());
+        resp.headers
+            .push(("Connection".to_owned(), "keep-alive".to_owned()));
+        add_connection_close(&mut resp);
+        // Should not add duplicate and should overwrite to close
+        assert_eq!(resp.headers.len(), 1);
+        assert_eq!(resp.headers[0].0, "Connection");
+        assert_eq!(resp.headers[0].1, "close");
+    }
+
+    #[test]
+    fn add_connection_keep_alive_header() {
+        let mut resp = Response::new(200, "OK", Vec::new());
+        assert!(resp.headers.is_empty());
+        add_connection_keep_alive(&mut resp);
+        assert_eq!(resp.headers.len(), 1);
+        assert_eq!(resp.headers[0].0, "Connection");
+        assert_eq!(resp.headers[0].1, "keep-alive");
+    }
+
+    #[test]
+    fn add_connection_keep_alive_header_already_present() {
+        let mut resp = Response::new(200, "OK", Vec::new());
+        resp.headers
+            .push(("Connection".to_owned(), "close".to_owned()));
+        add_connection_keep_alive(&mut resp);
+        assert_eq!(resp.headers.len(), 1);
+        assert_eq!(resp.headers[0].0, "Connection");
+        assert_eq!(resp.headers[0].1, "keep-alive");
+    }
+
+    #[test]
+    fn finalize_response_persistence_http10_keepalive_normalizes_version_and_header() {
+        let mut resp = Response::new(200, "OK", Vec::new());
+
+        let close_after = finalize_response_persistence(Version::Http10, &mut resp, false);
+
+        assert!(!close_after);
+        assert_eq!(resp.version, Version::Http10);
+        assert_eq!(resp.headers.len(), 1);
+        assert_eq!(resp.headers[0].0, "Connection");
+        assert_eq!(resp.headers[0].1, "keep-alive");
+    }
+
+    #[test]
+    fn finalize_response_persistence_http10_close_normalizes_version_and_header() {
+        let mut resp = Response::new(200, "OK", Vec::new());
+
+        let close_after = finalize_response_persistence(Version::Http10, &mut resp, true);
+
+        assert!(close_after);
+        assert_eq!(resp.version, Version::Http10);
+        assert_eq!(resp.headers.len(), 1);
+        assert_eq!(resp.headers[0].0, "Connection");
+        assert_eq!(resp.headers[0].1, "close");
+    }
+
+    #[test]
+    fn finalize_response_persistence_preserves_handler_requested_close() {
+        let mut resp = Response::new(200, "OK", Vec::new()).with_header("Connection", "close");
+
+        let close_after = finalize_response_persistence(Version::Http11, &mut resp, false);
+
+        assert!(close_after);
+        assert_eq!(resp.version, Version::Http11);
+        assert_eq!(resp.headers.len(), 1);
+        assert_eq!(resp.headers[0].0, "Connection");
+        assert_eq!(resp.headers[0].1, "close");
+    }
+
+    #[test]
+    fn config_builder() {
+        let config = Http1Config::default()
+            .max_headers_size(1024)
+            .max_body_size(2048)
+            .keep_alive(false)
+            .max_requests(Some(50))
+            .idle_timeout(Some(Duration::from_secs(30)));
+
+        assert_eq!(config.max_headers_size, 1024);
+        assert_eq!(config.max_body_size, 2048);
+        assert!(!config.keep_alive);
+        assert_eq!(config.max_requests_per_connection, Some(50));
+        assert_eq!(config.idle_timeout, Some(Duration::from_secs(30)));
+    }
+
+    #[test]
+    fn classify_expectation_none_when_absent() {
+        let req = make_request(Version::Http11, vec![]);
+        assert_eq!(classify_expectation(&req), ExpectationAction::None);
+    }
+
+    #[test]
+    fn classify_expectation_continue_for_http11() {
+        let req = make_request(
+            Version::Http11,
+            vec![("Expect".into(), "100-continue".into())],
+        );
+        assert_eq!(classify_expectation(&req), ExpectationAction::Continue);
+    }
+
+    #[test]
+    fn classify_expectation_rejects_http10_continue() {
+        let req = make_request(
+            Version::Http10,
+            vec![("Expect".into(), "100-continue".into())],
+        );
+        assert_eq!(classify_expectation(&req), ExpectationAction::Reject);
+    }
+
+    #[test]
+    fn classify_expectation_rejects_unsupported_expectation() {
+        let req = make_request(Version::Http11, vec![("Expect".into(), "foo".into())]);
+        assert_eq!(classify_expectation(&req), ExpectationAction::Reject);
+    }
+
+    #[test]
+    fn classify_expectation_rejects_mixed_tokens() {
+        let req = make_request(
+            Version::Http11,
+            vec![("Expect".into(), "100-continue, foo".into())],
+        );
+        assert_eq!(classify_expectation(&req), ExpectationAction::Reject);
+    }
+
+    #[test]
+    fn request_expects_body_content_length_positive() {
+        let req = make_request(Version::Http11, vec![("Content-Length".into(), "5".into())]);
+        assert!(request_expects_body(&req));
+    }
+
+    #[test]
+    fn request_expects_body_content_length_zero() {
+        let req = make_request(Version::Http11, vec![("Content-Length".into(), "0".into())]);
+        assert!(!request_expects_body(&req));
+    }
+
+    #[test]
+    fn request_expects_body_chunked_encoding() {
+        let req = make_request(
+            Version::Http11,
+            vec![("Transfer-Encoding".into(), "chunked".into())],
+        );
+        assert!(request_expects_body(&req));
+    }
+
+    #[test]
+    fn connection_phase_equality() {
+        assert_eq!(ConnectionPhase::Idle, ConnectionPhase::Idle);
+        assert_ne!(ConnectionPhase::Idle, ConnectionPhase::Reading);
+        assert_ne!(ConnectionPhase::Processing, ConnectionPhase::Writing);
+    }
+
+    #[test]
+    fn connection_phase_debug_clone_copy() {
+        let p = ConnectionPhase::Closing;
+        let dbg = format!("{p:?}");
+        assert!(dbg.contains("Closing"));
+
+        let p2 = p;
+        assert_eq!(p, p2);
+
+        // Copy
+        let p3 = p;
+        assert_eq!(p, p3);
+    }
+
+    #[test]
+    fn http1_config_debug_clone() {
+        let c = Http1Config::default();
+        let dbg = format!("{c:?}");
+        assert!(dbg.contains("Http1Config"));
+
+        let c2 = c;
+        assert_eq!(c2.max_headers_size, 64 * 1024);
+        assert!(c2.keep_alive);
+    }
+}

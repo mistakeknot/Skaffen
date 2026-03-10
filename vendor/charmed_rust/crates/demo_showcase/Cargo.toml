@@ -1,0 +1,84 @@
+[package]
+name = "charmed-demo-showcase"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+authors.workspace = true
+readme = "README.md"
+documentation = "https://docs.rs/charmed-demo-showcase"
+description = "Flagship showcase demonstrating all charmed_rust capabilities"
+keywords = ["tui", "terminal", "showcase", "demo", "cli"]
+categories = ["command-line-interface"]
+
+[lib]
+name = "demo_showcase"
+
+[features]
+default = ["syntax-highlighting"]
+syntax-highlighting = ["glamour/syntax-highlighting"]
+ssh = ["dep:wish", "dep:tracing", "dep:tracing-subscriber"]
+# Async runtime support for non-blocking background operations
+async = ["bubbletea/async"]
+
+[dependencies]
+# Core TUI framework
+bubbletea = { workspace = true, features = ["macros"] }
+lipgloss = { workspace = true }
+bubbles = { workspace = true }
+
+# Additional charmed_rust crates
+glamour = { workspace = true }
+harmonica = { workspace = true }
+huh = { workspace = true }
+charmed_log = { workspace = true }
+
+# Optional SSH support
+wish = { workspace = true, optional = true }
+tracing = { version = "0.1", optional = true }
+tracing-subscriber = { version = "0.3", features = ["env-filter"], optional = true }
+
+# CLI
+clap = { version = "4.4", features = ["derive", "env"] }
+
+# Error handling
+thiserror.workspace = true
+anyhow.workspace = true
+
+# Serialization (for config/data)
+serde = { version = "1.0", features = ["derive"] }
+serde_json.workspace = true
+
+# Async runtime
+tokio = { version = "1.40", features = ["full"] }
+
+# Terminal handling
+crossterm.workspace = true
+
+# Utilities
+unicode-width.workspace = true
+parking_lot = "0.12"
+chrono = { version = "0.4", features = ["serde"] }
+rand = "0.9"
+rand_pcg = "0.9"
+
+[dev-dependencies]
+tempfile.workspace = true
+assert_cmd.workspace = true
+predicates.workspace = true
+insta.workspace = true
+portable-pty = "0.9"
+vt100 = "0.16"
+regex = "1"
+
+[[bin]]
+name = "demo_showcase"
+path = "src/main.rs"
+
+[[bin]]
+name = "run_e2e"
+path = "src/bin/run_e2e.rs"
+
+[lints]
+workspace = true

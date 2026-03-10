@@ -1,0 +1,192 @@
+//! Repro test for race loser cancellation behavior.
+
+mod common;
+use common::*;
+
+use asupersync::cx::Cx;
+use asupersync::runtime::RuntimeState;
+use asupersync::types::Budget;
+use parking_lot::Mutex;
+use std::future::Future;
+use std::pin::Pin;
+use std::sync::Arc;
+use std::task::{Context, Poll, Waker};
+
+struct Flag {
+    set: bool,
+}
+
+impl Flag {
+    fn new() -> Arc<Mutex<Self>> {
+        Arc::new(Mutex::new(Self { set: false }))
+    }
+
+    fn set(flag: &Arc<Mutex<Self>>) {
+        flag.lock().set = true;
+    }
+}
+
+// A future that waits until told to finish, and sets a flag when dropped.
+struct DroppableFuture {
+    on_drop: Arc<Mutex<Flag>>,
+    waker: Option<Waker>,
+    ready: bool,
+}
+
+impl DroppableFuture {
+    fn new(on_drop: Arc<Mutex<Flag>>) -> Self {
+        Self {
+            on_drop,
+            waker: None,
+            ready: false,
+        }
+    }
+}
+
+impl Future for DroppableFuture {
+    type Output = ();
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<()> {
+        if self.ready {
+            Poll::Ready(())
+        } else {
+            self.waker = Some(cx.waker().clone());
+            Poll::Pending
+        }
+    }
+}
+
+impl Drop for DroppableFuture {
+    fn drop(&mut self) {
+        Flag::set(&self.on_drop);
+    }
+}
+
+struct NoopWaker;
+
+impl std::task::Wake for NoopWaker {
+    fn wake(self: Arc<Self>) {}
+}
+
+#[test]
+fn repro_race_leak() {
+    init_test_logging();
+    test_phase!("repro_race_leak");
+    run_test(|| async {
+        // Setup manual runtime state for testing
+        let mut state = RuntimeState::new();
+        let cx: Cx = Cx::for_testing();
+        let region = state.create_root_region(Budget::INFINITE);
+        let scope = cx.scope();
+        assert_eq!(scope.region_id(), region, "test scope region mismatch");
+
+        // Flag to check if the loser task actually ran its cleanup (simulate drain)
+        let loser_flag = Flag::new();
+
+        // Spawn a loser task that never finishes but has a drop guard
+        let (loser_handle, mut stored_loser) = scope
+            .spawn(&mut state, &cx, move |_| async move {
+                // This task runs forever. If it's cancelled, it should be dropped.
+                let fut = DroppableFuture::new(loser_flag);
+                fut.await;
+                "loser"
+            })
+            .expect("spawn failed");
+
+        // Spawn a winner task that finishes after yielding once
+        let (winner_handle, mut stored_winner) = scope
+            .spawn(&mut state, &cx, |_| async {
+                let mut yielded = false;
+                std::future::poll_fn(move |cx| {
+                    if yielded {
+                        Poll::Ready("winner")
+                    } else {
+                        yielded = true;
+                        cx.waker().wake_by_ref();
+                        Poll::Pending
+                    }
+                })
+                .await
+            })
+            .expect("spawn failed");
+
+        // Manually drive tasks (since we don't have a real reactor/executor loop in this test setup)
+        // We need to poll them.
+        // In a real runtime, the executor polls them.
+        // Here we simulate the executor.
+
+        // Create a waker
+        let waker = Waker::from(Arc::new(NoopWaker));
+        let mut ctx = Context::from_waker(&waker);
+
+        // Poll tasks once to get them started
+        assert!(stored_winner.poll(&mut ctx).is_pending()); // Winner yields once
+        assert!(stored_loser.poll(&mut ctx).is_pending()); // Loser is pending
+
+        let loser_task_id = loser_handle.task_id();
+
+        // Now race the handles using Cx::race
+        let mut race_future = Box::pin(cx.race(vec![
+            {
+                let cx = cx.clone();
+                let mut handle = winner_handle;
+                Box::pin(async move { handle.join(&cx).await })
+            },
+            {
+                let cx = cx.clone();
+                let mut handle = loser_handle;
+                Box::pin(async move { handle.join(&cx).await })
+            },
+        ]));
+
+        // Poll race_future once so both async blocks are polled, creating the JoinFutures
+        assert!(race_future.as_mut().poll(&mut ctx).is_pending());
+
+        // Now winner task can finish
+        assert!(stored_winner.poll(&mut ctx).is_ready());
+
+        // Poll race_future again to get the result
+        let result = match race_future.as_mut().poll(&mut ctx) {
+            Poll::Ready(r) => r,
+            Poll::Pending => panic!("expected race_future to be ready"),
+        };
+        // Drop the combinator
+        drop(race_future);
+
+        // Race should finish with "winner"
+        assert_eq!(result.unwrap(), Ok("winner"));
+
+        // CRITICAL CHECK: Did the loser task get cancelled/dropped?
+        // Since we used Cx::race, it dropped the join future.
+        // But does dropping the join future cancel the task?
+        // NO. TaskHandle says: "If the TaskHandle is dropped, the task continues running."
+
+        // If the task was cancelled, stored_loser should resolve to Ready or be dropped?
+        // In our manual setup, stored_loser is held by us (simulating executor).
+        // If cancellation happened, next poll of stored_loser should see cancellation.
+
+        // Check if cancellation request was sent to loser
+        // We can check if the loser task's context has cancellation requested.
+        // We need to peek into the stored task or the runtime state.
+
+        let task_record = state.task(loser_task_id).expect("task record");
+        let inner = task_record.cx_inner.as_ref().expect("cx inner missing");
+        let is_cancelled = inner.read().cancel_requested;
+
+        tracing::debug!(is_cancelled, "loser cancelled");
+
+        // With the fix, dropping JoinFuture should abort the task.
+        assert!(
+            is_cancelled,
+            "Loser task SHOULD be cancelled by Cx::race (TaskHandle leak fixed)"
+        );
+
+        // NOTE: Testing Scope::race in this manual setup is complex because
+        // Scope::race properly drains losers by awaiting join(), which requires
+        // a scheduler to drive tasks to completion. In this manual test, we only
+        // verify that Cx::race now properly cancels losers via JoinFuture::drop.
+        //
+        // Scope::race is separately tested in scope.rs with proper task driving.
+    });
+
+    test_complete!("repro_race_leak");
+}
