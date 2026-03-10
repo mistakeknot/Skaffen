@@ -60,7 +60,26 @@ Beads track each plugin adaptation as a task. The beads-viewer shows adaptation 
 
 ## Known Friction Points
 
-- The 53-plugin ecosystem is too large to adapt at once. Prioritization is critical: Clavain core, internext, interwatch, and interpath cover 80% of daily usage. The long tail (interfluence, interlens, interlock, etc.) can wait for v0.4+.
+- The 53-plugin ecosystem is too large to adapt at once. Usage-frequency data from 594 session messages gives a concrete priority order:
+
+  **Tier 1 — adapt first (daily-driver blockers):**
+  - Clavain core (`/route`, `/sprint`): 45 + 34 mentions. The sprint loop is the primary workflow.
+  - internext (`/next-work`): 28 mentions. Routing entry point.
+  - interspect (routing overrides): 38 mentions. Model selection per phase.
+  - interdoc (AGENTS.md/CLAUDE.md refresh): 37 mentions. Docs staleness check.
+  - interwatch (drift detection): 31 mentions. Doc health scanning.
+  - interpath (artifact generation): 27 mentions. PRDs, vision docs, roadmaps, CUJs.
+
+  **Tier 2 — adapt for parity (weekly usage):**
+  - interflux / flux-drive (multi-agent review + research): 27 mentions. Review dispatch.
+  - interlock (multi-agent coordination): 17 mentions. Relevant when Autarch orchestrates multiple Skaffens.
+  - interpub (plugin publish): 16 mentions. Ship-phase plugin publishing.
+
+  **Tier 3 — adapt opportunistically (nice-to-have):**
+  - interfluence (voice profiles): 10 mentions. Voice-aligned artifact generation.
+  - interpeer (cross-AI review): 3 mentions. Oracle/GPT escalation.
+  - intertest (TDD workflow): 2 explicit mentions, but implicitly part of every Build phase.
+  - The remaining ~35 plugins: interlens, interline, intership, interject, etc. Port on demand.
 - Some plugins depend on Claude Code's specific tool model (e.g., `PreToolUse` hooks that modify tool arguments before execution). Skaffen's OODARC loop has different interception points; the adaptation is not always 1:1.
 - Plugin MCP servers that maintain state (interlock for multi-agent coordination, intermux for session multiplexing) need careful consideration. Skaffen may talk to the same MCP servers Claude Code does, rather than porting the server itself.
 - QuickJS extension runtime in pi_agent_rust may not support all the Node.js idioms used in Interverse plugins. Adaptation may require rewriting some logic in Rust or finding QuickJS-compatible equivalents.
