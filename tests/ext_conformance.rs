@@ -291,7 +291,7 @@ fn trace_viewer_renders_pretty_and_exports_jsonl() {
     writeln!(log_file, "{line2}").expect("write log line2");
     writeln!(log_file, "{line3}").expect("write log line3");
 
-    let binary_path = PathBuf::from(env!("CARGO_BIN_EXE_pi_legacy_capture"));
+    let binary_path = PathBuf::from(env!("CARGO_BIN_EXE_skaffen_legacy_capture"));
 
     let pretty = Command::new(&binary_path)
         .args([

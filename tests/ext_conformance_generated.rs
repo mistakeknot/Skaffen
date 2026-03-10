@@ -964,7 +964,7 @@ fn run_shard_parallel(
 ) -> Vec<ShardedConformanceResult> {
     use std::sync::mpsc;
 
-    let (tx, mut rx) = mpsc::channel();
+    let (tx, rx) = mpsc::channel();
 
     // Process extensions in chunks to control parallelism.
     let chunks: Vec<Vec<String>> = extensions

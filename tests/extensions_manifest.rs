@@ -307,7 +307,7 @@ fn parse_slash_command_with_empty_args() {
     let parsed = ExtensionMessage::parse_and_validate(&json).expect("parse");
     match parsed.body {
         skaffen::extensions::ExtensionBody::SlashCommand(payload) => {
-            assert!(payload.args.is_empty())
+            assert!(payload.args.is_empty());
         }
         _ => unreachable!("expected SlashCommand"),
     }

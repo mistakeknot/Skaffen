@@ -194,6 +194,8 @@ strip = false
 
 [lints.rust]
 unsafe_code = "forbid"
+# Inherited from pi_agent_rust — tighten in v0.2
+unused_mut = "allow"
 
 [lints.clippy]
 pedantic = { level = "warn", priority = -1 }
@@ -202,6 +204,12 @@ nursery = { level = "warn", priority = -1 }
 missing_errors_doc = "allow"
 missing_panics_doc = "allow"
 module_name_repetitions = "allow"
+# Inherited from pi_agent_rust — tighten in v0.2
+collapsible_match = "allow"
+struct_excessive_bools = "allow"
+suboptimal_flops = "allow"
+useless_conversion = "allow"
+unnecessary_trailing_comma = "allow"
 
 # ---------------------------------------------------------------------------
 # Vendored dependencies

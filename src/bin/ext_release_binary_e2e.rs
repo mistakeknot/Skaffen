@@ -350,7 +350,7 @@ fn execute_cases(
     let mut first_error: Option<anyhow::Error> = None;
     let mut completed = 0usize;
     let mut ordered = vec![None; total];
-    let (tx, mut rx) = mpsc::channel::<Result<(usize, CaseResult)>>();
+    let (tx, rx) = mpsc::channel::<Result<(usize, CaseResult)>>();
     let next_index = Arc::new(AtomicUsize::new(0));
     thread::scope(|scope| {
         for _ in 0..jobs {
