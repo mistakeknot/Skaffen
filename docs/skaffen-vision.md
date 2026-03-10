@@ -20,7 +20,7 @@ The ceiling has five faces:
 4. **Phase gates are hints.** A system prompt that says "don't write during review" is a suggestion. Structural tool gating that removes write tools from the tool list is a constraint.
 5. **Steering is approximated.** Programmatic interrupt-mid-tool and queue-for-after require owning the loop.
 
-The answer is not replacing Clavain. Clavain rigs host agents, and there will always be value in that; the 53 plugins and the integrations with Claude Code, Codex, and Gemini are production-proven. Over time, Clavain's discipline content also becomes the skill system Skaffen loads: same protocols, different runtimes.
+The answer is not replacing Clavain. Clavain rigs host agents, and there will always be value in that; the 53 plugins and the integrations with Claude Code, Codex, and Gemini are production-proven. Both runtimes consume shared discipline docs (`docs/discipline/`); plugin ecosystem features (hooks, MCP servers) remain Clavain-only.
 
 Skaffen adds a runtime that owns its own loop so discipline becomes structural.
 
@@ -38,11 +38,11 @@ Skaffen's autonomy level is a dial, calibrated by Interspect from accumulated ev
 
 ### Authority is scoped and composed
 
-Phase gates are hard constraints enforced by the type system. In brainstorm phase, write tools are structurally unavailable. In review phase, the model may differ from build phase. The loop enforces scope; the LLM operates within it.
+Phase gates are runtime-enforced constraints. The agent loop routes all tool dispatch through `tools_for_phase()`; out-of-phase calls return a structured `PhaseViolation` error. Extensions and MCP tools are subject to the same gate. In brainstorm phase, write tools are unavailable. In review phase, the model may differ from build phase. The loop enforces scope; the LLM operates within it.
 
 ### Fork, don't rewrite
 
-[Pi_agent_rust](https://github.com/Dicklesworthstone/pi_agent_rust) is battle-tested: 89/89 feature parity with pi-mono, 3,857+ tests, `#![forbid(unsafe_code)]`. Rewriting a coding agent from scratch is accidental complexity; forking a proven foundation and diverging where it matters is not.
+[Pi_agent_rust](https://github.com/Dicklesworthstone/pi_agent_rust) is battle-tested: 3,857+ tests, `#![forbid(unsafe_code)]`. Skaffen requires 7 tools and 3 execution modes; full pi-mono parity is not a goal. Rewriting a coding agent from scratch is accidental complexity; forking a proven foundation and diverging where it matters is not.
 
 ### Performance enables the flywheel
 
@@ -66,7 +66,7 @@ Skaffen binary (Rust, forked from pi_agent_rust)
 │   ├── Plan       → read + write plan docs
 │   ├── Build      → full tool access
 │   ├── Review     → read + test (no write/edit)
-│   └── Ship       → commit/push only
+│   └── Ship       → read + git-only bash (allowlisted git subcommands)
 ├── Tool system (read, write, edit, bash, grep, find, ls)
 ├── TUI (charmed_rust / bubbletea → FrankenTUI migration planned)
 ├── Extension runtime (QuickJS, capability-gated)
@@ -81,10 +81,10 @@ Skaffen is the sixth pillar of Demarch and a sibling L2 OS alongside Clavain. Bo
 
 | Component | Relationship |
 |-----------|-------------|
-| **Clavain** | Permanent siblings. Clavain rigs host agents; Skaffen is the agent. Over time, Clavain's discipline content becomes the skill system Skaffen loads. |
+| **Clavain** | Permanent siblings. Clavain rigs host agents; Skaffen is the agent. Both consume shared discipline docs; plugin infrastructure stays Clavain-only. |
 | **Intercore** | L1 kernel. Skaffen talks to Intercore for dispatch, run state, and session registry. |
 | **Interspect** | Evidence pipeline. Skaffen emits events natively; Interspect routing overrides drive model selection per phase. |
-| **Interverse** | Plugin ecosystem. Skaffen loads Interverse plugins via compatibility bridge. |
+| **Interverse** | Plugin ecosystem. Skaffen loads MCP tools and agent definitions natively; hook/skill infrastructure stays Clavain-only. |
 | **Autarch** | L3 apps. Orchestrates multiple Skaffen instances via RPC mode. |
 | **Beads** | Work tracking. Skaffen sessions correlate with beads for cost attribution. |
 
@@ -105,8 +105,8 @@ Every project has bets that could be wrong. These are Skaffen's, in order of how
 |-----|----------|
 | **The evidence-authority flywheel compounds.** More evidence from native emission means better routing, cheaper tokens, more sessions, more evidence. | The core thesis fails and the fork cost isn't justified. This is the bet that matters. |
 | **Owning the loop is worth the fork cost.** The ceiling from host runtime opacity is real and blocking today. | If host agents add mid-session model routing and hard phase gates, the ceiling disappears and maintaining a fork is pure overhead. |
-| **Structural safety beats prompt-based safety.** `#![forbid(unsafe_code)]`, hard phase gates via the type system, capability-gated extensions. | If prompt-based safety is good enough in practice, the structural approach is over-engineered. |
-| **A Rust coding agent can be production-quality.** Pi_agent_rust's test suite and feature parity with pi-mono suggest this is achievable. | "89/89 feature parity claimed" is not the same as "89/89 feature parity verified," and the fork will diverge. |
+| **Structural safety beats prompt-based safety.** `#![forbid(unsafe_code)]`, runtime-enforced phase gates, capability-gated extensions. | If prompt-based safety is good enough in practice, the structural approach is over-engineered. |
+| **A Rust coding agent can be production-quality.** Pi_agent_rust's test suite suggests this is achievable. | Fork viability is tested by v0.1 acceptance criteria, not upstream parity claims. The fork will diverge. |
 
 ## Trajectory
 
@@ -116,11 +116,11 @@ Fork pi_agent_rust, rebrand to Skaffen, get CI green, verify all 3,857+ tests pa
 ### v0.2 -- OODARC Loop
 Modify `src/agent.rs` to implement phase-aware tool gating and the OODARC turn structure. Hard-gate tools by phase. Each turn: observe, orient, decide, act, reflect, compound. Mid-session model switching via routing overrides.
 
-### v0.3 -- Intercore Bridge + Evidence
-Connect to Intercore via CLI bridge. Agent loop emits dispatch events, receives run state. Native Interspect evidence emission: every turn produces structured events (tool calls, model selections, phase transitions). Events flow into the Interspect pipeline for routing calibration.
+### v0.3 -- Intercore Bridge + Evidence (Pipes Connected, Loop Open)
+Connect to Intercore via CLI bridge (`ic events record`). Agent loop emits structured events (tool calls, model selections, phase transitions, session terminal state, bead outcomes). Manual/static routing overrides consumed; evidence-derived overrides require the calibration pipeline (v0.3b, separate bead).
 
 ### v0.4 -- Self-Building
-Skaffen develops Skaffen features. The bootstrap: Clavain-rigged Claude Code builds v0.1-v0.3, then Skaffen builds v0.4+. Evidence from Skaffen building itself calibrates its own routing.
+Skaffen develops Skaffen features using graduated autonomy: L1 (supervised), L2 (monitored — human reviews output only), L3 (autonomous — zero intervention). v0.4 requires 5+ routine tasks at L2 and 1+ feature at L3. Bootstrap: Claude Code builds v0.1-v0.3, Skaffen builds v0.4+.
 
 ### v1.0 -- Production Parity
 Daily-driver quality. Measurable improvement over Clavain-rigged Claude Code for Demarch development. The trust ladder from PHILOSOPHY.md applied to Skaffen itself: autonomy earned through demonstrated competence, not assumed.
