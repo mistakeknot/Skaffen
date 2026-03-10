@@ -3901,3 +3901,5 @@
 {"actor":"mistakeknot","comment":"Added label: claimed_at:1773158242","created_at":"2026-03-10T09:05:23Z","event_type":"label_added","id":3901,"issue_id":"Demarch-rp5.8","new_value":null,"old_value":null}
 {"actor":"mistakeknot","comment":"Added label: claimed_by:unknown","created_at":"2026-03-10T09:05:23Z","event_type":"label_added","id":3902,"issue_id":"Demarch-rp5.8","new_value":null,"old_value":null}
 {"actor":"mistakeknot","comment":"Added label: complexity:3","created_at":"2026-03-10T09:05:23Z","event_type":"label_added","id":3903,"issue_id":"Demarch-rp5.8","new_value":null,"old_value":null}
+{"actor":"mistakeknot","comment":null,"created_at":"2026-03-10T11:19:51Z","event_type":"closed","id":3904,"issue_id":"Demarch-rp5.4","new_value":"Fork complete, build passes, 99.8% tests pass","old_value":""}
+{"actor":"mistakeknot","comment":null,"created_at":"2026-03-10T11:19:52Z","event_type":"closed","id":3905,"issue_id":"Demarch-rp5.5","new_value":"Fork complete, build passes, 99.8% tests pass","old_value":""}
