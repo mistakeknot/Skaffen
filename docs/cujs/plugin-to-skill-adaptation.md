@@ -43,6 +43,8 @@ The developer approves and transitions to **Build phase**. Skaffen reads the plu
 
 The developer tests the adapted skill by running it in Skaffen against a real project. If the behavior matches the Claude Code version, the adaptation succeeds. If not, the developer steers: "the interwatch drift scan should also check beads state changes, not just file changes."
 
+For batch adaptation (multiple Tier 1 plugins in one session), Skaffen spawns **parallel sub-agents per plugin**. Each sub-agent gets a scoped mandate: read the plugin source, categorize components, write the adapted skill, run tests. Sub-agents report back with structured results (files changed, tests passed/failed, blockers) for the developer to review in one pass. This mirrors the pattern that already works well in Demarch — the insights data shows 97 Agent tool invocations across 57 sessions, with the most successful sessions being those that parallelized independent work (bead recovery, label backfills, multi-repo verification).
+
 Beads track each plugin adaptation as a task. The beads-viewer shows adaptation progress across the full Interverse ecosystem — which plugins are adapted, which are in progress, which are deferred.
 
 ## Success Signals
