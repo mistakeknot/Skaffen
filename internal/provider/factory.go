@@ -33,4 +33,4 @@ func New(name string, cfg ProviderConfig) (Provider, error) {
 }
 
 // Default returns the default provider name.
-func Default() string { return "anthropic" }
+func Default() string { return "claude-code" }

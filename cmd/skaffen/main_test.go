@@ -98,7 +98,9 @@ func TestMissingAPIKey(t *testing.T) {
 		}
 	}
 
-	cmd = exec.Command(binary, "-p", "hello")
+	// Must explicitly request anthropic provider to trigger API key check
+	// (default is claude-code which uses OAuth)
+	cmd = exec.Command(binary, "-provider", "anthropic", "-p", "hello")
 	cmd.Env = env
 	out, err := cmd.CombinedOutput()
 	if err == nil {
@@ -106,5 +108,24 @@ func TestMissingAPIKey(t *testing.T) {
 	}
 	if !bytes.Contains(out, []byte("ANTHROPIC_API_KEY not set")) {
 		t.Errorf("error message: %s", string(out))
+	}
+}
+
+func TestAutoDetectProvider(t *testing.T) {
+	binary := t.TempDir() + "/skaffen"
+	cmd := exec.Command("go", "build", "-o", binary, ".")
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("build failed: %v\n%s", err, out)
+	}
+
+	// With ANTHROPIC_API_KEY set, should auto-select anthropic
+	// (will fail at the actual API call, but we check it picks the right provider)
+	cmd = exec.Command(binary, "-p", "hello")
+	cmd.Env = append(os.Environ(), "ANTHROPIC_API_KEY=sk-ant-test-invalid")
+	out, _ := cmd.CombinedOutput()
+	output := string(out)
+	// Should NOT say "claude" binary not found — it picked anthropic
+	if bytes.Contains(out, []byte("claude binary not found")) {
+		t.Errorf("should auto-detect anthropic when API key set, got: %s", output)
 	}
 }

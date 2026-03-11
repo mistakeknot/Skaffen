@@ -41,7 +41,7 @@ func TestFactory_UnknownProvider(t *testing.T) {
 }
 
 func TestFactory_Default(t *testing.T) {
-	if Default() != "anthropic" {
-		t.Errorf("Default() = %q, want %q", Default(), "anthropic")
+	if Default() != "claude-code" {
+		t.Errorf("Default() = %q, want %q", Default(), "claude-code")
 	}
 }

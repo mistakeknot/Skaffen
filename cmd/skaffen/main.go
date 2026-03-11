@@ -22,7 +22,7 @@ import (
 )
 
 var (
-	flagProvider = flag.String("provider", "anthropic", "LLM provider (anthropic, claude-code)")
+	flagProvider = flag.String("provider", "", "LLM provider: claude-code (default), anthropic")
 	flagModel    = flag.String("model", "", "Model override")
 	flagPhase    = flag.String("phase", "build", "OODARC phase (brainstorm, plan, build, review, ship)")
 	flagPrompt   = flag.String("p", "", "Prompt text (reads stdin if empty)")
@@ -78,18 +78,27 @@ func run() error {
 		return fmt.Errorf("no prompt provided (use -p or pipe to stdin)")
 	}
 
-	// Initialize provider
-	cfg := provider.ProviderConfig{
-		Model: *flagModel,
-	}
-	if *flagProvider == "anthropic" {
-		cfg.APIKey = os.Getenv("ANTHROPIC_API_KEY")
-		if cfg.APIKey == "" {
-			return fmt.Errorf("ANTHROPIC_API_KEY not set (use --provider claude-code for Claude Max)")
+	// Resolve provider: auto-detect if not specified
+	providerName := *flagProvider
+	if providerName == "" {
+		if os.Getenv("ANTHROPIC_API_KEY") != "" {
+			providerName = "anthropic"
+		} else {
+			providerName = "claude-code" // default — works with Claude Max OAuth
 		}
 	}
 
-	p, err := provider.New(*flagProvider, cfg)
+	cfg := provider.ProviderConfig{
+		Model: *flagModel,
+	}
+	if providerName == "anthropic" {
+		cfg.APIKey = os.Getenv("ANTHROPIC_API_KEY")
+		if cfg.APIKey == "" {
+			return fmt.Errorf("ANTHROPIC_API_KEY not set (omit --provider to use Claude Max via claude-code)")
+		}
+	}
+
+	p, err := provider.New(providerName, cfg)
 	if err != nil {
 		return fmt.Errorf("provider: %w", err)
 	}

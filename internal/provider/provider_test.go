@@ -126,8 +126,8 @@ func TestIntegration_ClaudeCodeBinaryNotFound(t *testing.T) {
 }
 
 func TestIntegration_FactoryDefault(t *testing.T) {
-	if provider.Default() != "anthropic" {
-		t.Errorf("Default() = %q", provider.Default())
+	if provider.Default() != "claude-code" {
+		t.Errorf("Default() = %q, want %q", provider.Default(), "claude-code")
 	}
 
 	// Verify anthropic is registered
