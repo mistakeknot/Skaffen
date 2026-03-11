@@ -7,13 +7,16 @@ import (
 	"io"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"runtime"
 	"runtime/debug"
 	"strings"
 	"syscall"
 
 	"github.com/mistakeknot/Skaffen/internal/agent"
+	"github.com/mistakeknot/Skaffen/internal/evidence"
 	"github.com/mistakeknot/Skaffen/internal/provider"
+	"github.com/mistakeknot/Skaffen/internal/session"
 	"github.com/mistakeknot/Skaffen/internal/tool"
 
 	// Register providers via init()
@@ -28,6 +31,7 @@ var (
 	flagPrompt   = flag.String("p", "", "Prompt text (reads stdin if empty)")
 	flagMaxTurns = flag.Int("max-turns", 100, "Maximum agent loop turns")
 	flagSystem   = flag.String("system", "", "System prompt")
+	flagSession  = flag.String("session", "", "Session ID for persistence (creates ~/.skaffen/sessions/<id>.jsonl)")
 )
 
 func main() {
@@ -112,9 +116,28 @@ func run() error {
 		agent.WithMaxTurns(*flagMaxTurns),
 		agent.WithStartPhase(phase),
 	}
-	if *flagSystem != "" {
+
+	// Session ID — used for both session persistence and evidence
+	sessionID := *flagSession
+	if sessionID == "" {
+		sessionID = fmt.Sprintf("skaffen-%d", os.Getpid())
+	}
+
+	if *flagSession != "" {
+		dir := filepath.Join(os.Getenv("HOME"), ".skaffen", "sessions")
+		sess := session.New(*flagSession, dir, *flagSystem, 20)
+		if err := sess.Load(); err != nil {
+			fmt.Fprintf(os.Stderr, "skaffen: warning: load session: %v\n", err)
+		}
+		opts = append(opts, agent.WithSession(sess))
+	} else if *flagSystem != "" {
 		opts = append(opts, agent.WithSession(&agent.NoOpSession{Prompt: *flagSystem}))
 	}
+
+	// Evidence emission — always enabled
+	evidenceDir := filepath.Join(os.Getenv("HOME"), ".skaffen", "evidence")
+	emitter := evidence.New(evidenceDir, sessionID)
+	opts = append(opts, agent.WithEmitter(emitter), agent.WithSessionID(sessionID))
 
 	a := agent.New(p, reg, opts...)
 

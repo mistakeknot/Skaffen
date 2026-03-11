@@ -1,0 +1,180 @@
+package session
+
+import (
+	"bufio"
+	"encoding/json"
+	"fmt"
+	"os"
+	"path/filepath"
+	"sync"
+	"time"
+
+	"github.com/mistakeknot/Skaffen/internal/agent"
+	"github.com/mistakeknot/Skaffen/internal/provider"
+	"github.com/mistakeknot/Skaffen/internal/tool"
+)
+
+// turnRecord is the JSONL format for a persisted turn.
+type turnRecord struct {
+	Type      string             `json:"type"` // always "turn"
+	Phase     tool.Phase         `json:"phase"`
+	Messages  []provider.Message `json:"messages"`
+	Usage     provider.Usage     `json:"usage"`
+	ToolCalls int                `json:"tool_calls"`
+	Timestamp string             `json:"timestamp"`
+}
+
+// JSONLSession implements agent.Session with JSONL-backed persistence.
+type JSONLSession struct {
+	id       string
+	dir      string
+	prompt   string
+	maxTurns int
+	messages []provider.Message
+	mu       sync.Mutex
+}
+
+// New creates a JSONLSession.
+func New(id, dir, systemPrompt string, maxTurns int) *JSONLSession {
+	if maxTurns <= 0 {
+		maxTurns = 20
+	}
+	return &JSONLSession{
+		id:       id,
+		dir:      dir,
+		prompt:   systemPrompt,
+		maxTurns: maxTurns,
+	}
+}
+
+// SystemPrompt returns the system prompt.
+func (s *JSONLSession) SystemPrompt(_ tool.Phase) string {
+	return s.prompt
+}
+
+// Messages returns the conversation history.
+func (s *JSONLSession) Messages() []provider.Message {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if len(s.messages) == 0 {
+		return nil
+	}
+	out := make([]provider.Message, len(s.messages))
+	copy(out, s.messages)
+	return out
+}
+
+// Save appends a turn to the JSONL file and updates in-memory state.
+func (s *JSONLSession) Save(turn agent.Turn) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	// Accumulate messages
+	s.messages = append(s.messages, turn.Messages...)
+
+	// Truncate if needed
+	s.truncate()
+
+	// Persist to file
+	record := turnRecord{
+		Type:      "turn",
+		Phase:     turn.Phase,
+		Messages:  turn.Messages,
+		Usage:     turn.Usage,
+		ToolCalls: turn.ToolCalls,
+		Timestamp: time.Now().UTC().Format(time.RFC3339),
+	}
+
+	return s.appendRecord(record)
+}
+
+// Load reads the JSONL file and reconstructs the message history.
+func (s *JSONLSession) Load() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	path := s.filePath()
+	f, err := os.Open(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil // new session, nothing to load
+		}
+		return fmt.Errorf("open session: %w", err)
+	}
+	defer f.Close()
+
+	s.messages = nil
+	scanner := bufio.NewScanner(f)
+	scanner.Buffer(make([]byte, 0, 256*1024), 1024*1024)
+
+	for scanner.Scan() {
+		line := scanner.Bytes()
+		if len(line) == 0 {
+			continue
+		}
+
+		var record turnRecord
+		if err := json.Unmarshal(line, &record); err != nil {
+			continue // skip malformed lines
+		}
+		if record.Type != "turn" {
+			continue
+		}
+
+		s.messages = append(s.messages, record.Messages...)
+	}
+
+	if err := scanner.Err(); err != nil {
+		return fmt.Errorf("scan session: %w", err)
+	}
+
+	// Truncate after loading
+	s.truncate()
+
+	return nil
+}
+
+// truncate keeps the conversation within maxTurns bounds.
+// Keeps the first message (context anchor) + last maxTurns*2 messages.
+func (s *JSONLSession) truncate() {
+	maxMsgs := s.maxTurns * 2 // rough: 2 messages per turn (assistant + user/tool_result)
+	if len(s.messages) <= maxMsgs {
+		return
+	}
+
+	// Keep first message as context anchor, plus last maxMsgs-1
+	tail := s.messages[len(s.messages)-(maxMsgs-1):]
+	truncated := make([]provider.Message, 0, maxMsgs)
+	truncated = append(truncated, s.messages[0])
+	truncated = append(truncated, tail...)
+	s.messages = truncated
+}
+
+// appendRecord writes a single JSONL record with fsync.
+func (s *JSONLSession) appendRecord(record turnRecord) error {
+	if err := os.MkdirAll(s.dir, 0755); err != nil {
+		return fmt.Errorf("create session dir: %w", err)
+	}
+
+	f, err := os.OpenFile(s.filePath(), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return fmt.Errorf("open session file: %w", err)
+	}
+	defer f.Close()
+
+	data, err := json.Marshal(record)
+	if err != nil {
+		return fmt.Errorf("marshal turn: %w", err)
+	}
+
+	data = append(data, '\n')
+	if _, err := f.Write(data); err != nil {
+		return fmt.Errorf("write turn: %w", err)
+	}
+
+	return f.Sync()
+}
+
+func (s *JSONLSession) filePath() string {
+	return filepath.Join(s.dir, s.id+".jsonl")
+}

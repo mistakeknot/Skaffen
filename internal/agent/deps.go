@@ -18,6 +18,8 @@ type Session interface {
 	SystemPrompt(phase tool.Phase) string
 	// Save persists a turn to the session log.
 	Save(turn Turn) error
+	// Messages returns the conversation history (for session resume).
+	Messages() []provider.Message
 }
 
 // Emitter receives structured evidence per turn.
@@ -36,12 +38,16 @@ type Turn struct {
 
 // Evidence captures one turn's structured data for the reflect step.
 type Evidence struct {
+	Timestamp  string     `json:"timestamp"`
+	SessionID  string     `json:"session_id,omitempty"`
 	Phase      tool.Phase `json:"phase"`
 	TurnNumber int        `json:"turn"`
 	ToolCalls  []string   `json:"tool_calls,omitempty"`
 	TokensIn   int        `json:"tokens_in"`
 	TokensOut  int        `json:"tokens_out"`
 	StopReason string     `json:"stop_reason"`
+	DurationMs int64      `json:"duration_ms,omitempty"`
+	Outcome    string     `json:"outcome,omitempty"` // success, failure, timeout
 }
 
 // NoOpRouter always returns the default model.
@@ -57,8 +63,9 @@ func (r *NoOpRouter) SelectModel(_ tool.Phase) (string, string) {
 // NoOpSession discards all state.
 type NoOpSession struct{ Prompt string }
 
-func (s *NoOpSession) SystemPrompt(_ tool.Phase) string { return s.Prompt }
-func (s *NoOpSession) Save(_ Turn) error                { return nil }
+func (s *NoOpSession) SystemPrompt(_ tool.Phase) string  { return s.Prompt }
+func (s *NoOpSession) Save(_ Turn) error                 { return nil }
+func (s *NoOpSession) Messages() []provider.Message      { return nil }
 
 // NoOpEmitter discards all evidence.
 type NoOpEmitter struct{}

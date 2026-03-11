@@ -7,12 +7,13 @@ import (
 
 // Agent runs the OODARC loop.
 type Agent struct {
-	provider provider.Provider
-	registry *tool.Registry
-	router   Router
-	session  Session
-	emitter  Emitter
-	fsm      *phaseFSM
+	provider  provider.Provider
+	registry  *tool.Registry
+	router    Router
+	session   Session
+	emitter   Emitter
+	fsm       *phaseFSM
+	sessionID string // for evidence attribution
 
 	maxTurns int // safety limit, default 100
 }
@@ -36,6 +37,9 @@ func WithEmitter(e Emitter) Option { return func(a *Agent) { a.emitter = e } }
 func WithStartPhase(p tool.Phase) Option {
 	return func(a *Agent) { a.fsm = newPhaseFSM(p) }
 }
+
+// WithSessionID sets the session ID for evidence attribution.
+func WithSessionID(id string) Option { return func(a *Agent) { a.sessionID = id } }
 
 // New creates an Agent with the given provider, tool registry, and options.
 func New(p provider.Provider, reg *tool.Registry, opts ...Option) *Agent {

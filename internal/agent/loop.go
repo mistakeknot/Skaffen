@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/mistakeknot/Skaffen/internal/provider"
 	"github.com/mistakeknot/Skaffen/internal/tool"
@@ -20,11 +21,16 @@ type RunResult struct {
 // Run executes the OODARC loop for a given task.
 // Each iteration: observe → orient → decide → act → reflect → compound.
 func (a *Agent) Run(ctx context.Context, task string) (*RunResult, error) {
-	// Observe: initialize conversation with the task
-	messages := []provider.Message{
-		{Role: provider.RoleUser, Content: []provider.ContentBlock{
-			{Type: "text", Text: task},
-		}},
+	// Observe: initialize conversation — resume from session or start fresh
+	messages := a.session.Messages()
+	taskMsg := provider.Message{
+		Role:    provider.RoleUser,
+		Content: []provider.ContentBlock{{Type: "text", Text: task}},
+	}
+	if len(messages) == 0 {
+		messages = []provider.Message{taskMsg}
+	} else {
+		messages = append(messages, taskMsg)
 	}
 
 	var totalUsage provider.Usage
@@ -46,6 +52,7 @@ func (a *Agent) Run(ctx context.Context, task string) (*RunResult, error) {
 		}
 
 		// Decide: call LLM with oriented context
+		turnStart := time.Now()
 		stream, err := a.provider.Stream(ctx, messages, providerTools, cfg)
 		if err != nil {
 			return nil, fmt.Errorf("turn %d: stream: %w", turn, err)
@@ -54,6 +61,7 @@ func (a *Agent) Run(ctx context.Context, task string) (*RunResult, error) {
 		if err != nil {
 			return nil, fmt.Errorf("turn %d: collect: %w", turn, err)
 		}
+		turnDuration := time.Since(turnStart)
 
 		// Accumulate usage
 		totalUsage.InputTokens += collected.Usage.InputTokens
@@ -76,18 +84,32 @@ func (a *Agent) Run(ctx context.Context, task string) (*RunResult, error) {
 		for _, tc := range collected.ToolCalls {
 			toolNames = append(toolNames, tc.Name)
 		}
+		outcome := "success"
+		if collected.StopReason == "tool_use" {
+			outcome = "tool_use"
+		}
 		a.emitter.Emit(Evidence{
+			Timestamp:  time.Now().UTC().Format(time.RFC3339),
+			SessionID:  a.sessionID,
 			Phase:      a.fsm.Current(),
 			TurnNumber: turn,
 			ToolCalls:  toolNames,
 			TokensIn:   collected.Usage.InputTokens,
 			TokensOut:  collected.Usage.OutputTokens,
 			StopReason: collected.StopReason,
+			DurationMs: turnDuration.Milliseconds(),
+			Outcome:    outcome,
 		})
 
-		// Compound: save turn to session
+		// Compound: save turn to session (include messages for replay)
+		turnMessages := []provider.Message{assistantMsg}
+		if collected.StopReason == "tool_use" && len(collected.ToolCalls) > 0 {
+			// Tool result message was appended above; grab it
+			turnMessages = append(turnMessages, messages[len(messages)-1])
+		}
 		a.session.Save(Turn{
 			Phase:     a.fsm.Current(),
+			Messages:  turnMessages,
 			Usage:     collected.Usage,
 			ToolCalls: len(collected.ToolCalls),
 		})
