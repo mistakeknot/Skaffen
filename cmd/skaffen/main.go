@@ -19,6 +19,8 @@ import (
 	"github.com/mistakeknot/Skaffen/internal/router"
 	"github.com/mistakeknot/Skaffen/internal/session"
 	"github.com/mistakeknot/Skaffen/internal/tool"
+	"github.com/mistakeknot/Skaffen/internal/trust"
+	"github.com/mistakeknot/Skaffen/internal/tui"
 
 	// Register providers via init()
 	_ "github.com/mistakeknot/Skaffen/internal/provider/anthropic"
@@ -34,6 +36,9 @@ var (
 	flagSystem   = flag.String("system", "", "System prompt")
 	flagSession  = flag.String("session", "", "Session ID for persistence (creates ~/.skaffen/sessions/<id>.jsonl)")
 	flagBudget   = flag.Int("budget", 0, "Per-session token budget (0 = unlimited)")
+	flagMode     = flag.String("mode", "tui", "Execution mode: tui (default), print")
+	flagResume   = flag.Bool("c", false, "Resume last session")
+	flagResumeID = flag.String("r", "", "Resume specific session by ID")
 )
 
 func main() {
@@ -51,13 +56,24 @@ func main() {
 		}
 	}
 
-	if err := run(); err != nil {
-		fmt.Fprintf(os.Stderr, "skaffen: %v\n", err)
+	switch *flagMode {
+	case "tui":
+		if err := runTUI(); err != nil {
+			fmt.Fprintf(os.Stderr, "skaffen: %v\n", err)
+			os.Exit(1)
+		}
+	case "print":
+		if err := runPrint(); err != nil {
+			fmt.Fprintf(os.Stderr, "skaffen: %v\n", err)
+			os.Exit(1)
+		}
+	default:
+		fmt.Fprintf(os.Stderr, "skaffen: unknown mode %q\n", *flagMode)
 		os.Exit(1)
 	}
 }
 
-func run() error {
+func runPrint() error {
 	// Context with signal handling
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
@@ -185,6 +201,106 @@ func run() error {
 		result.Turns, result.Usage.InputTokens, result.Usage.OutputTokens)
 
 	return nil
+}
+
+func runTUI() error {
+	// Resolve provider (same logic as runPrint)
+	providerName := *flagProvider
+	if providerName == "" {
+		if os.Getenv("ANTHROPIC_API_KEY") != "" {
+			providerName = "anthropic"
+		} else {
+			providerName = "claude-code"
+		}
+	}
+
+	cfg := provider.ProviderConfig{}
+	if providerName == "anthropic" {
+		cfg.APIKey = os.Getenv("ANTHROPIC_API_KEY")
+		if cfg.APIKey == "" {
+			return fmt.Errorf("ANTHROPIC_API_KEY not set")
+		}
+	}
+
+	p, err := provider.New(providerName, cfg)
+	if err != nil {
+		return fmt.Errorf("provider: %w", err)
+	}
+
+	// Tool registry
+	reg := tool.NewRegistry()
+	tool.RegisterBuiltins(reg)
+
+	// Router
+	routingPath := filepath.Join(os.Getenv("HOME"), ".skaffen", "routing.json")
+	routerCfg, err := router.LoadConfig(routingPath)
+	if err != nil {
+		routerCfg = &router.Config{}
+	}
+	if *flagBudget > 0 {
+		routerCfg.Budget = &router.BudgetConfig{
+			MaxTokens: *flagBudget,
+			Mode:      "graceful",
+			DegradeAt: 0.8,
+		}
+	}
+	if *flagModel != "" {
+		if routerCfg.Phases == nil {
+			routerCfg.Phases = make(map[tool.Phase]string)
+		}
+		for _, ph := range []tool.Phase{tool.PhaseBrainstorm, tool.PhasePlan, tool.PhaseBuild, tool.PhaseReview, tool.PhaseShip} {
+			routerCfg.Phases[ph] = *flagModel
+		}
+	}
+	modelRouter := router.New(routerCfg)
+
+	// Session
+	sessionID := *flagSession
+	if sessionID == "" {
+		sessionID = fmt.Sprintf("skaffen-%d", os.Getpid())
+	}
+
+	phase := tool.Phase(*flagPhase)
+
+	opts := []agent.Option{
+		agent.WithMaxTurns(*flagMaxTurns),
+		agent.WithStartPhase(phase),
+		agent.WithRouter(modelRouter),
+	}
+
+	if *flagSession != "" {
+		dir := filepath.Join(os.Getenv("HOME"), ".skaffen", "sessions")
+		sess := session.New(*flagSession, dir, *flagSystem, 20)
+		if err := sess.Load(); err != nil {
+			fmt.Fprintf(os.Stderr, "skaffen: warning: load session: %v\n", err)
+		}
+		opts = append(opts, agent.WithSession(sess))
+	} else if *flagSystem != "" {
+		opts = append(opts, agent.WithSession(&agent.NoOpSession{Prompt: *flagSystem}))
+	}
+
+	// Evidence
+	evidenceDir := filepath.Join(os.Getenv("HOME"), ".skaffen", "evidence")
+	emitter := evidence.New(evidenceDir, sessionID)
+	opts = append(opts, agent.WithEmitter(emitter), agent.WithSessionID(sessionID))
+
+	// Trust evaluator
+	trustEval := trust.NewEvaluator(nil)
+
+	// Create agent
+	a := agent.New(p, reg, opts...)
+
+	// Working directory
+	workDir, _ := os.Getwd()
+
+	// Run TUI
+	return tui.Run(tui.Config{
+		Agent:     a,
+		Trust:     trustEval,
+		SessionID: sessionID,
+		Verbose:   false,
+		WorkDir:   workDir,
+	})
 }
 
 func printVersion() {

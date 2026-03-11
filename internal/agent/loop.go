@@ -57,7 +57,13 @@ func (a *Agent) Run(ctx context.Context, task string) (*RunResult, error) {
 		if err != nil {
 			return nil, fmt.Errorf("turn %d: stream: %w", turn, err)
 		}
-		collected, err := stream.Collect()
+
+		var collected *provider.CollectedResponse
+		if a.streamCB != nil {
+			collected, err = a.collectWithCallbacks(stream, turn)
+		} else {
+			collected, err = stream.Collect()
+		}
 		if err != nil {
 			return nil, fmt.Errorf("turn %d: collect: %w", turn, err)
 		}
@@ -78,7 +84,7 @@ func (a *Agent) Run(ctx context.Context, task string) (*RunResult, error) {
 
 		// Act: execute tool calls if stop_reason is "tool_use"
 		if collected.StopReason == "tool_use" && len(collected.ToolCalls) > 0 {
-			toolResultMsg := a.executeTools(ctx, collected.ToolCalls)
+			toolResultMsg := a.executeToolsWithCallbacks(ctx, collected.ToolCalls)
 			messages = append(messages, toolResultMsg)
 		}
 
@@ -173,6 +179,85 @@ func (a *Agent) executeTools(ctx context.Context, calls []provider.ToolCall) pro
 		})
 	}
 	return provider.Message{Role: provider.RoleUser, Content: blocks}
+}
+
+// executeToolsWithCallbacks is like executeTools but emits StreamToolComplete
+// events when streamCB is set.
+func (a *Agent) executeToolsWithCallbacks(ctx context.Context, calls []provider.ToolCall) provider.Message {
+	var blocks []provider.ContentBlock
+	for _, tc := range calls {
+		result := a.registry.Execute(ctx, a.fsm.Current(), tc.Name, tc.Input)
+		blocks = append(blocks, provider.ContentBlock{
+			Type:          "tool_result",
+			ToolUseID:     tc.ID,
+			ResultContent: result.Content,
+			IsError:       result.IsError,
+		})
+		if a.streamCB != nil {
+			a.streamCB(StreamEvent{
+				Type:       StreamToolComplete,
+				ToolName:   tc.Name,
+				ToolResult: result.Content,
+				IsError:    result.IsError,
+			})
+		}
+	}
+	return provider.Message{Role: provider.RoleUser, Content: blocks}
+}
+
+// collectWithCallbacks iterates stream events one-by-one, emitting
+// StreamCallback events for real-time TUI display, while still
+// accumulating the full CollectedResponse for the agent loop.
+func (a *Agent) collectWithCallbacks(s *provider.StreamResponse, turn int) (*provider.CollectedResponse, error) {
+	var (
+		result      provider.CollectedResponse
+		currentTool *provider.ToolCall
+		partialJSON string
+	)
+
+	for s.Next() {
+		ev := s.Event()
+		switch ev.Type {
+		case provider.EventTextDelta:
+			result.Text += ev.Text
+			a.streamCB(StreamEvent{Type: StreamText, Text: ev.Text})
+
+		case provider.EventToolUseStart:
+			// Flush previous tool
+			if currentTool != nil {
+				currentTool.Input = json.RawMessage(partialJSON)
+				result.ToolCalls = append(result.ToolCalls, *currentTool)
+			}
+			currentTool = &provider.ToolCall{ID: ev.ID, Name: ev.Name}
+			partialJSON = ""
+			a.streamCB(StreamEvent{Type: StreamToolStart, ToolName: ev.Name})
+
+		case provider.EventToolUseDelta:
+			partialJSON += ev.Text
+
+		case provider.EventDone:
+			if ev.Usage != nil {
+				result.Usage = *ev.Usage
+			}
+			result.StopReason = ev.StopReason
+			a.streamCB(StreamEvent{
+				Type:       StreamTurnComplete,
+				Usage:      result.Usage,
+				TurnNumber: turn,
+			})
+		}
+	}
+
+	// Flush last tool if any
+	if currentTool != nil {
+		currentTool.Input = json.RawMessage(partialJSON)
+		result.ToolCalls = append(result.ToolCalls, *currentTool)
+	}
+
+	if s.Err() != nil {
+		return &result, s.Err()
+	}
+	return &result, nil
 }
 
 // convertToolDefs converts tool.ToolDef to provider.ToolDef.

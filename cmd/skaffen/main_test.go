@@ -52,8 +52,8 @@ func TestNoPromptError(t *testing.T) {
 		t.Fatalf("build failed: %v\n%s", err, out)
 	}
 
-	// Run with empty stdin and no -p flag
-	cmd = exec.Command(binary)
+	// Run with empty stdin and no -p flag (print mode to avoid TTY requirement)
+	cmd = exec.Command(binary, "-mode", "print")
 	cmd.Stdin = bytes.NewReader(nil)
 	cmd.Env = append(os.Environ(), "ANTHROPIC_API_KEY=test-key")
 	out, err := cmd.CombinedOutput()
@@ -72,7 +72,7 @@ func TestInvalidPhase(t *testing.T) {
 		t.Fatalf("build failed: %v\n%s", err, out)
 	}
 
-	cmd = exec.Command(binary, "-phase", "invalid", "-p", "hello")
+	cmd = exec.Command(binary, "-mode", "print", "-phase", "invalid", "-p", "hello")
 	cmd.Env = append(os.Environ(), "ANTHROPIC_API_KEY=test-key")
 	out, err := cmd.CombinedOutput()
 	if err == nil {
@@ -100,7 +100,7 @@ func TestMissingAPIKey(t *testing.T) {
 
 	// Must explicitly request anthropic provider to trigger API key check
 	// (default is claude-code which uses OAuth)
-	cmd = exec.Command(binary, "-provider", "anthropic", "-p", "hello")
+	cmd = exec.Command(binary, "-mode", "print", "-provider", "anthropic", "-p", "hello")
 	cmd.Env = env
 	out, err := cmd.CombinedOutput()
 	if err == nil {
@@ -120,7 +120,7 @@ func TestAutoDetectProvider(t *testing.T) {
 
 	// With ANTHROPIC_API_KEY set, should auto-select anthropic
 	// (will fail at the actual API call, but we check it picks the right provider)
-	cmd = exec.Command(binary, "-p", "hello")
+	cmd = exec.Command(binary, "-mode", "print", "-p", "hello")
 	cmd.Env = append(os.Environ(), "ANTHROPIC_API_KEY=sk-ant-test-invalid")
 	out, _ := cmd.CombinedOutput()
 	output := string(out)

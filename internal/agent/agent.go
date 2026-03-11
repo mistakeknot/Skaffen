@@ -14,6 +14,7 @@ type Agent struct {
 	emitter   Emitter
 	fsm       *phaseFSM
 	sessionID string // for evidence attribution
+	streamCB  StreamCallback
 
 	maxTurns int // safety limit, default 100
 }
@@ -40,6 +41,11 @@ func WithStartPhase(p tool.Phase) Option {
 
 // WithSessionID sets the session ID for evidence attribution.
 func WithSessionID(id string) Option { return func(a *Agent) { a.sessionID = id } }
+
+// WithStreamCallback sets a callback that receives real-time streaming events.
+// When set, the agent loop iterates stream events individually instead of
+// collecting them all at once, enabling TUI progress display.
+func WithStreamCallback(cb StreamCallback) Option { return func(a *Agent) { a.streamCB = cb } }
 
 // New creates an Agent with the given provider, tool registry, and options.
 func New(p provider.Provider, reg *tool.Registry, opts ...Option) *Agent {
