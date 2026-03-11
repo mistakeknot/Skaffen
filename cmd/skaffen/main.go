@@ -16,6 +16,7 @@ import (
 	"github.com/mistakeknot/Skaffen/internal/agent"
 	"github.com/mistakeknot/Skaffen/internal/evidence"
 	"github.com/mistakeknot/Skaffen/internal/provider"
+	"github.com/mistakeknot/Skaffen/internal/router"
 	"github.com/mistakeknot/Skaffen/internal/session"
 	"github.com/mistakeknot/Skaffen/internal/tool"
 
@@ -32,6 +33,7 @@ var (
 	flagMaxTurns = flag.Int("max-turns", 100, "Maximum agent loop turns")
 	flagSystem   = flag.String("system", "", "System prompt")
 	flagSession  = flag.String("session", "", "Session ID for persistence (creates ~/.skaffen/sessions/<id>.jsonl)")
+	flagBudget   = flag.Int("budget", 0, "Per-session token budget (0 = unlimited)")
 )
 
 func main() {
@@ -92,9 +94,7 @@ func run() error {
 		}
 	}
 
-	cfg := provider.ProviderConfig{
-		Model: *flagModel,
-	}
+	cfg := provider.ProviderConfig{}
 	if providerName == "anthropic" {
 		cfg.APIKey = os.Getenv("ANTHROPIC_API_KEY")
 		if cfg.APIKey == "" {
@@ -111,10 +111,40 @@ func run() error {
 	reg := tool.NewRegistry()
 	tool.RegisterBuiltins(reg)
 
+	// Load routing config (optional file, env vars always checked)
+	routingPath := filepath.Join(os.Getenv("HOME"), ".skaffen", "routing.json")
+	routerCfg, err := router.LoadConfig(routingPath)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "skaffen: warning: routing config: %v\n", err)
+		routerCfg = &router.Config{}
+	}
+
+	// CLI --budget flag overrides config file budget
+	if *flagBudget > 0 {
+		routerCfg.Budget = &router.BudgetConfig{
+			MaxTokens: *flagBudget,
+			Mode:      "graceful",
+			DegradeAt: 0.8,
+		}
+	}
+
+	// CLI --model flag: set as override for all phases (backward compat)
+	if *flagModel != "" {
+		if routerCfg.Phases == nil {
+			routerCfg.Phases = make(map[tool.Phase]string)
+		}
+		for _, ph := range []tool.Phase{tool.PhaseBrainstorm, tool.PhasePlan, tool.PhaseBuild, tool.PhaseReview, tool.PhaseShip} {
+			routerCfg.Phases[ph] = *flagModel
+		}
+	}
+
+	modelRouter := router.New(routerCfg)
+
 	// Configure agent
 	opts := []agent.Option{
 		agent.WithMaxTurns(*flagMaxTurns),
 		agent.WithStartPhase(phase),
+		agent.WithRouter(modelRouter),
 	}
 
 	// Session ID — used for both session persistence and evidence

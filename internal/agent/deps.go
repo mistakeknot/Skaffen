@@ -5,10 +5,11 @@ import (
 	"github.com/mistakeknot/Skaffen/internal/tool"
 )
 
-// Router selects which model to use per turn.
-// Stubbed here — real implementation comes in F4.
+// Router selects which model to use per turn and tracks token budget.
 type Router interface {
 	SelectModel(phase tool.Phase) (model string, reason string)
+	RecordUsage(usage provider.Usage)
+	BudgetState() (spent, max int, pct float64)
 }
 
 // Session persists conversation state.
@@ -46,8 +47,13 @@ type Evidence struct {
 	TokensIn   int        `json:"tokens_in"`
 	TokensOut  int        `json:"tokens_out"`
 	StopReason string     `json:"stop_reason"`
-	DurationMs int64      `json:"duration_ms,omitempty"`
-	Outcome    string     `json:"outcome,omitempty"` // success, failure, timeout
+	DurationMs         int64      `json:"duration_ms,omitempty"`
+	Outcome            string     `json:"outcome,omitempty"` // success, failure, timeout
+	BudgetSpent        int        `json:"budget_spent,omitempty"`
+	BudgetMax          int        `json:"budget_max,omitempty"`
+	BudgetPercentage   float64    `json:"budget_pct,omitempty"`
+	ComplexityTier     int        `json:"complexity_tier,omitempty"`
+	ComplexityOverride bool       `json:"complexity_override,omitempty"`
 }
 
 // NoOpRouter always returns the default model.
@@ -59,6 +65,10 @@ func (r *NoOpRouter) SelectModel(_ tool.Phase) (string, string) {
 	}
 	return r.Model, "configured"
 }
+
+func (r *NoOpRouter) RecordUsage(_ provider.Usage) {}
+
+func (r *NoOpRouter) BudgetState() (int, int, float64) { return 0, 0, 0 }
 
 // NoOpSession discards all state.
 type NoOpSession struct{ Prompt string }

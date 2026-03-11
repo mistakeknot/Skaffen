@@ -69,6 +69,9 @@ func (a *Agent) Run(ctx context.Context, task string) (*RunResult, error) {
 		totalUsage.CacheCreationInputTokens += collected.Usage.CacheCreationInputTokens
 		totalUsage.CacheReadInputTokens += collected.Usage.CacheReadInputTokens
 
+		// Feed budget tracker
+		a.router.RecordUsage(collected.Usage)
+
 		// Build assistant message from response
 		assistantMsg := buildAssistantMessage(collected)
 		messages = append(messages, assistantMsg)
@@ -88,17 +91,21 @@ func (a *Agent) Run(ctx context.Context, task string) (*RunResult, error) {
 		if collected.StopReason == "tool_use" {
 			outcome = "tool_use"
 		}
+		spent, bmax, bpct := a.router.BudgetState()
 		a.emitter.Emit(Evidence{
-			Timestamp:  time.Now().UTC().Format(time.RFC3339),
-			SessionID:  a.sessionID,
-			Phase:      a.fsm.Current(),
-			TurnNumber: turn,
-			ToolCalls:  toolNames,
-			TokensIn:   collected.Usage.InputTokens,
-			TokensOut:  collected.Usage.OutputTokens,
-			StopReason: collected.StopReason,
-			DurationMs: turnDuration.Milliseconds(),
-			Outcome:    outcome,
+			Timestamp:        time.Now().UTC().Format(time.RFC3339),
+			SessionID:        a.sessionID,
+			Phase:            a.fsm.Current(),
+			TurnNumber:       turn,
+			ToolCalls:        toolNames,
+			TokensIn:         collected.Usage.InputTokens,
+			TokensOut:        collected.Usage.OutputTokens,
+			StopReason:       collected.StopReason,
+			DurationMs:       turnDuration.Milliseconds(),
+			Outcome:          outcome,
+			BudgetSpent:      spent,
+			BudgetMax:        bmax,
+			BudgetPercentage: bpct,
 		})
 
 		// Compound: save turn to session (include messages for replay)
