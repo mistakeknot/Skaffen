@@ -76,6 +76,7 @@ func (p *ClaudeCodeProvider) Stream(ctx context.Context, messages []provider.Mes
 	args := []string{
 		"--print",
 		"--output-format", "stream-json",
+		"--verbose",
 	}
 	if model := config.Model; model != "" {
 		args = append(args, "--model", model)
