@@ -117,11 +117,11 @@ func (p promptModel) View(width int, running bool) string {
 
 	result := border.Render(display)
 
-	// Show file picker overlay above prompt if active
+	// Show file picker below prompt input
 	if p.picking {
 		pickerView := p.picker.View(width)
 		if pickerView != "" {
-			result = pickerView + "\n" + result
+			result = result + "\n" + pickerView
 		}
 	}
 
