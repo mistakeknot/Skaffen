@@ -6,6 +6,7 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/mistakeknot/masaq/theme"
 )
 
 type promptModel struct {
@@ -51,14 +52,15 @@ func (p promptModel) Update(msg tea.Msg) (promptModel, tea.Cmd) {
 }
 
 func (p promptModel) View(width int, running bool) string {
+	c := theme.Current().Semantic()
 	border := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("#3b4261")).
+		BorderForeground(c.Border.Color()).
 		Width(width - 2).
 		Padding(0, 1)
 
 	if running {
-		spinStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#7aa2f7"))
+		spinStyle := lipgloss.NewStyle().Foreground(c.Primary.Color())
 		return border.Render(spinStyle.Render("Thinking..."))
 	}
 

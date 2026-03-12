@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/mistakeknot/masaq/theme"
 )
 
 // OODARC phases
@@ -11,25 +12,26 @@ var phaseOrder = []string{"brainstorm", "plan", "build", "review", "ship"}
 
 // phaseColor returns the lipgloss color for a given phase.
 func phaseColor(phase string) lipgloss.Color {
+	c := theme.Current().Semantic()
 	switch phase {
 	case "brainstorm":
-		return lipgloss.Color("#bb9af7") // purple
+		return c.Secondary.Color()
 	case "plan":
-		return lipgloss.Color("#7aa2f7") // blue
+		return c.Primary.Color()
 	case "build":
-		return lipgloss.Color("#9ece6a") // green
+		return c.Success.Color()
 	case "review":
-		return lipgloss.Color("#e0af68") // yellow
+		return c.Warning.Color()
 	case "ship":
-		return lipgloss.Color("#f7768e") // red/pink
+		return c.Error.Color()
 	default:
-		return lipgloss.Color("#a9b1d6") // muted
+		return c.FgDim.Color()
 	}
 }
 
 // PhaseTransition renders a phase change message for the chat stream.
 func PhaseTransition(from, to string) string {
-	borderStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#3b4261"))
+	borderStyle := lipgloss.NewStyle().Foreground(theme.Current().Semantic().Border.Color())
 	fromStyle := lipgloss.NewStyle().Foreground(phaseColor(from))
 	toStyle := lipgloss.NewStyle().Foreground(phaseColor(to)).Bold(true)
 

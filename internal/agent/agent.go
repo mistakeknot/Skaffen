@@ -1,9 +1,16 @@
 package agent
 
 import (
+	"encoding/json"
+
 	"github.com/mistakeknot/Skaffen/internal/provider"
 	"github.com/mistakeknot/Skaffen/internal/tool"
 )
+
+// ToolApprover is called before executing a tool call. It blocks until
+// the caller (typically the TUI) returns an approval decision. Returning
+// false skips execution and feeds an error result back to the model.
+type ToolApprover func(toolName string, input json.RawMessage) (allow bool)
 
 // Agent runs the OODARC loop.
 type Agent struct {
@@ -15,6 +22,7 @@ type Agent struct {
 	fsm       *phaseFSM
 	sessionID string // for evidence attribution
 	streamCB  StreamCallback
+	approver  ToolApprover
 
 	maxTurns int // safety limit, default 100
 }
@@ -78,4 +86,11 @@ func (a *Agent) CurrentPhase() tool.Phase {
 // This allows the TUI to wire events once the tea.Program is available.
 func (a *Agent) SetStreamCallback(cb StreamCallback) {
 	a.streamCB = cb
+}
+
+// SetToolApprover sets the callback that gates tool execution.
+// When set, the agent loop calls it before each tool call and skips
+// execution if the approver returns false.
+func (a *Agent) SetToolApprover(fn ToolApprover) {
+	a.approver = fn
 }

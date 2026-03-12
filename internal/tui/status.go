@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/mistakeknot/masaq/theme"
 )
 
 type statusModel struct {
@@ -16,44 +17,46 @@ func newStatusModel() statusModel {
 
 // View renders the status bar: phase | model | cost | context% | turns
 func (s statusModel) View(phase, model string, cost, contextPct float64, turns int) string {
+	c := theme.Current().Semantic()
+
 	bg := lipgloss.NewStyle().
-		Background(lipgloss.Color("#24283b")).
+		Background(c.BgLight.Color()).
 		Width(s.width)
 
 	phaseStyle := lipgloss.NewStyle().
 		Foreground(phaseColor(phase)).
 		Bold(true).
-		Background(lipgloss.Color("#24283b"))
+		Background(c.BgLight.Color())
 
 	mutedStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#565f89")).
-		Background(lipgloss.Color("#24283b"))
+		Foreground(c.Muted.Color()).
+		Background(c.BgLight.Color())
 
 	sep := mutedStyle.Render(" | ")
 
-	costStyle := lipgloss.NewStyle().Background(lipgloss.Color("#24283b"))
+	costStyle := lipgloss.NewStyle().Background(c.BgLight.Color())
 	switch {
 	case cost >= 2.0:
-		costStyle = costStyle.Foreground(lipgloss.Color("#f7768e"))
+		costStyle = costStyle.Foreground(c.Error.Color())
 	case cost >= 0.5:
-		costStyle = costStyle.Foreground(lipgloss.Color("#e0af68"))
+		costStyle = costStyle.Foreground(c.Warning.Color())
 	default:
-		costStyle = costStyle.Foreground(lipgloss.Color("#9ece6a"))
+		costStyle = costStyle.Foreground(c.Success.Color())
 	}
 
-	ctxStyle := lipgloss.NewStyle().Background(lipgloss.Color("#24283b"))
+	ctxStyle := lipgloss.NewStyle().Background(c.BgLight.Color())
 	switch {
 	case contextPct >= 80:
-		ctxStyle = ctxStyle.Foreground(lipgloss.Color("#f7768e"))
+		ctxStyle = ctxStyle.Foreground(c.Error.Color())
 	case contextPct >= 50:
-		ctxStyle = ctxStyle.Foreground(lipgloss.Color("#e0af68"))
+		ctxStyle = ctxStyle.Foreground(c.Warning.Color())
 	default:
-		ctxStyle = ctxStyle.Foreground(lipgloss.Color("#9ece6a"))
+		ctxStyle = ctxStyle.Foreground(c.Success.Color())
 	}
 
 	turnStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#c0caf5")).
-		Background(lipgloss.Color("#24283b"))
+		Foreground(c.Fg.Color()).
+		Background(c.BgLight.Color())
 
 	bar := phaseStyle.Render(phase) +
 		sep +

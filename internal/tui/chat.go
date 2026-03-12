@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/mistakeknot/masaq/theme"
 )
 
 // MessageRole identifies who sent a message.
@@ -28,31 +29,32 @@ type ChatMessage struct {
 
 // RenderMessage formats a chat message for display.
 func RenderMessage(msg ChatMessage, width int) string {
+	c := theme.Current().Semantic()
 	switch msg.Role {
 	case RoleUser:
 		headerStyle := lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#7aa2f7")).
+			Foreground(c.Primary.Color()).
 			Bold(true)
 		return fmt.Sprintf("\n%s\n%s\n", headerStyle.Render("You"), msg.Content)
 
 	case RoleAssistant:
 		headerStyle := lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#bb9af7")).
+			Foreground(c.Secondary.Color()).
 			Bold(true)
 		return fmt.Sprintf("\n%s\n%s", headerStyle.Render("Skaffen"), msg.Content)
 
 	case RoleSystem:
 		style := lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#565f89")).
+			Foreground(c.Muted.Color()).
 			Italic(true)
 		return style.Render(fmt.Sprintf("--- %s ---", msg.Content))
 
 	case RoleTool:
 		if msg.IsError {
-			style := lipgloss.NewStyle().Foreground(lipgloss.Color("#f7768e"))
+			style := lipgloss.NewStyle().Foreground(c.Error.Color())
 			return style.Render(fmt.Sprintf("[x] %s: %s", msg.ToolName, msg.Content))
 		}
-		style := lipgloss.NewStyle().Foreground(lipgloss.Color("#7dcfff"))
+		style := lipgloss.NewStyle().Foreground(c.Info.Color())
 		return style.Render(fmt.Sprintf("> %s", msg.Content))
 
 	default:
