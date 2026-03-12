@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -108,6 +110,74 @@ func TestMissingAPIKey(t *testing.T) {
 	}
 	if !bytes.Contains(out, []byte("ANTHROPIC_API_KEY not set")) {
 		t.Errorf("error message: %s", string(out))
+	}
+}
+
+func TestBuildSystemPromptWithContextFiles(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "CLAUDE.md"), []byte("# Project\nBe helpful."), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Override HOME so walkUp stops at tempdir
+	oldHome := os.Getenv("HOME")
+	os.Setenv("HOME", dir)
+	defer os.Setenv("HOME", oldHome)
+
+	result := buildSystemPrompt(dir, "")
+	if !strings.Contains(result, "Be helpful.") {
+		t.Fatalf("expected CLAUDE.md content in system prompt, got: %s", result)
+	}
+}
+
+func TestBuildSystemPromptCombinesExplicitFlag(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "CLAUDE.md"), []byte("project context"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	oldHome := os.Getenv("HOME")
+	os.Setenv("HOME", dir)
+	defer os.Setenv("HOME", oldHome)
+
+	result := buildSystemPrompt(dir, "explicit instructions")
+	if !strings.Contains(result, "project context") {
+		t.Fatal("expected context file content")
+	}
+	if !strings.Contains(result, "explicit instructions") {
+		t.Fatal("expected explicit flag content")
+	}
+	// Context should come before explicit
+	ctxIdx := strings.Index(result, "project context")
+	expIdx := strings.Index(result, "explicit instructions")
+	if ctxIdx >= expIdx {
+		t.Fatal("context files should appear before explicit --system flag")
+	}
+}
+
+func TestBuildSystemPromptNoContextFiles(t *testing.T) {
+	dir := t.TempDir()
+
+	oldHome := os.Getenv("HOME")
+	os.Setenv("HOME", dir)
+	defer os.Setenv("HOME", oldHome)
+
+	result := buildSystemPrompt(dir, "only explicit")
+	if result != "only explicit" {
+		t.Fatalf("expected only explicit prompt, got: %s", result)
+	}
+}
+
+func TestBuildSystemPromptEmpty(t *testing.T) {
+	dir := t.TempDir()
+
+	oldHome := os.Getenv("HOME")
+	os.Setenv("HOME", dir)
+	defer os.Setenv("HOME", oldHome)
+
+	result := buildSystemPrompt(dir, "")
+	if result != "" {
+		t.Fatalf("expected empty result, got: %s", result)
 	}
 }
 

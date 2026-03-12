@@ -16,6 +16,7 @@ import (
 
 	"github.com/mistakeknot/Masaq/theme"
 	"github.com/mistakeknot/Skaffen/internal/agent"
+	"github.com/mistakeknot/Skaffen/internal/contextfiles"
 	"github.com/mistakeknot/Skaffen/internal/evidence"
 	"github.com/mistakeknot/Skaffen/internal/mcp"
 	"github.com/mistakeknot/Skaffen/internal/provider"
@@ -186,15 +187,19 @@ func runPrint() error {
 		agent.WithRouter(modelRouter),
 	}
 
+	// Build system prompt from context files + --system flag
+	workDir, _ := os.Getwd()
+	systemPrompt := buildSystemPrompt(workDir, *flagSystem)
+
 	if *flagSession != "" {
 		dir := filepath.Join(os.Getenv("HOME"), ".skaffen", "sessions")
-		sess := session.New(*flagSession, dir, *flagSystem, 20)
+		sess := session.New(*flagSession, dir, systemPrompt, 20)
 		if err := sess.Load(); err != nil {
 			fmt.Fprintf(os.Stderr, "skaffen: warning: load session: %v\n", err)
 		}
 		opts = append(opts, agent.WithSession(sess))
-	} else if *flagSystem != "" {
-		opts = append(opts, agent.WithSession(&agent.NoOpSession{Prompt: *flagSystem}))
+	} else if systemPrompt != "" {
+		opts = append(opts, agent.WithSession(&agent.NoOpSession{Prompt: systemPrompt}))
 	}
 
 	// Evidence emission — always enabled
@@ -295,15 +300,19 @@ func runTUI() error {
 		agent.WithRouter(modelRouter),
 	}
 
+	// Working directory + context files
+	workDir, _ := os.Getwd()
+	systemPrompt := buildSystemPrompt(workDir, *flagSystem)
+
 	if *flagSession != "" {
 		dir := filepath.Join(os.Getenv("HOME"), ".skaffen", "sessions")
-		sess := session.New(*flagSession, dir, *flagSystem, 20)
+		sess := session.New(*flagSession, dir, systemPrompt, 20)
 		if err := sess.Load(); err != nil {
 			fmt.Fprintf(os.Stderr, "skaffen: warning: load session: %v\n", err)
 		}
 		opts = append(opts, agent.WithSession(sess))
-	} else if *flagSystem != "" {
-		opts = append(opts, agent.WithSession(&agent.NoOpSession{Prompt: *flagSystem}))
+	} else if systemPrompt != "" {
+		opts = append(opts, agent.WithSession(&agent.NoOpSession{Prompt: systemPrompt}))
 	}
 
 	// Evidence
@@ -316,9 +325,6 @@ func runTUI() error {
 
 	// Create agent
 	a := agent.New(p, reg, opts...)
-
-	// Working directory
-	workDir, _ := os.Getwd()
 
 	// Run TUI
 	return tui.Run(tui.Config{
@@ -427,6 +433,21 @@ func masaqVersion() string {
 		}
 	}
 	return "dev"
+}
+
+// buildSystemPrompt assembles the system prompt from project context files
+// (CLAUDE.md, AGENTS.md) found in the directory hierarchy, plus any explicit
+// --system flag. Context files are loaded outermost-first (home → project).
+func buildSystemPrompt(workDir, explicit string) string {
+	ctx := contextfiles.Load(workDir)
+	switch {
+	case ctx != "" && explicit != "":
+		return ctx + "\n\n---\n\n" + explicit
+	case ctx != "":
+		return ctx
+	default:
+		return explicit
+	}
 }
 
 func printVersion() {
