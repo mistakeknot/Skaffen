@@ -76,6 +76,77 @@ func TestSessionOverride(t *testing.T) {
 	}
 }
 
+func TestSessionCountIncrements(t *testing.T) {
+	e := trust.NewEvaluator(nil)
+	for i := 0; i < 5; i++ {
+		e.Learn("bash:make build", trust.Allow, trust.ScopeSession)
+	}
+	if got := e.SessionCount("bash:make build"); got != 5 {
+		t.Errorf("SessionCount = %d, want 5", got)
+	}
+	// Should still be session-scoped (below threshold)
+	if overrides := e.Overrides(); len(overrides) != 0 {
+		t.Errorf("should have no learned overrides yet, got %d", len(overrides))
+	}
+}
+
+func TestAutoPromoteAtThreshold(t *testing.T) {
+	e := trust.NewEvaluator(nil)
+	for i := 0; i < trust.PromoteThreshold; i++ {
+		e.Learn("bash:make build", trust.Allow, trust.ScopeSession)
+	}
+
+	// Should have been promoted to a learned override
+	overrides := e.Overrides()
+	if len(overrides) != 1 {
+		t.Fatalf("expected 1 learned override after promotion, got %d", len(overrides))
+	}
+	if overrides[0].Pattern != "bash:make build" {
+		t.Errorf("promoted pattern = %q", overrides[0].Pattern)
+	}
+	if overrides[0].Scope != trust.ScopeGlobal {
+		t.Errorf("promoted scope = %v, want ScopeGlobal", overrides[0].Scope)
+	}
+	if overrides[0].Count != trust.PromoteThreshold {
+		t.Errorf("promoted count = %d, want %d", overrides[0].Count, trust.PromoteThreshold)
+	}
+
+	// Session count should be cleared after promotion
+	if got := e.SessionCount("bash:make build"); got != 0 {
+		t.Errorf("session count should be 0 after promotion, got %d", got)
+	}
+}
+
+func TestPromotedOverrideUsedInEval(t *testing.T) {
+	e := trust.NewEvaluator(nil)
+	// Promote "bash:make build" to global
+	for i := 0; i < trust.PromoteThreshold; i++ {
+		e.Learn("bash:make build", trust.Allow, trust.ScopeSession)
+	}
+
+	// Evaluate should now hit the learned override (tier 2) even though
+	// the session entry was deleted during promotion
+	got := e.Evaluate("bash", `{"command": "make build"}`)
+	if got != trust.Allow {
+		t.Errorf("promoted override should Allow, got %v", got)
+	}
+}
+
+func TestLearnedOverrideCountIncrements(t *testing.T) {
+	e := trust.NewEvaluator(nil)
+	e.Learn("bash:npm install*", trust.Allow, trust.ScopeProject)
+	e.Learn("bash:npm install*", trust.Allow, trust.ScopeProject)
+	e.Learn("bash:npm install*", trust.Allow, trust.ScopeProject)
+
+	overrides := e.Overrides()
+	if len(overrides) != 1 {
+		t.Fatalf("expected 1 override (deduplicated), got %d", len(overrides))
+	}
+	if overrides[0].Count != 3 {
+		t.Errorf("count = %d, want 3", overrides[0].Count)
+	}
+}
+
 func TestDecisionString(t *testing.T) {
 	if trust.Allow.String() != "allow" {
 		t.Errorf("Allow.String() = %q", trust.Allow.String())

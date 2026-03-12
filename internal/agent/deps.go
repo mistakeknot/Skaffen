@@ -57,28 +57,32 @@ type Turn struct {
 
 // Evidence captures one turn's structured data for the reflect step.
 type Evidence struct {
-	Timestamp          string     `json:"timestamp"`
-	SessionID          string     `json:"session_id,omitempty"`
-	Phase              tool.Phase `json:"phase"`
-	TurnNumber         int        `json:"turn"`
-	ToolCalls          []string   `json:"tool_calls,omitempty"`
-	TokensIn           int        `json:"tokens_in"`
-	TokensOut          int        `json:"tokens_out"`
-	StopReason         string     `json:"stop_reason"`
-	DurationMs         int64      `json:"duration_ms,omitempty"`
-	Outcome            string     `json:"outcome,omitempty"`
-	BudgetSpent        int        `json:"budget_spent,omitempty"`
-	BudgetMax          int        `json:"budget_max,omitempty"`
-	BudgetPercentage   float64    `json:"budget_pct,omitempty"`
-	ComplexityTier     int        `json:"complexity_tier,omitempty"`
-	ComplexityOverride bool       `json:"complexity_override,omitempty"`
-	PromptTokens       int        `json:"prompt_tokens,omitempty"`
-	StableTokens       int        `json:"stable_tokens,omitempty"`
-	ExcludedElements   []string   `json:"excluded_elements,omitempty"`
-	ExcludedStable     []string   `json:"excluded_stable,omitempty"`
-	Model              string     `json:"model,omitempty"`
-	ModelReason        string     `json:"model_reason,omitempty"`
+	Timestamp          string         `json:"timestamp"`
+	SessionID          string         `json:"session_id,omitempty"`
+	Phase              tool.Phase     `json:"phase"`
+	TurnNumber         int            `json:"turn"`
+	ToolCalls          []string       `json:"tool_calls,omitempty"`
+	FileActivity       []FileActivity `json:"file_activity,omitempty"`
+	TokensIn           int            `json:"tokens_in"`
+	TokensOut          int            `json:"tokens_out"`
+	StopReason         string         `json:"stop_reason"`
+	DurationMs         int64          `json:"duration_ms,omitempty"`
+	Outcome            string         `json:"outcome,omitempty"`
+	BudgetSpent        int            `json:"budget_spent,omitempty"`
+	BudgetMax          int            `json:"budget_max,omitempty"`
+	BudgetPercentage   float64        `json:"budget_pct,omitempty"`
+	ComplexityTier     int            `json:"complexity_tier,omitempty"`
+	ComplexityOverride bool           `json:"complexity_override,omitempty"`
+	PromptTokens       int            `json:"prompt_tokens,omitempty"`
+	StableTokens       int            `json:"stable_tokens,omitempty"`
+	ExcludedElements   []string       `json:"excluded_elements,omitempty"`
+	ExcludedStable     []string       `json:"excluded_stable,omitempty"`
+	Model              string         `json:"model,omitempty"`
+	ModelReason        string         `json:"model_reason,omitempty"`
 }
+
+// FileActivity records a file operation observed during a turn.
+type FileActivity = agentloop.FileActivity
 
 // RunResult holds the outcome of a completed agent run.
 type RunResult struct {

@@ -172,6 +172,7 @@ func (l *Loop) Run(ctx context.Context, task string, config LoopConfig) (*RunRes
 			Phase:            config.Hints.Phase,
 			TurnNumber:       turn,
 			ToolCalls:        toolNames,
+			FileActivity:     extractFileActivity(collected.ToolCalls),
 			TokensIn:         collected.Usage.InputTokens,
 			TokensOut:        collected.Usage.OutputTokens,
 			StopReason:       collected.StopReason,
@@ -361,6 +362,38 @@ func convertToolDefs(defs []ToolDef) []provider.ToolDef {
 		}
 	}
 	return out
+}
+
+// filePathTools maps tool names to the JSON key containing a file path.
+var filePathTools = map[string]string{
+	"read":  "file_path",
+	"write": "file_path",
+	"edit":  "file_path",
+}
+
+// extractFileActivity scans tool calls for file operations and returns
+// a FileActivity entry for each one.
+func extractFileActivity(calls []provider.ToolCall) []FileActivity {
+	var activity []FileActivity
+	for _, tc := range calls {
+		key, ok := filePathTools[tc.Name]
+		if !ok {
+			continue
+		}
+		var params map[string]interface{}
+		if err := json.Unmarshal(tc.Input, &params); err != nil {
+			continue
+		}
+		path, _ := params[key].(string)
+		if path == "" {
+			continue
+		}
+		activity = append(activity, FileActivity{
+			Path:      path,
+			Operation: tc.Name,
+		})
+	}
+	return activity
 }
 
 // estimateMessageTokens estimates total tokens for a message slice.

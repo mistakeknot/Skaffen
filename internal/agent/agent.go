@@ -238,6 +238,7 @@ func (ea *emitterAdapter) Emit(ev agentloop.Evidence) error {
 		Phase:              tool.Phase(ev.Phase),
 		TurnNumber:         ev.TurnNumber,
 		ToolCalls:          ev.ToolCalls,
+		FileActivity:       ev.FileActivity,
 		TokensIn:           ev.TokensIn,
 		TokensOut:          ev.TokensOut,
 		StopReason:         ev.StopReason,

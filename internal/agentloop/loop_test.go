@@ -352,6 +352,59 @@ func TestLoopRunWithToolResultError(t *testing.T) {
 	}
 }
 
+func TestExtractFileActivity(t *testing.T) {
+	calls := []provider.ToolCall{
+		{Name: "read", Input: json.RawMessage(`{"file_path":"/tmp/foo.go"}`)},
+		{Name: "write", Input: json.RawMessage(`{"file_path":"/tmp/bar.go","content":"x"}`)},
+		{Name: "edit", Input: json.RawMessage(`{"file_path":"/tmp/baz.go","old_string":"a","new_string":"b"}`)},
+		{Name: "grep", Input: json.RawMessage(`{"pattern":"TODO"}`)},
+		{Name: "bash", Input: json.RawMessage(`{"command":"ls"}`)},
+	}
+
+	activity := extractFileActivity(calls)
+	if len(activity) != 3 {
+		t.Fatalf("expected 3 file activities, got %d", len(activity))
+	}
+
+	expected := []FileActivity{
+		{Path: "/tmp/foo.go", Operation: "read"},
+		{Path: "/tmp/bar.go", Operation: "write"},
+		{Path: "/tmp/baz.go", Operation: "edit"},
+	}
+	for i, want := range expected {
+		if activity[i] != want {
+			t.Errorf("activity[%d] = %+v, want %+v", i, activity[i], want)
+		}
+	}
+}
+
+func TestExtractFileActivityEmpty(t *testing.T) {
+	activity := extractFileActivity(nil)
+	if activity != nil {
+		t.Errorf("expected nil for no tool calls, got %v", activity)
+	}
+}
+
+func TestExtractFileActivityBadJSON(t *testing.T) {
+	calls := []provider.ToolCall{
+		{Name: "read", Input: json.RawMessage(`{invalid}`)},
+	}
+	activity := extractFileActivity(calls)
+	if len(activity) != 0 {
+		t.Errorf("expected 0 for bad JSON, got %d", len(activity))
+	}
+}
+
+func TestExtractFileActivityMissingPath(t *testing.T) {
+	calls := []provider.ToolCall{
+		{Name: "read", Input: json.RawMessage(`{"other":"value"}`)},
+	}
+	activity := extractFileActivity(calls)
+	if len(activity) != 0 {
+		t.Errorf("expected 0 for missing file_path, got %d", len(activity))
+	}
+}
+
 // --- Test helpers ---
 
 type capturingRouter struct {

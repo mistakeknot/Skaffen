@@ -49,17 +49,23 @@ type Config struct {
 	Overrides []Override
 }
 
+// PromoteThreshold is the number of session-scoped Learn calls on the same
+// pattern before auto-promoting to ScopeGlobal.
+const PromoteThreshold = 10
+
 // Evaluator implements the three-tier trust evaluation pipeline.
 type Evaluator struct {
-	mu        sync.RWMutex
-	session   map[string]Decision
-	overrides []Override
+	mu           sync.RWMutex
+	session      map[string]Decision
+	sessionCount map[string]int // per-pattern Learn call count
+	overrides    []Override
 }
 
 // NewEvaluator creates an Evaluator. Pass nil for built-in rules only.
 func NewEvaluator(cfg *Config) *Evaluator {
 	e := &Evaluator{
-		session: make(map[string]Decision),
+		session:      make(map[string]Decision),
+		sessionCount: make(map[string]int),
 	}
 	if cfg != nil {
 		e.overrides = cfg.Overrides
@@ -90,20 +96,60 @@ func (e *Evaluator) Evaluate(toolName, paramsJSON string) Decision {
 	return evaluateBuiltIn(toolName, paramsJSON)
 }
 
-// Learn adds a trust override.
+// Learn adds a trust override. For session-scoped overrides, it increments a
+// confidence counter and auto-promotes to ScopeGlobal once PromoteThreshold
+// is reached.
 func (e *Evaluator) Learn(pattern string, decision Decision, scope Scope) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
 	if scope == ScopeSession {
 		e.session[pattern] = decision
+		e.sessionCount[pattern]++
+		if e.sessionCount[pattern] >= PromoteThreshold {
+			// Auto-promote: move from session to learned overrides
+			e.overrides = append(e.overrides, Override{
+				Pattern:  pattern,
+				Decision: decision,
+				Scope:    ScopeGlobal,
+				Count:    e.sessionCount[pattern],
+			})
+			delete(e.session, pattern)
+			delete(e.sessionCount, pattern)
+		}
 		return
+	}
+
+	// Non-session overrides: check for existing pattern and increment count
+	for i := range e.overrides {
+		if e.overrides[i].Pattern == pattern {
+			e.overrides[i].Count++
+			e.overrides[i].Decision = decision
+			return
+		}
 	}
 	e.overrides = append(e.overrides, Override{
 		Pattern:  pattern,
 		Decision: decision,
 		Scope:    scope,
+		Count:    1,
 	})
+}
+
+// SessionCount returns the confidence count for a session-scoped pattern.
+func (e *Evaluator) SessionCount(pattern string) int {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	return e.sessionCount[pattern]
+}
+
+// Overrides returns a snapshot of the current learned overrides.
+func (e *Evaluator) Overrides() []Override {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	out := make([]Override, len(e.overrides))
+	copy(out, e.overrides)
+	return out
 }
 
 func buildKey(toolName, paramsJSON string) string {
