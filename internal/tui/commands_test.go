@@ -100,7 +100,7 @@ func newTestModel() *appModel {
 		viewport:   viewport.New(80, 20),
 		settings:   defaultSettings(),
 		phase:      "build",
-		modelName:  "claude-sonnet",
+		modelName:  "opus",
 		skaffenVer: "0.2.0",
 		masaqVer:   "0.1.0",
 	}
@@ -164,14 +164,36 @@ func TestExecuteCommand_Verbose(t *testing.T) {
 	}
 }
 
-func TestExecuteCommand_Model(t *testing.T) {
+func TestExecuteCommand_ModelShow(t *testing.T) {
 	m := newTestModel()
 	result := m.executeCommand(&Command{Name: "model"})
 	if result.IsError {
 		t.Fatal("model should not error")
 	}
-	if !strings.Contains(result.Message, "claude-sonnet") {
+	if !strings.Contains(result.Message, "opus") {
 		t.Fatalf("model should show model name, got: %s", result.Message)
+	}
+}
+
+func TestExecuteCommand_ModelSwitchNoAgent(t *testing.T) {
+	m := newTestModel()
+	result := m.executeCommand(&Command{Name: "model", Args: []string{"sonnet"}})
+	if !result.IsError {
+		t.Fatal("model switch without agent should be an error")
+	}
+}
+
+func TestExecuteCommand_ModelInvalid(t *testing.T) {
+	m := newTestModel()
+	result := m.executeCommand(&Command{Name: "model", Args: []string{"gpt-4"}})
+	if !result.IsError {
+		t.Fatal("invalid model should be an error")
+	}
+	if !strings.Contains(result.Message, "Unknown model") {
+		t.Fatalf("should mention unknown model, got: %s", result.Message)
+	}
+	if !strings.Contains(result.Message, "haiku") {
+		t.Fatalf("should list available models, got: %s", result.Message)
 	}
 }
 
@@ -223,20 +245,32 @@ func TestExecuteCommand_AdvanceNoAgent(t *testing.T) {
 	}
 }
 
-func TestExecuteCommand_SettingsShow(t *testing.T) {
+func TestExecuteCommand_SettingsOpenOverlay(t *testing.T) {
 	m := newTestModel()
 	result := m.executeCommand(&Command{Name: "settings"})
 	if result.IsError {
 		t.Fatal("settings should not error")
 	}
-	if !strings.Contains(result.Message, "verbose") {
-		t.Fatal("settings should list verbose")
+	if result.Message != "" {
+		t.Fatalf("settings with no args should return empty message (overlay opens), got: %q", result.Message)
 	}
-	if !strings.Contains(result.Message, "theme") {
-		t.Fatal("settings should list theme")
+	if !m.settingsOpen {
+		t.Fatal("settingsOpen should be true after /settings")
 	}
-	if !strings.Contains(result.Message, "color-mode") {
-		t.Fatal("settings should list color-mode")
+	// Verify overlay contains settings entries
+	entries := m.settingsOverlay.Entries()
+	if len(entries) != len(settingsRegistry) {
+		t.Fatalf("overlay entries = %d, want %d", len(entries), len(settingsRegistry))
+	}
+	// Check known keys
+	keys := make(map[string]bool)
+	for _, e := range entries {
+		keys[e.Key] = true
+	}
+	for _, key := range []string{"verbose", "theme", "color-mode"} {
+		if !keys[key] {
+			t.Errorf("overlay should contain %q entry", key)
+		}
 	}
 }
 

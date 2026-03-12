@@ -5,6 +5,7 @@ import (
 	"sort"
 	"strings"
 
+	msettings "github.com/mistakeknot/Masaq/settings"
 	"github.com/mistakeknot/Masaq/theme"
 )
 
@@ -36,6 +37,8 @@ func defaultSettings() settings {
 type settingEntry struct {
 	Key         string
 	Description string
+	EntryType   msettings.EntryType    // TypeBool or TypeEnum
+	Options     func() []string        // for enum: returns allowed values
 	Get         func(s *settings) string
 	Set         func(s *settings, val string) error
 }
@@ -45,6 +48,7 @@ var settingsRegistry = []settingEntry{
 	{
 		Key:         "verbose",
 		Description: "Verbose tool call display",
+		EntryType:   msettings.TypeBool,
 		Get:         func(s *settings) string { return fmtBool(s.Verbose) },
 		Set: func(s *settings, val string) error {
 			b, err := parseBool(val)
@@ -58,6 +62,7 @@ var settingsRegistry = []settingEntry{
 	{
 		Key:         "show-tool-results",
 		Description: "Show successful tool results (not just errors)",
+		EntryType:   msettings.TypeBool,
 		Get:         func(s *settings) string { return fmtBool(s.ShowToolResults) },
 		Set: func(s *settings, val string) error {
 			b, err := parseBool(val)
@@ -71,6 +76,7 @@ var settingsRegistry = []settingEntry{
 	{
 		Key:         "diff-preview",
 		Description: "Inline diff preview on edit/write approval",
+		EntryType:   msettings.TypeBool,
 		Get:         func(s *settings) string { return fmtBool(s.DiffPreview) },
 		Set: func(s *settings, val string) error {
 			b, err := parseBool(val)
@@ -84,6 +90,7 @@ var settingsRegistry = []settingEntry{
 	{
 		Key:         "auto-scroll",
 		Description: "Viewport follows new content",
+		EntryType:   msettings.TypeBool,
 		Get:         func(s *settings) string { return fmtBool(s.AutoScroll) },
 		Set: func(s *settings, val string) error {
 			b, err := parseBool(val)
@@ -97,6 +104,7 @@ var settingsRegistry = []settingEntry{
 	{
 		Key:         "timestamps",
 		Description: "Show timestamps on messages",
+		EntryType:   msettings.TypeBool,
 		Get:         func(s *settings) string { return fmtBool(s.Timestamps) },
 		Set: func(s *settings, val string) error {
 			b, err := parseBool(val)
@@ -110,6 +118,8 @@ var settingsRegistry = []settingEntry{
 	{
 		Key:         "theme",
 		Description: "Color theme",
+		EntryType:   msettings.TypeEnum,
+		Options:     availableThemeNames,
 		Get:         func(s *settings) string { return s.Theme },
 		Set: func(s *settings, val string) error {
 			t, ok := theme.ThemeByName(val)
@@ -125,6 +135,8 @@ var settingsRegistry = []settingEntry{
 	{
 		Key:         "color-mode",
 		Description: "Color mode (dark/light)",
+		EntryType:   msettings.TypeEnum,
+		Options:     func() []string { return []string{"dark", "light"} },
 		Get:         func(s *settings) string { return s.ColorMode },
 		Set: func(s *settings, val string) error {
 			switch strings.ToLower(val) {
@@ -140,6 +152,24 @@ var settingsRegistry = []settingEntry{
 			return nil
 		},
 	},
+}
+
+// buildSettingsEntries converts the settingsRegistry into Masaq settings entries.
+func buildSettingsEntries(s *settings) []msettings.Entry {
+	entries := make([]msettings.Entry, len(settingsRegistry))
+	for i, e := range settingsRegistry {
+		entry := msettings.Entry{
+			Key:         e.Key,
+			Description: e.Description,
+			Type:        e.EntryType,
+			Value:       e.Get(s),
+		}
+		if e.Options != nil {
+			entry.Options = e.Options()
+		}
+		entries[i] = entry
+	}
+	return entries
 }
 
 // FormatSettings renders all settings as a table.

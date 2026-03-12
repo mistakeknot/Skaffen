@@ -15,27 +15,27 @@ const (
 // Hardcoded fallback chain: opus -> sonnet -> haiku.
 var fallbackChain = []string{ModelOpus, ModelSonnet, ModelHaiku}
 
-// Phase defaults from Clavain's economy routing table.
-// brainstorm=opus (creative exploration needs heavy reasoning),
-// all other phases=sonnet (proven sufficient for plan/build/review/ship).
+// Phase defaults — Opus is the default for all phases.
+// Override per-phase via config file, env vars, or runtime SetModelOverride.
 var phaseDefaults = map[tool.Phase]string{
 	tool.PhaseBrainstorm: ModelOpus,
-	tool.PhasePlan:       ModelSonnet,
-	tool.PhaseBuild:      ModelSonnet,
-	tool.PhaseReview:     ModelSonnet,
-	tool.PhaseShip:       ModelSonnet,
+	tool.PhasePlan:       ModelOpus,
+	tool.PhaseBuild:      ModelOpus,
+	tool.PhaseReview:     ModelOpus,
+	tool.PhaseShip:       ModelOpus,
 }
 
 // DefaultRouter selects models based on phase, config overrides, and budget.
 type DefaultRouter struct {
-	cfg          *Config
-	budget       *BudgetTracker
-	complexity   *ComplexityClassifier
-	inputTokens  int                // set before SelectModel for complexity
-	lastOverride *ComplexityOverride // last complexity result for evidence
-	overrides    map[string]string  // phase -> model, from ic route model
-	ic           *ICClient
-	sessionID    string
+	cfg            *Config
+	budget         *BudgetTracker
+	complexity     *ComplexityClassifier
+	inputTokens    int                // set before SelectModel for complexity
+	lastOverride   *ComplexityOverride // last complexity result for evidence
+	overrides      map[string]string  // phase -> model, from ic route model
+	ic             *ICClient
+	sessionID      string
+	runtimeModel   string // runtime override from /model command (empty = use defaults)
 }
 
 // New creates a DefaultRouter. Pass nil config to use hardcoded defaults.
@@ -79,6 +79,12 @@ func (r *DefaultRouter) SelectModel(phase tool.Phase) (string, string) {
 	if model == "" {
 		model = ModelSonnet
 		reason = "fallback-default"
+	}
+
+	// Runtime override (from /model command — above phase default, below config file)
+	if r.runtimeModel != "" {
+		model = r.runtimeModel
+		reason = "runtime-override"
 	}
 
 	// Config file override
@@ -149,6 +155,22 @@ func (r *DefaultRouter) SetInputTokens(n int) {
 // LastComplexityOverride returns the complexity override from the last SelectModel call.
 func (r *DefaultRouter) LastComplexityOverride() *ComplexityOverride {
 	return r.lastOverride
+}
+
+// SetModelOverride sets a runtime model override for all phases.
+// Pass an alias ("opus", "sonnet", "haiku") or a full model ID.
+// Pass empty string to clear the override and revert to defaults.
+func (r *DefaultRouter) SetModelOverride(model string) {
+	if model == "" {
+		r.runtimeModel = ""
+		return
+	}
+	r.runtimeModel = resolveModelAlias(model)
+}
+
+// ModelOverride returns the current runtime model override, or empty string if none.
+func (r *DefaultRouter) ModelOverride() string {
+	return r.runtimeModel
 }
 
 // Default context window sizes per model (tokens).

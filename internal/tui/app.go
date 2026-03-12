@@ -19,6 +19,7 @@ import (
 	"github.com/mistakeknot/Masaq/keys"
 	"github.com/mistakeknot/Masaq/markdown"
 	"github.com/mistakeknot/Masaq/question"
+	msettings "github.com/mistakeknot/Masaq/settings"
 	"github.com/mistakeknot/Masaq/theme"
 	"github.com/mistakeknot/Masaq/viewport"
 )
@@ -125,6 +126,10 @@ type appModel struct {
 	approvalQ     question.Model
 	approvalReply chan bool
 	approvalTool  string
+
+	// Settings overlay
+	settingsOpen    bool
+	settingsOverlay msettings.Model
 }
 
 func newAppModel(cfg Config) *appModel {
@@ -167,7 +172,7 @@ func newAppModel(cfg Config) *appModel {
 		skaffenVer: skVer,
 		masaqVer:   mqVer,
 		phase:      "build",
-		modelName:  "claude",
+		modelName:  "opus",
 		logo:       newLogoModel(skVer, mqVer),
 	}
 }
@@ -197,6 +202,7 @@ func (m *appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case logoTickMsg:
 		if m.logo.active {
 			m.logo.frame++
+			m.logo.step()
 			cmds = append(cmds, m.logo.tick())
 		}
 
@@ -211,8 +217,10 @@ func (m *appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return m, tea.Quit
 		}
-		// Stop logo animation on first typed character (not scroll keys)
-		if m.logo.active && !isScrollKey(msg) {
+		// Stop logo animation on first real typed character.
+		// Ignore scroll keys, control sequences, and escape sequence
+		// fragments (like termenv OSC query responses).
+		if m.logo.active && isTypedChar(msg) {
 			m.logo.stop()
 		}
 		// When showing approval overlay, delegate keys to question widget
@@ -222,8 +230,17 @@ func (m *appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			cmds = append(cmds, cmd)
 			break
 		}
-		// Delegate to prompt (including file picker) when not running
-		if !m.running {
+		// When showing settings overlay, delegate keys to settings widget
+		if m.settingsOpen {
+			var cmd tea.Cmd
+			m.settingsOverlay, cmd = m.settingsOverlay.Update(msg)
+			cmds = append(cmds, cmd)
+			break
+		}
+		// Delegate to prompt (including file picker) when not running.
+		// Block escape sequence fragments (mouse reports, OSC responses)
+		// that arrive as KeyRunes from reaching the textinput.
+		if !m.running && !isEscapeFragment(msg) {
 			var cmd tea.Cmd
 			m.prompt, cmd = m.prompt.Update(msg)
 			cmds = append(cmds, cmd)
@@ -299,6 +316,30 @@ func (m *appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.approvalReply <- allowed
 		m.approvalReply = nil
 
+	case msettings.ChangedMsg:
+		if !m.settingsOpen {
+			break
+		}
+		if _, err := ApplySetting(&m.settings, msg.Key, msg.NewValue); err != nil {
+			// Revert entry in overlay to old value
+			entries := m.settingsOverlay.Entries()
+			for i, e := range entries {
+				if e.Key == msg.Key {
+					e.Value = msg.OldValue
+					m.settingsOverlay = m.settingsOverlay.UpdateEntry(i, e)
+					break
+				}
+			}
+			break
+		}
+		// Sync side-effects for settings that affect other model state
+		if msg.Key == "verbose" {
+			m.compact.SetVerbose(m.settings.Verbose)
+		}
+
+	case msettings.DismissedMsg:
+		m.settingsOpen = false
+
 	case filePickerSelectedMsg, filePickerCancelMsg:
 		var cmd tea.Cmd
 		m.prompt, cmd = m.prompt.Update(msg)
@@ -345,6 +386,10 @@ func (m *appModel) View() string {
 
 	if m.approving {
 		return lipgloss.JoinVertical(lipgloss.Left, logoView, vpView, m.approvalQ.View(), statusView)
+	}
+
+	if m.settingsOpen {
+		return lipgloss.JoinVertical(lipgloss.Left, logoView, vpView, m.settingsOverlay.View(), statusView)
 	}
 
 	promptView := m.prompt.View(m.width, m.running)
@@ -396,6 +441,43 @@ func (m *appModel) runAgent(prompt string) tea.Cmd {
 func isScrollKey(msg tea.KeyMsg) bool {
 	switch msg.Type {
 	case tea.KeyPgUp, tea.KeyPgDown, tea.KeyHome, tea.KeyEnd, tea.KeyCtrlU, tea.KeyCtrlD:
+		return true
+	}
+	return false
+}
+
+// isTypedChar returns true for actual user-typed printable characters.
+// Returns false for control keys, escape sequences, function keys, and
+// terminal query responses (like OSC 11 background color replies).
+func isTypedChar(msg tea.KeyMsg) bool {
+	if msg.Type != tea.KeyRunes {
+		return false
+	}
+	s := msg.String()
+	if isEscapeLike(s) {
+		return false
+	}
+	return len(s) > 0
+}
+
+// isEscapeFragment returns true for KeyMsg events that look like terminal
+// escape sequence fragments rather than real user input. This catches:
+//   - SGR mouse reports: [<65;58;19M  (mouse wheel/click)
+//   - OSC responses:     ]11;rgb:0000/0000/0000\
+func isEscapeFragment(msg tea.KeyMsg) bool {
+	if msg.Type != tea.KeyRunes {
+		return false
+	}
+	return isEscapeLike(msg.String())
+}
+
+func isEscapeLike(s string) bool {
+	// OSC responses contain ] ; and backslash
+	if strings.ContainsAny(s, "\x1b];\\") {
+		return true
+	}
+	// SGR mouse reports: [<NN;NN;NNM or [<NN;NN;NNm
+	if len(s) > 3 && s[0] == '[' && s[1] == '<' {
 		return true
 	}
 	return false

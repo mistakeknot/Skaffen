@@ -88,6 +88,24 @@ func (a *Agent) SetToolApprover(fn ToolApprover) {
 	a.approver = fn
 }
 
+// SetModelOverride sets a runtime model override if the router supports it.
+// Returns false if the router does not implement ModelOverrideSetter.
+func (a *Agent) SetModelOverride(model string) bool {
+	if setter, ok := a.router.(ModelOverrideSetter); ok {
+		setter.SetModelOverride(model)
+		return true
+	}
+	return false
+}
+
+// ModelOverride returns the current runtime model override, or empty string.
+func (a *Agent) ModelOverride() string {
+	if getter, ok := a.router.(ModelOverrideSetter); ok {
+		return getter.ModelOverride()
+	}
+	return ""
+}
+
 // Run executes the OODARC loop for a given task by delegating to agentloop.Loop.
 // It translates the current phase into SelectionHints and bridges the
 // phase-typed agent interfaces to the phase-agnostic agentloop interfaces.

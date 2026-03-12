@@ -92,8 +92,8 @@ func TestNewWithIC_NilICSelectModelWorks(t *testing.T) {
 
 	// SelectModel should still work
 	model, reason := r.SelectModel(tool.PhaseBuild)
-	if model != ModelSonnet {
-		t.Errorf("model = %q, want sonnet", model)
+	if model != ModelOpus {
+		t.Errorf("model = %q, want opus", model)
 	}
 	if reason != "phase-default" {
 		t.Errorf("reason = %q, want phase-default", reason)

@@ -396,7 +396,17 @@ func setupTheme() {
 	}
 }
 
+// Version variables — set via -ldflags or default to compiled-in values.
+// Example: go build -ldflags="-X main.version=1.2.3" ./cmd/skaffen
+var (
+	version      = "0.1.0"
+	masaqVersion_ = "0.1.0"
+)
+
 func skaffenVersion() string {
+	if version != "" {
+		return version
+	}
 	if info, ok := debug.ReadBuildInfo(); ok && info.Main.Version != "" {
 		return info.Main.Version
 	}
@@ -404,6 +414,9 @@ func skaffenVersion() string {
 }
 
 func masaqVersion() string {
+	if masaqVersion_ != "" {
+		return masaqVersion_
+	}
 	if info, ok := debug.ReadBuildInfo(); ok {
 		for _, dep := range info.Deps {
 			if strings.HasSuffix(dep.Path, "Masaq") {

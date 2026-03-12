@@ -9,6 +9,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/mistakeknot/Skaffen/internal/session"
+	msettings "github.com/mistakeknot/Masaq/settings"
 )
 
 // Command represents a parsed slash command.
@@ -50,7 +51,7 @@ func KnownCommands() map[string]string {
 		"compact":  "Switch to compact tool call display",
 		"diff":     "Show git diff",
 		"help":     "Show available commands",
-		"model":    "Show current model",
+		"model":    "Show or switch model (opus, sonnet, haiku)",
 		"phase":    "Show current OODARC phase",
 		"quit":     "Exit Skaffen",
 		"sessions": "List saved sessions",
@@ -105,7 +106,7 @@ func (m *appModel) executeCommand(cmd *Command) CommandResult {
 		return CommandResult{Message: "Switched to verbose display."}
 
 	case "model":
-		return CommandResult{Message: fmt.Sprintf("Model: %s", m.modelName)}
+		return m.execModel(cmd.Args)
 
 	case "version":
 		return CommandResult{Message: fmt.Sprintf("Skaffen %s / Masaq %s", m.skaffenVer, m.masaqVer)}
@@ -194,10 +195,52 @@ func (m *appModel) execStatus() CommandResult {
 	return CommandResult{Message: b.String()}
 }
 
-func (m *appModel) execSettings(args []string) CommandResult {
-	// /settings — show all
+// validModels maps short aliases to display names for the /model command.
+var validModels = map[string]string{
+	"opus":   "claude-opus-4-6",
+	"sonnet": "claude-sonnet-4-6",
+	"haiku":  "claude-haiku-4-5-20251001",
+}
+
+func (m *appModel) execModel(args []string) CommandResult {
+	// /model — show current
 	if len(args) == 0 {
-		return CommandResult{Message: FormatSettings(&m.settings)}
+		return CommandResult{Message: fmt.Sprintf("Model: %s", m.modelName)}
+	}
+
+	alias := strings.ToLower(args[0])
+	canonical, ok := validModels[alias]
+	if !ok {
+		names := make([]string, 0, len(validModels))
+		for k := range validModels {
+			names = append(names, k)
+		}
+		sort.Strings(names)
+		return CommandResult{
+			Message: fmt.Sprintf("Unknown model %q. Available: %s", args[0], strings.Join(names, ", ")),
+			IsError: true,
+		}
+	}
+
+	if m.agent == nil {
+		return CommandResult{Message: "No agent configured.", IsError: true}
+	}
+
+	if !m.agent.SetModelOverride(alias) {
+		return CommandResult{Message: "Router does not support model switching.", IsError: true}
+	}
+
+	m.modelName = alias
+	return CommandResult{Message: fmt.Sprintf("Switched to %s (%s)", alias, canonical)}
+}
+
+func (m *appModel) execSettings(args []string) CommandResult {
+	// /settings — open interactive overlay
+	if len(args) == 0 {
+		entries := buildSettingsEntries(&m.settings)
+		m.settingsOverlay = msettings.New("Settings", entries).SetWidth(m.width)
+		m.settingsOpen = true
+		return CommandResult{} // no message — overlay renders in View
 	}
 	// /settings <key> — show one
 	if len(args) == 1 {

@@ -13,6 +13,7 @@ import (
 	"github.com/mistakeknot/Skaffen/internal/provider"
 	"github.com/mistakeknot/Skaffen/internal/trust"
 	"github.com/mistakeknot/Masaq/question"
+	msettings "github.com/mistakeknot/Masaq/settings"
 )
 
 // --- helpers ---
@@ -52,8 +53,8 @@ func TestNewAppModelDefaults(t *testing.T) {
 	if m.phase != "build" {
 		t.Errorf("default phase = %q, want build", m.phase)
 	}
-	if m.modelName != "claude" {
-		t.Errorf("default modelName = %q, want claude", m.modelName)
+	if m.modelName != "opus" {
+		t.Errorf("default modelName = %q, want opus", m.modelName)
 	}
 	if m.running {
 		t.Fatal("should not be running initially")
@@ -483,6 +484,34 @@ func TestKeysDelegateToQuestionWhenApproving(t *testing.T) {
 	}
 }
 
+// --- Escape Fragment Filtering ---
+
+func TestMouseEscapeFragmentBlockedFromPrompt(t *testing.T) {
+	m := setup(t)
+	// SGR mouse report arriving as runes: [<65;58;19M
+	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("[<65;58;19M")})
+	if m.prompt.input.Value() != "" {
+		t.Errorf("mouse escape fragment leaked into prompt: %q", m.prompt.input.Value())
+	}
+}
+
+func TestOSCResponseBlockedFromPrompt(t *testing.T) {
+	m := setup(t)
+	// OSC 11 response arriving as runes
+	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("]11;rgb:0000/0000/0000\\")})
+	if m.prompt.input.Value() != "" {
+		t.Errorf("OSC response leaked into prompt: %q", m.prompt.input.Value())
+	}
+}
+
+func TestNormalKeysStillReachPrompt(t *testing.T) {
+	m := setup(t)
+	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'a'}})
+	if m.prompt.input.Value() != "a" {
+		t.Errorf("normal key blocked from prompt: value = %q", m.prompt.input.Value())
+	}
+}
+
 // --- Diff Preview ---
 
 func TestRenderDiffPreviewEdit(t *testing.T) {
@@ -624,5 +653,86 @@ func TestViewShowsApprovalOverlay(t *testing.T) {
 	// Should NOT show the prompt when approving
 	if strings.Contains(view, "Ask anything") {
 		t.Fatal("view should not show prompt during approval")
+	}
+}
+
+func TestSettingsOverlayRendersInView(t *testing.T) {
+	m := setup(t)
+	// Open settings overlay
+	m.settingsOpen = true
+	m.settingsOverlay = msettings.New("Settings", buildSettingsEntries(&m.settings)).SetWidth(m.width)
+	view := m.View()
+	if !strings.Contains(view, "verbose") {
+		t.Fatal("settings overlay should contain 'verbose'")
+	}
+	if !strings.Contains(view, "Esc") {
+		t.Fatal("settings overlay should contain Esc hint")
+	}
+	// Should NOT show the prompt when settings overlay is open
+	if strings.Contains(view, "Ask anything") {
+		t.Fatal("view should not show prompt during settings overlay")
+	}
+}
+
+func TestSettingsOverlayDismiss(t *testing.T) {
+	m := setup(t)
+	m.settingsOpen = true
+	m.settingsOverlay = msettings.New("Settings", buildSettingsEntries(&m.settings)).SetWidth(m.width)
+
+	// Press Esc → settings widget emits DismissedMsg cmd
+	m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	// The cmd produces DismissedMsg; simulate delivering it
+	m.Update(msettings.DismissedMsg{})
+	if m.settingsOpen {
+		t.Fatal("settingsOpen should be false after DismissedMsg")
+	}
+}
+
+func TestSettingsOverlayChangedMsg(t *testing.T) {
+	m := setup(t)
+	m.settingsOpen = true
+	m.settingsOverlay = msettings.New("Settings", buildSettingsEntries(&m.settings)).SetWidth(m.width)
+
+	// Simulate a ChangedMsg for verbose: off → on
+	m.Update(msettings.ChangedMsg{Key: "verbose", OldValue: "off", NewValue: "on"})
+	if !m.settings.Verbose {
+		t.Fatal("verbose should be true after ChangedMsg")
+	}
+	if !m.compact.IsVerbose() {
+		t.Fatal("compact formatter should be synced to verbose after ChangedMsg")
+	}
+}
+
+func TestSettingsOverlayChangedMsgInvalidReverts(t *testing.T) {
+	m := setup(t)
+	m.settingsOpen = true
+	m.settingsOverlay = msettings.New("Settings", buildSettingsEntries(&m.settings)).SetWidth(m.width)
+
+	// Simulate a ChangedMsg with invalid value — should revert
+	m.Update(msettings.ChangedMsg{Key: "verbose", OldValue: "off", NewValue: "bogus"})
+	if m.settings.Verbose {
+		t.Fatal("verbose should remain false after invalid ChangedMsg")
+	}
+	// Entry in overlay should revert to old value
+	entries := m.settingsOverlay.Entries()
+	for _, e := range entries {
+		if e.Key == "verbose" {
+			if e.Value != "off" {
+				t.Fatalf("overlay entry should revert to 'off', got %q", e.Value)
+			}
+			break
+		}
+	}
+}
+
+func TestSettingsOverlayKeysDelegated(t *testing.T) {
+	m := setup(t)
+	m.settingsOpen = true
+	m.settingsOverlay = msettings.New("Settings", buildSettingsEntries(&m.settings)).SetWidth(m.width)
+
+	// Press Down — cursor should move in the overlay
+	m.Update(tea.KeyMsg{Type: tea.KeyDown})
+	if m.settingsOverlay.Cursor() != 1 {
+		t.Fatalf("after down key, overlay cursor = %d, want 1", m.settingsOverlay.Cursor())
 	}
 }

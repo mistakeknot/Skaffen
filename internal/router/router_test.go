@@ -14,10 +14,10 @@ func TestPhaseDefaults(t *testing.T) {
 		want  string
 	}{
 		{tool.PhaseBrainstorm, ModelOpus},
-		{tool.PhasePlan, ModelSonnet},
-		{tool.PhaseBuild, ModelSonnet},
-		{tool.PhaseReview, ModelSonnet},
-		{tool.PhaseShip, ModelSonnet},
+		{tool.PhasePlan, ModelOpus},
+		{tool.PhaseBuild, ModelOpus},
+		{tool.PhaseReview, ModelOpus},
+		{tool.PhaseShip, ModelOpus},
 	}
 	for _, tt := range tests {
 		model, reason := r.SelectModel(tt.phase)
@@ -76,7 +76,7 @@ func TestRouterWithComplexityShadow(t *testing.T) {
 	}
 	r := New(cfg)
 	model, reason := r.SelectModel(tool.PhaseBuild)
-	if model != ModelSonnet {
+	if model != ModelOpus {
 		t.Errorf("shadow complexity changed model to %q", model)
 	}
 	if reason != "phase-default" {
@@ -84,16 +84,52 @@ func TestRouterWithComplexityShadow(t *testing.T) {
 	}
 }
 
-func TestRouterWithComplexityEnforce(t *testing.T) {
+func TestRouterWithComplexityEnforcePromoteNoop(t *testing.T) {
+	// C5 promote is a no-op when default is already Opus
 	cfg := &Config{
 		Phases:     map[tool.Phase]string{},
 		Complexity: &ComplexityConfig{Mode: "enforce"},
 	}
 	r := New(cfg)
-	r.SetInputTokens(5000) // C5 -> promote to opus
+	r.SetInputTokens(5000) // C5 — but already opus, nothing to promote
 	model, reason := r.SelectModel(tool.PhaseBuild)
 	if model != ModelOpus {
 		t.Errorf("enforce C5: model = %q, want opus", model)
+	}
+	if reason != "phase-default" {
+		t.Errorf("enforce C5: reason = %q, want phase-default (already opus)", reason)
+	}
+}
+
+func TestRouterWithComplexityEnforceDemote(t *testing.T) {
+	// C1 demotes opus → haiku in enforce mode
+	cfg := &Config{
+		Phases:     map[tool.Phase]string{},
+		Complexity: &ComplexityConfig{Mode: "enforce"},
+	}
+	r := New(cfg)
+	r.SetInputTokens(100) // C1 -> demote to haiku
+	model, reason := r.SelectModel(tool.PhaseBuild)
+	if model != ModelHaiku {
+		t.Errorf("enforce C1: model = %q, want haiku", model)
+	}
+	if reason != "complexity-demote" {
+		t.Errorf("enforce C1: reason = %q, want complexity-demote", reason)
+	}
+}
+
+func TestRouterWithComplexityEnforcePromoteFromSonnet(t *testing.T) {
+	// C5 promotes when runtime override has set model to sonnet
+	cfg := &Config{
+		Phases:     map[tool.Phase]string{},
+		Complexity: &ComplexityConfig{Mode: "enforce"},
+	}
+	r := New(cfg)
+	r.SetModelOverride("sonnet")
+	r.SetInputTokens(5000) // C5 -> promote sonnet to opus
+	model, reason := r.SelectModel(tool.PhaseBuild)
+	if model != ModelOpus {
+		t.Errorf("enforce C5 from sonnet: model = %q, want opus", model)
 	}
 	if reason != "complexity-promote" {
 		t.Errorf("enforce C5: reason = %q, want complexity-promote", reason)
@@ -226,8 +262,8 @@ func TestEnvOverrideBeatsIntercoreOverride(t *testing.T) {
 func TestNewWithIC_NilIC(t *testing.T) {
 	r := NewWithIC(&Config{}, nil, "test-session")
 	model, reason := r.SelectModel(tool.PhaseBuild)
-	if model != ModelSonnet {
-		t.Errorf("nil IC: model = %q, want sonnet", model)
+	if model != ModelOpus {
+		t.Errorf("nil IC: model = %q, want opus", model)
 	}
 	if reason != "phase-default" {
 		t.Errorf("nil IC: reason = %q, want phase-default", reason)
@@ -259,6 +295,85 @@ func TestBuildDecisionRecord(t *testing.T) {
 	}
 	if rec.SessionID != "test-session" {
 		t.Errorf("session = %q", rec.SessionID)
+	}
+}
+
+func TestSetModelOverride(t *testing.T) {
+	r := New(nil)
+
+	// Default: all phases return opus
+	model, _ := r.SelectModel(tool.PhaseBuild)
+	if model != ModelOpus {
+		t.Errorf("default build = %q, want opus", model)
+	}
+
+	// Set runtime override to sonnet
+	r.SetModelOverride("sonnet")
+	model, reason := r.SelectModel(tool.PhaseBuild)
+	if model != ModelSonnet {
+		t.Errorf("after override: model = %q, want sonnet", model)
+	}
+	if reason != "runtime-override" {
+		t.Errorf("after override: reason = %q, want runtime-override", reason)
+	}
+
+	// Override applies to all phases
+	model, _ = r.SelectModel(tool.PhaseBrainstorm)
+	if model != ModelSonnet {
+		t.Errorf("brainstorm after override = %q, want sonnet", model)
+	}
+
+	// Clear override
+	r.SetModelOverride("")
+	model, reason = r.SelectModel(tool.PhaseBuild)
+	if model != ModelOpus {
+		t.Errorf("after clear: model = %q, want opus", model)
+	}
+	if reason != "phase-default" {
+		t.Errorf("after clear: reason = %q, want phase-default", reason)
+	}
+}
+
+func TestModelOverride(t *testing.T) {
+	r := New(nil)
+	if o := r.ModelOverride(); o != "" {
+		t.Errorf("initial override = %q, want empty", o)
+	}
+	r.SetModelOverride("haiku")
+	if o := r.ModelOverride(); o != ModelHaiku {
+		t.Errorf("after set: override = %q, want %q", o, ModelHaiku)
+	}
+	r.SetModelOverride("")
+	if o := r.ModelOverride(); o != "" {
+		t.Errorf("after clear: override = %q, want empty", o)
+	}
+}
+
+func TestRuntimeOverrideBelowConfigFile(t *testing.T) {
+	cfg := &Config{
+		Phases: map[tool.Phase]string{
+			tool.PhaseBuild: "haiku",
+		},
+	}
+	r := New(cfg)
+	r.SetModelOverride("sonnet")
+
+	// Config file beats runtime override
+	model, reason := r.SelectModel(tool.PhaseBuild)
+	if model != ModelHaiku {
+		t.Errorf("config should beat runtime: model = %q, want haiku", model)
+	}
+	if reason != "config-file" {
+		t.Errorf("reason = %q, want config-file", reason)
+	}
+
+	// But runtime override works for phases without config override
+	model, reason = r.SelectModel(tool.PhasePlan)
+	if model != ModelSonnet {
+		t.Errorf("plan should use runtime override: model = %q, want sonnet", model)
+	}
+	if reason != "runtime-override" {
+		t.Errorf("reason = %q, want runtime-override", reason)
 	}
 }
 

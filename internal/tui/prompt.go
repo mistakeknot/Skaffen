@@ -90,6 +90,11 @@ func (p promptModel) Update(msg tea.Msg) (promptModel, tea.Cmd) {
 		}
 	}
 
+	// Block mouse events — textinput renders them as raw escape text.
+	if _, ok := msg.(tea.MouseMsg); ok {
+		return p, nil
+	}
+
 	var cmd tea.Cmd
 	p.input, cmd = p.input.Update(msg)
 	return p, cmd

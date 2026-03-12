@@ -88,6 +88,13 @@ type RunResult struct {
 	Phase    tool.Phase
 }
 
+// ModelOverrideSetter is an optional interface for routers that support
+// runtime model switching (e.g. via /model command). Checked via type assertion.
+type ModelOverrideSetter interface {
+	SetModelOverride(model string)
+	ModelOverride() string
+}
+
 // NoOpRouter always returns the default model.
 type NoOpRouter struct{ Model string }
 

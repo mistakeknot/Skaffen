@@ -2,7 +2,7 @@
 
 **Bead:** Demarch-0ed
 **PRD:** [docs/prds/2026-03-12-claude-code-provider-visibility.md](../prds/2026-03-12-claude-code-provider-visibility.md)
-**Stage:** design
+**Stage:** executed
 
 ## Overview
 
