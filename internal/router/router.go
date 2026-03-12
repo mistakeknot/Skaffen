@@ -28,11 +28,14 @@ var phaseDefaults = map[tool.Phase]string{
 
 // DefaultRouter selects models based on phase, config overrides, and budget.
 type DefaultRouter struct {
-	cfg         *Config
-	budget      *BudgetTracker
-	complexity  *ComplexityClassifier
-	inputTokens int                // set before SelectModel for complexity
+	cfg          *Config
+	budget       *BudgetTracker
+	complexity   *ComplexityClassifier
+	inputTokens  int                // set before SelectModel for complexity
 	lastOverride *ComplexityOverride // last complexity result for evidence
+	overrides    map[string]string  // phase -> model, from ic route model
+	ic           *ICClient
+	sessionID    string
 }
 
 // New creates a DefaultRouter. Pass nil config to use hardcoded defaults.
@@ -50,8 +53,25 @@ func New(cfg *Config) *DefaultRouter {
 	return r
 }
 
+// NewWithIC creates a DefaultRouter with Intercore integration.
+// Overrides are queried once at construction and cached for the session.
+func NewWithIC(cfg *Config, ic *ICClient, sessionID string) *DefaultRouter {
+	r := New(cfg)
+	r.ic = ic
+	r.sessionID = sessionID
+	if ic != nil {
+		r.overrides = make(map[string]string)
+		for _, phase := range []string{"brainstorm", "plan", "build", "review", "ship"} {
+			if model := ic.QueryOverride(phase); model != "" {
+				r.overrides[phase] = model
+			}
+		}
+	}
+	return r
+}
+
 // SelectModel returns the model and reason for the given phase.
-// Resolution order: budget degradation > complexity > env var > config file > phase default.
+// Resolution order: budget degradation > complexity > env var > intercore override > config file > phase default.
 func (r *DefaultRouter) SelectModel(phase tool.Phase) (string, string) {
 	// Start with phase default
 	model := phaseDefaults[phase]
@@ -67,7 +87,15 @@ func (r *DefaultRouter) SelectModel(phase tool.Phase) (string, string) {
 		reason = "config-file"
 	}
 
-	// Env var override (highest priority for explicit user control)
+	// Intercore override (above config, below env)
+	if r.overrides != nil {
+		if m, ok := r.overrides[string(phase)]; ok && m != "" {
+			model = resolveModelAlias(m)
+			reason = "intercore-override"
+		}
+	}
+
+	// Env var override (highest explicit priority)
 	if m := r.cfg.envOverride(phase); m != "" {
 		model = resolveModelAlias(m)
 		reason = "env-override"

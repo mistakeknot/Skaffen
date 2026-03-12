@@ -187,3 +187,56 @@ func TestResolveModelAlias(t *testing.T) {
 		}
 	}
 }
+
+func TestOverrideApplied(t *testing.T) {
+	r := New(&Config{})
+	r.overrides = map[string]string{"build": ModelOpus}
+	model, reason := r.SelectModel(tool.PhaseBuild)
+	if model != ModelOpus {
+		t.Errorf("override: model = %q, want opus", model)
+	}
+	if reason != "intercore-override" {
+		t.Errorf("override: reason = %q, want intercore-override", reason)
+	}
+}
+
+func TestOverrideNotAppliedForOtherPhase(t *testing.T) {
+	r := New(&Config{})
+	r.overrides = map[string]string{"build": ModelOpus}
+	_, reason := r.SelectModel(tool.PhaseBrainstorm)
+	if reason == "intercore-override" {
+		t.Error("override should not apply to brainstorm")
+	}
+}
+
+func TestEnvOverrideBeatsIntercoreOverride(t *testing.T) {
+	cfg := &Config{}
+	r := New(cfg)
+	r.overrides = map[string]string{"build": ModelHaiku}
+	t.Setenv("SKAFFEN_MODEL_BUILD", "opus")
+	model, reason := r.SelectModel(tool.PhaseBuild)
+	if model != ModelOpus {
+		t.Errorf("env should beat intercore: model = %q, want opus", model)
+	}
+	if reason != "env-override" {
+		t.Errorf("reason = %q, want env-override", reason)
+	}
+}
+
+func TestNewWithIC_NilIC(t *testing.T) {
+	r := NewWithIC(&Config{}, nil, "test-session")
+	model, reason := r.SelectModel(tool.PhaseBuild)
+	if model != ModelSonnet {
+		t.Errorf("nil IC: model = %q, want sonnet", model)
+	}
+	if reason != "phase-default" {
+		t.Errorf("nil IC: reason = %q, want phase-default", reason)
+	}
+}
+
+func TestNewWithIC_SessionID(t *testing.T) {
+	r := NewWithIC(&Config{}, nil, "my-session")
+	if r.sessionID != "my-session" {
+		t.Errorf("sessionID = %q, want my-session", r.sessionID)
+	}
+}
