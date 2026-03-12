@@ -19,6 +19,7 @@ type Loop struct {
 	emitter   Emitter
 	streamCB  StreamCallback
 	approver  ToolApprover
+	hooks     HookRunner // lifecycle hooks (nil = no hooks)
 	maxTurns  int
 	sessionID string
 }
@@ -48,6 +49,9 @@ func WithSessionID(id string) Option { return func(l *Loop) { l.sessionID = id }
 
 // WithStreamCallback sets a callback that receives real-time streaming events.
 func WithStreamCallback(cb StreamCallback) Option { return func(l *Loop) { l.streamCB = cb } }
+
+// WithHooks sets the lifecycle hook runner.
+func WithHooks(h HookRunner) Option { return func(l *Loop) { l.hooks = h } }
 
 // New creates a Loop with the given provider, tool registry, and options.
 func New(p provider.Provider, reg *Registry, opts ...Option) *Loop {
@@ -241,12 +245,37 @@ func buildAssistantMessage(c *provider.CollectedResponse) provider.Message {
 	return provider.Message{Role: provider.RoleAssistant, Content: blocks}
 }
 
-// executeToolsWithCallbacks executes tool calls with optional approval gating
-// and streaming callbacks.
+// executeToolsWithCallbacks executes tool calls with optional hook gating,
+// approval gating, and streaming callbacks.
 func (l *Loop) executeToolsWithCallbacks(ctx context.Context, calls []provider.ToolCall) provider.Message {
 	var blocks []provider.ContentBlock
 	for _, tc := range calls {
-		// Gate: check approval before execution
+		// Phase 1: Hook gating (if hooks configured)
+		if l.hooks != nil {
+			decision, _ := l.hooks.PreToolUse(ctx, tc.Name, tc.Input)
+			// Fail-open: error from PreToolUse is ignored (hooks package logs it)
+			if decision == "deny" {
+				blocks = append(blocks, provider.ContentBlock{
+					Type:          "tool_result",
+					ToolUseID:     tc.ID,
+					ResultContent: fmt.Sprintf("Tool call %q was denied by a hook.", tc.Name),
+					IsError:       true,
+				})
+				if l.streamCB != nil {
+					l.streamCB(StreamEvent{
+						Type:       StreamToolComplete,
+						ToolName:   tc.Name,
+						ToolResult: fmt.Sprintf("Denied by hook: %s", tc.Name),
+						IsError:    true,
+					})
+				}
+				continue
+			}
+			// "ask" falls through to approver (same as no hook)
+			// "allow" also falls through — hooks can't override trust
+		}
+
+		// Phase 2: Trust approval (always runs unless hook denied)
 		if l.approver != nil && !l.approver(tc.Name, tc.Input) {
 			blocks = append(blocks, provider.ContentBlock{
 				Type:          "tool_result",
@@ -265,6 +294,7 @@ func (l *Loop) executeToolsWithCallbacks(ctx context.Context, calls []provider.T
 			continue
 		}
 
+		// Phase 3: Execute
 		result := l.registry.Execute(ctx, tc.Name, tc.Input)
 		blocks = append(blocks, provider.ContentBlock{
 			Type:          "tool_result",
@@ -279,6 +309,15 @@ func (l *Loop) executeToolsWithCallbacks(ctx context.Context, calls []provider.T
 				ToolResult: result.Content,
 				IsError:    result.IsError,
 			})
+		}
+
+		// Phase 4: PostToolUse hook (advisory, background)
+		// Uses context.Background() — parent ctx may be cancelled when
+		// the agent loop advances, which would kill in-flight hooks.
+		if l.hooks != nil {
+			hookRunner := l.hooks
+			name, input, content, isErr := tc.Name, tc.Input, result.Content, result.IsError
+			go hookRunner.PostToolUse(context.Background(), name, input, content, isErr)
 		}
 	}
 	return provider.Message{Role: provider.RoleUser, Content: blocks}

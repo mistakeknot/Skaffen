@@ -1,6 +1,7 @@
 package agentloop
 
 import (
+	"context"
 	"encoding/json"
 
 	"github.com/mistakeknot/Skaffen/internal/provider"
@@ -135,6 +136,18 @@ type RunResult struct {
 	Usage    provider.Usage
 	Turns    int
 	Phase    string // opaque — set by agent layer
+}
+
+// HookRunner executes lifecycle hooks. The agentloop only uses
+// PreToolUse and PostToolUse; SessionStart and Notify are called
+// directly from main.go.
+//
+// PreToolUse returns a string decision: "allow", "deny", or "ask".
+// Using string (not a typed enum) keeps agentloop decoupled from
+// the hooks package — the agent layer adapts between the two.
+type HookRunner interface {
+	PreToolUse(ctx context.Context, toolName string, input json.RawMessage) (string, error)
+	PostToolUse(ctx context.Context, toolName string, input json.RawMessage, result string, isError bool)
 }
 
 // --- NoOp implementations ---
