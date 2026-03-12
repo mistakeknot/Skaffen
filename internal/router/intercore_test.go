@@ -2,6 +2,8 @@ package router
 
 import (
 	"testing"
+
+	"github.com/mistakeknot/Skaffen/internal/tool"
 )
 
 func TestICClient_HealthWithFakeBinary(t *testing.T) {
@@ -76,5 +78,24 @@ func TestICClient_BuildRecordArgsNoOptional(t *testing.T) {
 	// No session, no complexity — should have 6 args (route record + 4 flags)
 	if len(args) != 6 {
 		t.Fatalf("args len = %d, want 6: %v", len(args), args)
+	}
+}
+
+func TestNewWithIC_NilICSelectModelWorks(t *testing.T) {
+	// Full flow: NewWithIC with nil IC should work exactly like New
+	r := NewWithIC(&Config{}, nil, "integration-test")
+
+	// Override map should be nil (no IC to query)
+	if r.overrides != nil {
+		t.Error("nil IC should leave overrides nil")
+	}
+
+	// SelectModel should still work
+	model, reason := r.SelectModel(tool.PhaseBuild)
+	if model != ModelSonnet {
+		t.Errorf("model = %q, want sonnet", model)
+	}
+	if reason != "phase-default" {
+		t.Errorf("reason = %q, want phase-default", reason)
 	}
 }
