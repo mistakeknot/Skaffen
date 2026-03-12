@@ -185,7 +185,17 @@ func (m *appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.prompt, cmd = m.prompt.Update(msg)
 			cmds = append(cmds, cmd)
 		}
-		// Always allow viewport scrolling
+		// Viewport scrolling: when prompt is focused, only pass through
+		// dedicated scroll keys (PgUp/PgDn/Home/End/Ctrl+U/Ctrl+D) —
+		// arrow keys belong to the textinput for cursor movement.
+		if m.running || isScrollKey(msg) {
+			vp, cmd := m.viewport.Update(msg)
+			m.viewport = vp
+			cmds = append(cmds, cmd)
+		}
+
+	case tea.MouseMsg:
+		// Mouse wheel always goes to viewport
 		vp, cmd := m.viewport.Update(msg)
 		m.viewport = vp
 		cmds = append(cmds, cmd)
@@ -303,6 +313,16 @@ func (m *appModel) runAgent(prompt string) tea.Cmd {
 		}
 		return agentDoneMsg{Response: result.Response}
 	}
+}
+
+// isScrollKey returns true for keys that should scroll the viewport even
+// when the prompt has focus (i.e. keys that don't conflict with textinput).
+func isScrollKey(msg tea.KeyMsg) bool {
+	switch msg.Type {
+	case tea.KeyPgUp, tea.KeyPgDown, tea.KeyHome, tea.KeyEnd, tea.KeyCtrlU, tea.KeyCtrlD:
+		return true
+	}
+	return false
 }
 
 // atMentionRe matches @path tokens in user input.
