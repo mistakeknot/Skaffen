@@ -4,69 +4,60 @@ import (
 	"fmt"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/mistakeknot/Masaq/statusbar"
 	"github.com/mistakeknot/Masaq/theme"
 )
 
-type statusModel struct {
-	width int
+// newStatusBar creates a status bar pre-configured with the standard Skaffen
+// slots: phase, model, cost, context%, turns.
+func newStatusBar(width int) statusbar.Model {
+	sb := statusbar.New(width)
+	sb.SetSlots([]statusbar.Slot{
+		{Label: "", Value: "build"},  // phase (no label, colored)
+		{Label: "", Value: "opus"},   // model
+		{Label: "", Value: "$0.00"},  // cost
+		{Label: "", Value: "0%"},     // context
+		{Label: "", Value: "0 turns"},// turns
+	})
+	return sb
 }
 
-func newStatusModel() statusModel {
-	return statusModel{}
-}
-
-// View renders the status bar: phase | model | cost | context% | turns
-func (s statusModel) View(phase, model string, cost, contextPct float64, turns int) string {
+// updateStatusSlots refreshes status bar slots with current agent state.
+func updateStatusSlots(sb *statusbar.Model, phase, model string, cost, contextPct float64, turns int) {
 	c := theme.Current().Semantic()
 
-	bg := lipgloss.NewStyle().
-		Background(c.BgLight.Color()).
-		Width(s.width)
+	// Phase slot: colored by OODARC phase.
+	sb.SetSlots([]statusbar.Slot{
+		{Label: "", Value: phase, Color: phaseColor(phase)},
+		{Label: "", Value: model, Color: c.FgDim.Color()},
+		{Label: "", Value: fmt.Sprintf("$%.2f", cost), Color: costColor(cost)},
+		{Label: "", Value: fmt.Sprintf("%.0f%%", contextPct), Color: contextColor(contextPct)},
+		{Label: "", Value: fmt.Sprintf("%d turns", turns), Color: c.Fg.Color()},
+	})
+}
 
-	phaseStyle := lipgloss.NewStyle().
-		Foreground(phaseColor(phase)).
-		Bold(true).
-		Background(c.BgLight.Color())
-
-	mutedStyle := lipgloss.NewStyle().
-		Foreground(c.Muted.Color()).
-		Background(c.BgLight.Color())
-
-	sep := mutedStyle.Render(" | ")
-
-	costStyle := lipgloss.NewStyle().Background(c.BgLight.Color())
+// costColor returns a semantic color based on accumulated cost.
+func costColor(cost float64) lipgloss.Color {
+	c := theme.Current().Semantic()
 	switch {
 	case cost >= 2.0:
-		costStyle = costStyle.Foreground(c.Error.Color())
+		return c.Error.Color()
 	case cost >= 0.5:
-		costStyle = costStyle.Foreground(c.Warning.Color())
+		return c.Warning.Color()
 	default:
-		costStyle = costStyle.Foreground(c.Success.Color())
+		return c.Success.Color()
 	}
+}
 
-	ctxStyle := lipgloss.NewStyle().Background(c.BgLight.Color())
+// contextColor returns a semantic color based on context window usage.
+func contextColor(pct float64) lipgloss.Color {
+	c := theme.Current().Semantic()
 	switch {
-	case contextPct >= 80:
-		ctxStyle = ctxStyle.Foreground(c.Error.Color())
-	case contextPct >= 50:
-		ctxStyle = ctxStyle.Foreground(c.Warning.Color())
+	case pct >= 80:
+		return c.Error.Color()
+	case pct >= 50:
+		return c.Warning.Color()
 	default:
-		ctxStyle = ctxStyle.Foreground(c.Success.Color())
+		return c.Success.Color()
 	}
-
-	turnStyle := lipgloss.NewStyle().
-		Foreground(c.Fg.Color()).
-		Background(c.BgLight.Color())
-
-	bar := phaseStyle.Render(phase) +
-		sep +
-		mutedStyle.Render(model) +
-		sep +
-		costStyle.Render(fmt.Sprintf("$%.2f", cost)) +
-		sep +
-		ctxStyle.Render(fmt.Sprintf("%.0f%%", contextPct)) +
-		sep +
-		turnStyle.Render(fmt.Sprintf("%d turns", turns))
-
-	return bg.Render(bar)
 }

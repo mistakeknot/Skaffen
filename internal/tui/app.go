@@ -14,12 +14,14 @@ import (
 	"github.com/mistakeknot/Skaffen/internal/agent"
 	"github.com/mistakeknot/Skaffen/internal/git"
 	"github.com/mistakeknot/Skaffen/internal/trust"
+	"github.com/mistakeknot/Masaq/breadcrumb"
 	"github.com/mistakeknot/Masaq/compact"
 	"github.com/mistakeknot/Masaq/diff"
 	"github.com/mistakeknot/Masaq/keys"
 	"github.com/mistakeknot/Masaq/markdown"
 	"github.com/mistakeknot/Masaq/question"
 	msettings "github.com/mistakeknot/Masaq/settings"
+	"github.com/mistakeknot/Masaq/statusbar"
 	"github.com/mistakeknot/Masaq/theme"
 	"github.com/mistakeknot/Masaq/viewport"
 )
@@ -101,7 +103,8 @@ type appModel struct {
 	md            *markdown.Renderer
 	compact       *compact.Formatter
 	keys          keys.Map
-	status        statusModel
+	status        statusbar.Model
+	crumbs        breadcrumb.Model
 	prompt        promptModel
 	agent         *agent.Agent
 	trust         *trust.Evaluator
@@ -157,12 +160,21 @@ func newAppModel(cfg Config) *appModel {
 	if cfg.Verbose {
 		s.Verbose = true
 	}
+	bc := breadcrumb.New(80)
+	bc.SetSteps([]breadcrumb.Step{
+		{Label: "brainstorm", Status: breadcrumb.Pending},
+		{Label: "plan", Status: breadcrumb.Pending},
+		{Label: "build", Status: breadcrumb.Active},
+		{Label: "review", Status: breadcrumb.Pending},
+		{Label: "ship", Status: breadcrumb.Pending},
+	})
 	return &appModel{
 		viewport:   vp,
 		md:         markdown.New(80),
 		compact:    cf,
 		keys:       keys.NewDefault(keys.WithVim()),
-		status:     newStatusModel(),
+		status:     newStatusBar(80),
+		crumbs:     bc,
 		prompt:     pm,
 		agent:      cfg.Agent,
 		trust:      cfg.Trust,
@@ -188,15 +200,17 @@ func (m *appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
-		// Layout: status=1, prompt=3, rest=viewport
-		vpHeight := m.height - 4 // 1 status + 3 prompt
+		// Layout: breadcrumb=1, status=1, prompt=3, rest=viewport
+		vpHeight := m.height - 5 // 1 breadcrumb + 1 status + 3 prompt
 		if vpHeight < 1 {
 			vpHeight = 1
 		}
 		m.viewport.SetSize(m.width, vpHeight)
 		m.md = markdown.New(m.width)
 		m.compact = compact.New(m.width)
-		m.status.width = m.width
+		m.status = newStatusBar(m.width)
+		m.crumbs = breadcrumb.New(m.width)
+		m.syncBreadcrumb()
 		m.logo.width = m.width
 
 	case logoTickMsg:
@@ -410,11 +424,15 @@ func (m *appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m *appModel) View() string {
 	logoView := m.logo.View()
 	vpView := m.viewport.View()
-	statusView := m.status.View(m.phase, m.modelName, m.totalCost, m.contextPct, m.turns)
+
+	// Update status slots with current state.
+	updateStatusSlots(&m.status, m.phase, m.modelName, m.totalCost, m.contextPct, m.turns)
+	statusView := m.status.View()
+	crumbView := m.crumbs.View()
 
 	// Logo sits above viewport, taking space from viewport height
 	logoHeight := strings.Count(logoView, "\n")
-	vpHeight := m.height - 4 - logoHeight // 1 status + 3 prompt + logo
+	vpHeight := m.height - 5 - logoHeight // 1 breadcrumb + 1 status + 3 prompt + logo
 	if vpHeight < 1 {
 		vpHeight = 1
 	}
@@ -424,15 +442,15 @@ func (m *appModel) View() string {
 	}
 
 	if m.approving {
-		return lipgloss.JoinVertical(lipgloss.Left, logoView, vpView, m.approvalQ.View(), statusView)
+		return lipgloss.JoinVertical(lipgloss.Left, logoView, vpView, m.approvalQ.View(), crumbView, statusView)
 	}
 
 	if m.settingsOpen {
-		return lipgloss.JoinVertical(lipgloss.Left, logoView, vpView, m.settingsOverlay.View(), statusView)
+		return lipgloss.JoinVertical(lipgloss.Left, logoView, vpView, m.settingsOverlay.View(), crumbView, statusView)
 	}
 
 	promptView := m.prompt.View(m.width, m.running)
-	return lipgloss.JoinVertical(lipgloss.Left, logoView, vpView, promptView, statusView)
+	return lipgloss.JoinVertical(lipgloss.Left, logoView, vpView, promptView, crumbView, statusView)
 }
 
 func (m *appModel) handleStreamEvent(ev agent.StreamEvent) {
@@ -456,7 +474,36 @@ func (m *appModel) handleStreamEvent(ev agent.StreamEvent) {
 		}
 	case agent.StreamPhaseChange:
 		m.phase = ev.Phase
+		m.syncBreadcrumb()
 	}
+}
+
+// syncBreadcrumb updates the breadcrumb trail to reflect the current OODARC phase.
+// Phases before the current one are Done, the current is Active, the rest are Pending.
+func (m *appModel) syncBreadcrumb() {
+	current := -1
+	for i, p := range phaseOrder {
+		if p == m.phase {
+			current = i
+			break
+		}
+	}
+	steps := make([]breadcrumb.Step, len(phaseOrder))
+	for i, p := range phaseOrder {
+		var s breadcrumb.Status
+		switch {
+		case current < 0:
+			s = breadcrumb.Pending // unknown phase — all pending
+		case i < current:
+			s = breadcrumb.Done
+		case i == current:
+			s = breadcrumb.Active
+		default:
+			s = breadcrumb.Pending
+		}
+		steps[i] = breadcrumb.Step{Label: p, Status: s}
+	}
+	m.crumbs.SetSteps(steps)
 }
 
 func (m *appModel) runAgent(prompt string) tea.Cmd {
