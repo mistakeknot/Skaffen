@@ -290,6 +290,7 @@ func (l *Loop) collectWithCallbacks(s *provider.StreamResponse, turn int) (*prov
 		result      provider.CollectedResponse
 		currentTool *provider.ToolCall
 		partialJSON string
+		toolNames   = make(map[string]string) // tool_use ID → tool name (for result correlation)
 	)
 
 	for s.Next() {
@@ -306,10 +307,24 @@ func (l *Loop) collectWithCallbacks(s *provider.StreamResponse, turn int) (*prov
 			}
 			currentTool = &provider.ToolCall{ID: ev.ID, Name: ev.Name}
 			partialJSON = ""
-			l.streamCB(StreamEvent{Type: StreamToolStart, ToolName: ev.Name})
+			toolNames[ev.ID] = ev.Name
+			l.streamCB(StreamEvent{
+				Type:       StreamToolStart,
+				ToolName:   ev.Name,
+				ToolParams: ev.Text, // claudecode sends full input JSON here
+			})
 
 		case provider.EventToolUseDelta:
 			partialJSON += ev.Text
+
+		case provider.EventToolResult:
+			name := toolNames[ev.ID]
+			l.streamCB(StreamEvent{
+				Type:       StreamToolComplete,
+				ToolName:   name,
+				ToolResult: ev.Text,
+				IsError:    ev.Err != nil,
+			})
 
 		case provider.EventDone:
 			if ev.Usage != nil {

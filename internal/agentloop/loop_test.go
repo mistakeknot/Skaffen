@@ -3,6 +3,7 @@ package agentloop
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"testing"
 
 	"github.com/mistakeknot/Skaffen/internal/provider"
@@ -244,6 +245,110 @@ func TestLoopRunSessionSaved(t *testing.T) {
 	}
 	if session.turns[0].Phase != "build" {
 		t.Errorf("turn.Phase = %q, want 'build'", session.turns[0].Phase)
+	}
+}
+
+func TestLoopRunWithToolResultEvents(t *testing.T) {
+	// Simulates claudecode provider: ToolUseStart + ToolResult come through the
+	// event channel (not via executeToolsWithCallbacks) with StopReason="end_turn".
+	ch := make(chan provider.StreamEvent, 8)
+	ch <- provider.StreamEvent{Type: provider.EventTextDelta, Text: "Reading file."}
+	ch <- provider.StreamEvent{Type: provider.EventToolUseStart, ID: "toolu_01", Name: "Read", Text: `{"file_path":"x.go"}`}
+	ch <- provider.StreamEvent{Type: provider.EventToolResult, ID: "toolu_01", Text: "package main"}
+	ch <- provider.StreamEvent{Type: provider.EventTextDelta, Text: "Got it."}
+	ch <- provider.StreamEvent{Type: provider.EventDone, StopReason: "end_turn", Usage: &provider.Usage{InputTokens: 200, OutputTokens: 30}}
+	close(ch)
+
+	var events []StreamEvent
+	cb := func(ev StreamEvent) {
+		events = append(events, ev)
+	}
+
+	reg := NewRegistry()
+	loop := New(&mockProvider{text: "unused"}, reg, WithStreamCallback(cb))
+
+	// Directly test collectWithCallbacks
+	resp := provider.NewStreamResponse(ch)
+	collected, err := loop.collectWithCallbacks(resp, 1)
+	if err != nil {
+		t.Fatalf("collectWithCallbacks error: %v", err)
+	}
+	if collected.Text != "Reading file.Got it." {
+		t.Errorf("text = %q", collected.Text)
+	}
+
+	// Check stream events: expect Text, ToolStart, ToolComplete, Text, TurnComplete
+	if len(events) != 5 {
+		t.Fatalf("expected 5 events, got %d: %+v", len(events), events)
+	}
+	if events[0].Type != StreamText {
+		t.Errorf("events[0].Type = %d, want StreamText", events[0].Type)
+	}
+	if events[1].Type != StreamToolStart || events[1].ToolName != "Read" {
+		t.Errorf("events[1] = %+v, want ToolStart Read", events[1])
+	}
+	if events[1].ToolParams != `{"file_path":"x.go"}` {
+		t.Errorf("events[1].ToolParams = %q", events[1].ToolParams)
+	}
+	if events[2].Type != StreamToolComplete || events[2].ToolName != "Read" {
+		t.Errorf("events[2] = %+v, want ToolComplete Read", events[2])
+	}
+	if events[2].ToolResult != "package main" {
+		t.Errorf("events[2].ToolResult = %q", events[2].ToolResult)
+	}
+	if events[2].IsError {
+		t.Error("events[2].IsError should be false")
+	}
+	if events[3].Type != StreamText {
+		t.Errorf("events[3].Type = %d, want StreamText", events[3].Type)
+	}
+	if events[4].Type != StreamTurnComplete {
+		t.Errorf("events[4].Type = %d, want StreamTurnComplete", events[4].Type)
+	}
+}
+
+func TestLoopRunWithToolResultError(t *testing.T) {
+	ch := make(chan provider.StreamEvent, 8)
+	ch <- provider.StreamEvent{Type: provider.EventToolUseStart, ID: "t1", Name: "Bash"}
+	ch <- provider.StreamEvent{
+		Type: provider.EventToolResult,
+		ID:   "t1",
+		Text: "command failed",
+		Err:  fmt.Errorf("command failed"),
+	}
+	ch <- provider.StreamEvent{Type: provider.EventDone, StopReason: "end_turn", Usage: &provider.Usage{}}
+	close(ch)
+
+	var events []StreamEvent
+	cb := func(ev StreamEvent) {
+		events = append(events, ev)
+	}
+
+	reg := NewRegistry()
+	loop := New(&mockProvider{text: "unused"}, reg, WithStreamCallback(cb))
+
+	resp := provider.NewStreamResponse(ch)
+	_, err := loop.collectWithCallbacks(resp, 1)
+	if err != nil {
+		t.Fatalf("collectWithCallbacks error: %v", err)
+	}
+
+	// Find the ToolComplete event
+	var toolComplete *StreamEvent
+	for i, ev := range events {
+		if ev.Type == StreamToolComplete {
+			toolComplete = &events[i]
+			break
+		}
+	}
+	if toolComplete == nil {
+		t.Fatal("expected StreamToolComplete event")
+	}
+	if !toolComplete.IsError {
+		t.Error("IsError should be true for error tool result")
+	}
+	if toolComplete.ToolName != "Bash" {
+		t.Errorf("ToolName = %q, want Bash", toolComplete.ToolName)
 	}
 }
 

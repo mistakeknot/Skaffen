@@ -11,6 +11,7 @@ const (
 	EventToolUseDelta                  // Partial tool input JSON
 	EventDone                          // Stream complete, Usage populated
 	EventError                         // Stream error
+	EventToolResult                    // Tool result observed (subprocess providers)
 )
 
 // StreamEvent is a single event from a streaming response.

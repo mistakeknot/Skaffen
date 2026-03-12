@@ -129,10 +129,11 @@ func (p *ClaudeCodeProvider) processOutput(ctx context.Context, cmd *exec.Cmd, s
 		switch envelope.Type {
 		case "assistant":
 			p.handleAssistantMessage(line, events)
+		case "user":
+			p.handleUserMessage(line, events)
 		case "result":
 			p.handleResult(line, events)
 		}
-		// Skip other event types (system, tool_use, etc.)
 	}
 
 	// Read stderr for error context
@@ -161,26 +162,74 @@ func (p *ClaudeCodeProvider) processOutput(ctx context.Context, cmd *exec.Cmd, s
 	}
 }
 
-// handleAssistantMessage extracts text from an assistant message event.
+// handleAssistantMessage extracts text and tool_use blocks from an assistant message.
 func (p *ClaudeCodeProvider) handleAssistantMessage(data []byte, events chan<- provider.StreamEvent) {
 	var msg struct {
 		Message struct {
-			Content []struct {
-				Type string `json:"type"`
-				Text string `json:"text"`
-			} `json:"content"`
+			Content []json.RawMessage `json:"content"`
 		} `json:"message"`
 	}
 	if err := json.Unmarshal(data, &msg); err != nil {
 		return
 	}
-	for _, block := range msg.Message.Content {
-		if block.Type == "text" && block.Text != "" {
+	for _, raw := range msg.Message.Content {
+		var block struct {
+			Type  string          `json:"type"`
+			Text  string          `json:"text"`
+			ID    string          `json:"id"`
+			Name  string          `json:"name"`
+			Input json.RawMessage `json:"input"`
+		}
+		if json.Unmarshal(raw, &block) != nil {
+			continue
+		}
+		switch block.Type {
+		case "text":
+			if block.Text != "" {
+				events <- provider.StreamEvent{
+					Type: provider.EventTextDelta,
+					Text: block.Text,
+				}
+			}
+		case "tool_use":
 			events <- provider.StreamEvent{
-				Type: provider.EventTextDelta,
-				Text: block.Text,
+				Type: provider.EventToolUseStart,
+				ID:   block.ID,
+				Name: block.Name,
+				Text: string(block.Input),
 			}
 		}
+	}
+}
+
+// handleUserMessage extracts tool_result blocks from a user message.
+func (p *ClaudeCodeProvider) handleUserMessage(data []byte, events chan<- provider.StreamEvent) {
+	var msg struct {
+		Message struct {
+			Content []struct {
+				Type      string `json:"type"`
+				ToolUseID string `json:"tool_use_id"`
+				Content   string `json:"content"`
+				IsError   bool   `json:"is_error"`
+			} `json:"content"`
+		} `json:"message"`
+	}
+	if json.Unmarshal(data, &msg) != nil {
+		return
+	}
+	for _, block := range msg.Message.Content {
+		if block.Type != "tool_result" {
+			continue
+		}
+		ev := provider.StreamEvent{
+			Type: provider.EventToolResult,
+			ID:   block.ToolUseID,
+			Text: truncate(block.Content, 4096),
+		}
+		if block.IsError {
+			ev.Err = fmt.Errorf("%s", truncate(block.Content, 200))
+		}
+		events <- ev
 	}
 }
 
