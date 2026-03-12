@@ -66,6 +66,46 @@ func LoadConfig(path string) (*Config, error) {
 	return cfg, nil
 }
 
+// MergeConfig overlays project config onto base config.
+// Returns a new Config — neither base nor project is modified.
+// Maps are deep-copied to prevent aliasing.
+func MergeConfig(base, project *Config) *Config {
+	merged := &Config{
+		Phases:         make(map[tool.Phase]string, len(base.Phases)+len(project.Phases)),
+		ContextWindows: make(map[string]int, len(base.ContextWindows)+len(project.ContextWindows)),
+	}
+	// Deep-copy base maps
+	for k, v := range base.Phases {
+		merged.Phases[k] = v
+	}
+	for k, v := range base.ContextWindows {
+		merged.ContextWindows[k] = v
+	}
+	// Deep-copy base pointers
+	if base.Budget != nil {
+		cp := *base.Budget
+		merged.Budget = &cp
+	}
+	if base.Complexity != nil {
+		cp := *base.Complexity
+		merged.Complexity = &cp
+	}
+	// Overlay project values
+	for phase, model := range project.Phases {
+		merged.Phases[phase] = model
+	}
+	if project.Budget != nil {
+		merged.Budget = project.Budget
+	}
+	if project.Complexity != nil {
+		merged.Complexity = project.Complexity
+	}
+	for model, window := range project.ContextWindows {
+		merged.ContextWindows[model] = window
+	}
+	return merged
+}
+
 // envOverride checks for SKAFFEN_MODEL_<PHASE> env var.
 func (c *Config) envOverride(phase tool.Phase) string {
 	key := "SKAFFEN_MODEL_" + strings.ToUpper(string(phase))

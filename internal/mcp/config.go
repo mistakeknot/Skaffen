@@ -161,6 +161,19 @@ func resolvePlugin(name string, entry tomlPlugin, configDir string) (PluginConfi
 	}, nil
 }
 
+// MergePluginConfigs merges per-project plugins into user-global plugins.
+// Per-project plugins with the same name override user-global entirely.
+func MergePluginConfigs(base, project map[string]PluginConfig) map[string]PluginConfig {
+	merged := make(map[string]PluginConfig, len(base)+len(project))
+	for k, v := range base {
+		merged[k] = v
+	}
+	for k, v := range project {
+		merged[k] = v // per-project wins on name collision
+	}
+	return merged
+}
+
 // expandEnv replaces ${VAR} patterns with values from os.Environ.
 // Does not expand $VAR (bare dollar) or ${VAR:-default} syntax.
 func expandEnv(s string) string {

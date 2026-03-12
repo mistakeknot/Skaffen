@@ -7,7 +7,6 @@ import (
 	"io"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"runtime"
 	"runtime/debug"
 	"strings"
@@ -16,6 +15,7 @@ import (
 
 	"github.com/mistakeknot/Masaq/theme"
 	"github.com/mistakeknot/Skaffen/internal/agent"
+	"github.com/mistakeknot/Skaffen/internal/config"
 	"github.com/mistakeknot/Skaffen/internal/contextfiles"
 	"github.com/mistakeknot/Skaffen/internal/evidence"
 	"github.com/mistakeknot/Skaffen/internal/mcp"
@@ -43,7 +43,7 @@ var (
 	flagMode     = flag.String("mode", "tui", "Execution mode: tui (default), print")
 	flagResume    = flag.Bool("c", false, "Resume last session")
 	flagResumeID  = flag.String("r", "", "Resume specific session by ID")
-	flagPlugins   = flag.String("plugins", "", "Path to plugins.toml (default: ~/.skaffen/plugins.toml)")
+	flagPlugins   = flag.String("plugins", "", "Path to plugins.toml (overrides config hierarchy)")
 	flagColorMode = flag.String("color-mode", "", "Color mode: dark, light (default: auto-detect)")
 	flagTheme     = flag.String("theme", "", "Theme: tokyonight, catppuccin (default: Tokyo Night)")
 )
@@ -81,6 +81,92 @@ func main() {
 		fmt.Fprintf(os.Stderr, "skaffen: unknown mode %q\n", *flagMode)
 		os.Exit(1)
 	}
+}
+
+// initConfig loads and merges configuration from user-global and per-project
+// directories, applies CLI flag overrides, and returns the resolved config,
+// routing config, and plugin configs.
+func initConfig() (*config.Config, *router.Config, map[string]mcp.PluginConfig, error) {
+	workDir, err := os.Getwd()
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("getwd: %w", err)
+	}
+	cfg, err := config.Load(workDir)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	// Load and merge routing configs (user-global base, per-project overlay)
+	var routerCfg *router.Config
+	routingPaths := cfg.RoutingPaths()
+	if len(routingPaths) == 0 {
+		routerCfg = &router.Config{Phases: make(map[tool.Phase]string)}
+	} else {
+		base, err := router.LoadConfig(routingPaths[0])
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "skaffen: warning: routing config: %v\n", err)
+			routerCfg = &router.Config{Phases: make(map[tool.Phase]string)}
+		} else {
+			routerCfg = base
+			if len(routingPaths) > 1 {
+				project, err := router.LoadConfig(routingPaths[1])
+				if err != nil {
+					fmt.Fprintf(os.Stderr, "skaffen: warning: project routing config: %v\n", err)
+				} else {
+					routerCfg = router.MergeConfig(base, project)
+				}
+			}
+		}
+	}
+
+	// CLI --budget flag overrides config file budget
+	if *flagBudget > 0 {
+		routerCfg.Budget = &router.BudgetConfig{
+			MaxTokens: *flagBudget,
+			Mode:      "graceful",
+			DegradeAt: 0.8,
+		}
+	}
+
+	// CLI --model flag: set as override for all phases
+	if *flagModel != "" {
+		if routerCfg.Phases == nil {
+			routerCfg.Phases = make(map[tool.Phase]string)
+		}
+		for _, ph := range []tool.Phase{tool.PhaseBrainstorm, tool.PhasePlan, tool.PhaseBuild, tool.PhaseReview, tool.PhaseShip} {
+			routerCfg.Phases[ph] = *flagModel
+		}
+	}
+
+	// Load and merge plugin configs
+	var pluginsCfg map[string]mcp.PluginConfig
+	if *flagPlugins != "" {
+		// CLI flag overrides entire config hierarchy
+		pluginsCfg, err = mcp.LoadConfig(*flagPlugins)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "skaffen: warning: plugins config: %v\n", err)
+			pluginsCfg = make(map[string]mcp.PluginConfig)
+		}
+	} else {
+		pluginPaths := cfg.PluginPaths()
+		for _, p := range pluginPaths {
+			pcfg, err := mcp.LoadConfig(p)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "skaffen: warning: plugins config %s: %v\n", p, err)
+				continue
+			}
+			if pluginsCfg == nil {
+				pluginsCfg = pcfg
+			} else {
+				pluginsCfg = mcp.MergePluginConfigs(pluginsCfg, pcfg)
+			}
+		}
+		if pluginsCfg == nil {
+			pluginsCfg = make(map[string]mcp.PluginConfig)
+		}
+	}
+
+	return cfg, routerCfg, pluginsCfg, nil
 }
 
 func runPrint() error {
@@ -122,15 +208,15 @@ func runPrint() error {
 		}
 	}
 
-	cfg := provider.ProviderConfig{}
+	pcfg := provider.ProviderConfig{}
 	if providerName == "anthropic" {
-		cfg.APIKey = os.Getenv("ANTHROPIC_API_KEY")
-		if cfg.APIKey == "" {
+		pcfg.APIKey = os.Getenv("ANTHROPIC_API_KEY")
+		if pcfg.APIKey == "" {
 			return fmt.Errorf("ANTHROPIC_API_KEY not set (omit --provider to use Claude Max via claude-code)")
 		}
 	}
 
-	p, err := provider.New(providerName, cfg)
+	p, err := provider.New(providerName, pcfg)
 	if err != nil {
 		return fmt.Errorf("provider: %w", err)
 	}
@@ -139,37 +225,16 @@ func runPrint() error {
 	reg := tool.NewRegistry()
 	tool.RegisterBuiltins(reg)
 
+	// Load config (user-global + per-project + CLI overrides)
+	cfg, routerCfg, pluginsCfg, err := initConfig()
+	if err != nil {
+		return fmt.Errorf("config: %w", err)
+	}
+
 	// Load MCP plugins
-	mcpMgr := loadMCPPlugins(ctx, reg)
+	mcpMgr := loadMCPPluginsFromConfig(ctx, reg, pluginsCfg)
 	if mcpMgr != nil {
 		defer mcpMgr.Shutdown()
-	}
-
-	// Load routing config (optional file, env vars always checked)
-	routingPath := filepath.Join(os.Getenv("HOME"), ".skaffen", "routing.json")
-	routerCfg, err := router.LoadConfig(routingPath)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "skaffen: warning: routing config: %v\n", err)
-		routerCfg = &router.Config{}
-	}
-
-	// CLI --budget flag overrides config file budget
-	if *flagBudget > 0 {
-		routerCfg.Budget = &router.BudgetConfig{
-			MaxTokens: *flagBudget,
-			Mode:      "graceful",
-			DegradeAt: 0.8,
-		}
-	}
-
-	// CLI --model flag: set as override for all phases (backward compat)
-	if *flagModel != "" {
-		if routerCfg.Phases == nil {
-			routerCfg.Phases = make(map[tool.Phase]string)
-		}
-		for _, ph := range []tool.Phase{tool.PhaseBrainstorm, tool.PhasePlan, tool.PhaseBuild, tool.PhaseReview, tool.PhaseShip} {
-			routerCfg.Phases[ph] = *flagModel
-		}
 	}
 
 	// Session ID — used for both session persistence and evidence
@@ -188,12 +253,10 @@ func runPrint() error {
 	}
 
 	// Build system prompt from context files + --system flag
-	workDir, _ := os.Getwd()
-	systemPrompt := buildSystemPrompt(workDir, *flagSystem)
+	systemPrompt := buildSystemPrompt(cfg.WorkDir(), *flagSystem)
 
 	if *flagSession != "" {
-		dir := filepath.Join(os.Getenv("HOME"), ".skaffen", "sessions")
-		sess := session.New(*flagSession, dir, systemPrompt, 20)
+		sess := session.New(*flagSession, cfg.SessionDir(), systemPrompt, 20)
 		if err := sess.Load(); err != nil {
 			fmt.Fprintf(os.Stderr, "skaffen: warning: load session: %v\n", err)
 		}
@@ -203,8 +266,7 @@ func runPrint() error {
 	}
 
 	// Evidence emission — always enabled
-	evidenceDir := filepath.Join(os.Getenv("HOME"), ".skaffen", "evidence")
-	emitter := evidence.New(evidenceDir, sessionID)
+	emitter := evidence.New(cfg.EvidenceDir(), sessionID)
 	opts = append(opts, agent.WithEmitter(emitter), agent.WithSessionID(sessionID))
 
 	a := agent.New(p, reg, opts...)
@@ -238,15 +300,15 @@ func runTUI() error {
 		}
 	}
 
-	cfg := provider.ProviderConfig{}
+	pcfg := provider.ProviderConfig{}
 	if providerName == "anthropic" {
-		cfg.APIKey = os.Getenv("ANTHROPIC_API_KEY")
-		if cfg.APIKey == "" {
+		pcfg.APIKey = os.Getenv("ANTHROPIC_API_KEY")
+		if pcfg.APIKey == "" {
 			return fmt.Errorf("ANTHROPIC_API_KEY not set")
 		}
 	}
 
-	p, err := provider.New(providerName, cfg)
+	p, err := provider.New(providerName, pcfg)
 	if err != nil {
 		return fmt.Errorf("provider: %w", err)
 	}
@@ -255,35 +317,20 @@ func runTUI() error {
 	reg := tool.NewRegistry()
 	tool.RegisterBuiltins(reg)
 
+	// Load config (user-global + per-project + CLI overrides)
+	cfg, routerCfg, pluginsCfg, err := initConfig()
+	if err != nil {
+		return fmt.Errorf("config: %w", err)
+	}
+
 	// Load MCP plugins (use timeout context since TUI manages its own context)
 	mcpCtx, mcpCancel := context.WithTimeout(context.Background(), 30*time.Second)
-	mcpMgr := loadMCPPlugins(mcpCtx, reg)
+	mcpMgr := loadMCPPluginsFromConfig(mcpCtx, reg, pluginsCfg)
 	mcpCancel()
 	if mcpMgr != nil {
 		defer mcpMgr.Shutdown()
 	}
 
-	// Router
-	routingPath := filepath.Join(os.Getenv("HOME"), ".skaffen", "routing.json")
-	routerCfg, err := router.LoadConfig(routingPath)
-	if err != nil {
-		routerCfg = &router.Config{}
-	}
-	if *flagBudget > 0 {
-		routerCfg.Budget = &router.BudgetConfig{
-			MaxTokens: *flagBudget,
-			Mode:      "graceful",
-			DegradeAt: 0.8,
-		}
-	}
-	if *flagModel != "" {
-		if routerCfg.Phases == nil {
-			routerCfg.Phases = make(map[tool.Phase]string)
-		}
-		for _, ph := range []tool.Phase{tool.PhaseBrainstorm, tool.PhasePlan, tool.PhaseBuild, tool.PhaseReview, tool.PhaseShip} {
-			routerCfg.Phases[ph] = *flagModel
-		}
-	}
 	// Session
 	sessionID := *flagSession
 	if sessionID == "" {
@@ -301,13 +348,11 @@ func runTUI() error {
 	}
 
 	// Working directory + context files
-	workDir, _ := os.Getwd()
-	systemPrompt := buildSystemPrompt(workDir, *flagSystem)
+	systemPrompt := buildSystemPrompt(cfg.WorkDir(), *flagSystem)
 
 	var tuiSession *session.JSONLSession
 	if *flagSession != "" {
-		dir := filepath.Join(os.Getenv("HOME"), ".skaffen", "sessions")
-		tuiSession = session.New(*flagSession, dir, systemPrompt, 20)
+		tuiSession = session.New(*flagSession, cfg.SessionDir(), systemPrompt, 20)
 		if err := tuiSession.Load(); err != nil {
 			fmt.Fprintf(os.Stderr, "skaffen: warning: load session: %v\n", err)
 		}
@@ -317,8 +362,7 @@ func runTUI() error {
 	}
 
 	// Evidence
-	evidenceDir := filepath.Join(os.Getenv("HOME"), ".skaffen", "evidence")
-	emitter := evidence.New(evidenceDir, sessionID)
+	emitter := evidence.New(cfg.EvidenceDir(), sessionID)
 	opts = append(opts, agent.WithEmitter(emitter), agent.WithSessionID(sessionID))
 
 	// Trust evaluator
@@ -334,7 +378,7 @@ func runTUI() error {
 		Session:    tuiSession,
 		SessionID:  sessionID,
 		Verbose:    false,
-		WorkDir:    workDir,
+		WorkDir:    cfg.WorkDir(),
 		SkaffenVer: skaffenVersion(),
 		MasaqVer:   masaqVersion(),
 	})
@@ -355,18 +399,9 @@ func checkIntercore() *router.ICClient {
 	return ic
 }
 
-// loadMCPPlugins loads configured MCP plugins into the registry.
+// loadMCPPluginsFromConfig loads pre-resolved plugin configs into the registry.
 // Returns the manager (may be nil if no plugins configured) — caller must defer Shutdown().
-func loadMCPPlugins(ctx context.Context, reg *tool.Registry) *mcp.Manager {
-	pluginsPath := *flagPlugins
-	if pluginsPath == "" {
-		pluginsPath = filepath.Join(os.Getenv("HOME"), ".skaffen", "plugins.toml")
-	}
-	pluginsCfg, err := mcp.LoadConfig(pluginsPath)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "skaffen: warning: plugins config: %v\n", err)
-		return nil
-	}
+func loadMCPPluginsFromConfig(ctx context.Context, reg *tool.Registry, pluginsCfg map[string]mcp.PluginConfig) *mcp.Manager {
 	if len(pluginsCfg) == 0 {
 		return nil
 	}
@@ -407,7 +442,7 @@ func setupTheme() {
 // Version variables — set via -ldflags or default to compiled-in values.
 // Example: go build -ldflags="-X main.version=1.2.3" ./cmd/skaffen
 var (
-	version      = "0.1.0"
+	version       = "0.1.0"
 	masaqVersion_ = "0.1.0"
 )
 

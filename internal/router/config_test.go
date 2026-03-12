@@ -126,3 +126,119 @@ func TestLoadConfigBudgetDefaults(t *testing.T) {
 		t.Errorf("default degrade_at = %f, want 0.8", cfg.Budget.DegradeAt)
 	}
 }
+
+func TestMergeConfigPhases(t *testing.T) {
+	base := &Config{
+		Phases: map[tool.Phase]string{
+			tool.PhaseBuild:     "sonnet",
+			tool.PhaseBrainstorm: "haiku",
+		},
+	}
+	project := &Config{
+		Phases: map[tool.Phase]string{
+			tool.PhaseBuild: "opus", // override
+		},
+	}
+	merged := MergeConfig(base, project)
+
+	if merged.Phases[tool.PhaseBuild] != "opus" {
+		t.Errorf("build = %q, want opus (project override)", merged.Phases[tool.PhaseBuild])
+	}
+	if merged.Phases[tool.PhaseBrainstorm] != "haiku" {
+		t.Errorf("brainstorm = %q, want haiku (base preserved)", merged.Phases[tool.PhaseBrainstorm])
+	}
+	// Verify base is NOT mutated
+	if base.Phases[tool.PhaseBuild] != "sonnet" {
+		t.Errorf("base.build mutated to %q, want sonnet", base.Phases[tool.PhaseBuild])
+	}
+}
+
+func TestMergeConfigBudget(t *testing.T) {
+	base := &Config{
+		Phases: map[tool.Phase]string{},
+		Budget: &BudgetConfig{MaxTokens: 100000, Mode: "graceful"},
+	}
+	project := &Config{
+		Phases: map[tool.Phase]string{},
+		Budget: &BudgetConfig{MaxTokens: 50000, Mode: "hard-stop"},
+	}
+	merged := MergeConfig(base, project)
+	if merged.Budget.MaxTokens != 50000 {
+		t.Errorf("budget = %d, want 50000 (project override)", merged.Budget.MaxTokens)
+	}
+	if merged.Budget.Mode != "hard-stop" {
+		t.Errorf("mode = %q, want hard-stop", merged.Budget.Mode)
+	}
+}
+
+func TestMergeConfigEmpty(t *testing.T) {
+	base := &Config{
+		Phases: map[tool.Phase]string{tool.PhaseBuild: "sonnet"},
+		Budget: &BudgetConfig{MaxTokens: 100000},
+	}
+	project := &Config{
+		Phases: map[tool.Phase]string{},
+	}
+	merged := MergeConfig(base, project)
+	if merged.Phases[tool.PhaseBuild] != "sonnet" {
+		t.Errorf("build = %q, want sonnet (base preserved)", merged.Phases[tool.PhaseBuild])
+	}
+	if merged.Budget == nil || merged.Budget.MaxTokens != 100000 {
+		t.Error("budget should be preserved from base")
+	}
+}
+
+func TestMergeConfigNilMaps(t *testing.T) {
+	base := &Config{} // Phases and ContextWindows both nil
+	project := &Config{
+		Phases:         map[tool.Phase]string{tool.PhaseBuild: "opus"},
+		ContextWindows: map[string]int{"opus": 200000},
+	}
+	merged := MergeConfig(base, project)
+	if merged.Phases[tool.PhaseBuild] != "opus" {
+		t.Errorf("build = %q, want opus", merged.Phases[tool.PhaseBuild])
+	}
+	if merged.ContextWindows["opus"] != 200000 {
+		t.Errorf("context_windows[opus] = %d, want 200000", merged.ContextWindows["opus"])
+	}
+}
+
+func TestMergeConfigNoAlias(t *testing.T) {
+	base := &Config{
+		Phases: map[tool.Phase]string{tool.PhaseBuild: "sonnet"},
+		ContextWindows: map[string]int{"sonnet": 200000},
+	}
+	project := &Config{
+		Phases: map[tool.Phase]string{},
+	}
+	merged := MergeConfig(base, project)
+
+	// Mutate merged — should NOT affect base
+	merged.Phases[tool.PhaseReview] = "haiku"
+	merged.ContextWindows["haiku"] = 100000
+
+	if _, ok := base.Phases[tool.PhaseReview]; ok {
+		t.Error("mutating merged.Phases affected base.Phases (aliased)")
+	}
+	if _, ok := base.ContextWindows["haiku"]; ok {
+		t.Error("mutating merged.ContextWindows affected base.ContextWindows (aliased)")
+	}
+}
+
+func TestMergeConfigContextWindows(t *testing.T) {
+	base := &Config{
+		Phases:         map[tool.Phase]string{},
+		ContextWindows: map[string]int{"sonnet": 200000, "haiku": 100000},
+	}
+	project := &Config{
+		Phases:         map[tool.Phase]string{},
+		ContextWindows: map[string]int{"sonnet": 300000}, // override
+	}
+	merged := MergeConfig(base, project)
+	if merged.ContextWindows["sonnet"] != 300000 {
+		t.Errorf("sonnet = %d, want 300000 (project override)", merged.ContextWindows["sonnet"])
+	}
+	if merged.ContextWindows["haiku"] != 100000 {
+		t.Errorf("haiku = %d, want 100000 (base preserved)", merged.ContextWindows["haiku"])
+	}
+}

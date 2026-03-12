@@ -162,3 +162,49 @@ func TestLoadConfig_NoFile(t *testing.T) {
 		t.Errorf("got %d plugins for missing config", len(cfg))
 	}
 }
+
+func TestMergePluginConfigsBasic(t *testing.T) {
+	base := map[string]PluginConfig{
+		"global-search": {Name: "global-search", Phases: []string{"build"}},
+	}
+	project := map[string]PluginConfig{
+		"project-db": {Name: "project-db", Phases: []string{"build", "review"}},
+	}
+	merged := MergePluginConfigs(base, project)
+	if len(merged) != 2 {
+		t.Fatalf("merged has %d plugins, want 2", len(merged))
+	}
+	if _, ok := merged["global-search"]; !ok {
+		t.Error("missing global-search from base")
+	}
+	if _, ok := merged["project-db"]; !ok {
+		t.Error("missing project-db from project")
+	}
+}
+
+func TestMergePluginConfigsNameCollision(t *testing.T) {
+	base := map[string]PluginConfig{
+		"shared": {Name: "shared", Phases: []string{"build"}},
+	}
+	project := map[string]PluginConfig{
+		"shared": {Name: "shared", Phases: []string{"build", "review"}},
+	}
+	merged := MergePluginConfigs(base, project)
+	if len(merged) != 1 {
+		t.Fatalf("merged has %d plugins, want 1", len(merged))
+	}
+	if len(merged["shared"].Phases) != 2 {
+		t.Errorf("phases = %v, want [build review] (project override)", merged["shared"].Phases)
+	}
+}
+
+func TestMergePluginConfigsNilInputs(t *testing.T) {
+	var base map[string]PluginConfig
+	project := map[string]PluginConfig{
+		"only": {Name: "only"},
+	}
+	merged := MergePluginConfigs(base, project)
+	if len(merged) != 1 {
+		t.Fatalf("merged has %d plugins, want 1", len(merged))
+	}
+}
