@@ -271,8 +271,25 @@ func (l *Loop) executeToolsWithCallbacks(ctx context.Context, calls []provider.T
 				}
 				continue
 			}
-			// "ask" falls through to approver (same as no hook)
-			// "allow" also falls through — hooks can't override trust
+			// "ask" escalates to approver — if no approver (headless), deny
+			if decision == "ask" && l.approver == nil {
+				blocks = append(blocks, provider.ContentBlock{
+					Type:          "tool_result",
+					ToolUseID:     tc.ID,
+					ResultContent: fmt.Sprintf("Tool call %q requires approval but no approver is available (headless mode).", tc.Name),
+					IsError:       true,
+				})
+				if l.streamCB != nil {
+					l.streamCB(StreamEvent{
+						Type:       StreamToolComplete,
+						ToolName:   tc.Name,
+						ToolResult: fmt.Sprintf("Denied (ask without approver): %s", tc.Name),
+						IsError:    true,
+					})
+				}
+				continue
+			}
+			// "allow" falls through — hooks can't override trust
 		}
 
 		// Phase 2: Trust approval (always runs unless hook denied)

@@ -34,9 +34,10 @@ type HookGroup struct {
 
 // HookDef defines a single hook command.
 type HookDef struct {
-	Type    string `json:"type"`    // "command"
-	Command string `json:"command"` // shell command to execute
-	Timeout int    `json:"timeout"` // seconds, 0 = use default
+	Type    string `json:"type"`     // "command"
+	Command string `json:"command"`  // shell command to execute
+	Timeout int    `json:"timeout"`  // seconds, 0 = use default
+	OnError string `json:"on_error"` // "allow" (default) or "deny" — what to do when hook fails/times out
 }
 
 // HookResult holds the outcome of a hook execution.

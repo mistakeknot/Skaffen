@@ -22,21 +22,29 @@ const (
 	MaxTimeout                = 120 // hard cap on any hook timeout
 )
 
-// credentialPrefixes are env var prefixes stripped from hook environments.
+// credentialPrefixes are env var name prefixes stripped from hook environments.
 var credentialPrefixes = []string{
 	"ANTHROPIC_API_KEY",
 	"OPENAI_API_KEY",
-	"AWS_SECRET",
+	"AWS_ACCESS_KEY_ID",
+	"AWS_SECRET_ACCESS_KEY",
+	"AWS_SESSION_TOKEN",
+	"AWS_SECURITY_TOKEN",
 	"GITHUB_TOKEN",
 	"GH_TOKEN",
+	"GITLAB_TOKEN",
+	"BITBUCKET_TOKEN",
+	"NPM_TOKEN",
+	"PYPI_API_TOKEN",
+	"DATABASE_URL",
 }
 
-// HookRunner is the interface consumed by the agent loop.
-type HookRunner interface {
-	PreToolUse(ctx context.Context, toolName string, input json.RawMessage) (Decision, error)
-	PostToolUse(ctx context.Context, toolName string, input json.RawMessage, result string, isError bool)
-	SessionStart(ctx context.Context, mode string)
-	Notify(ctx context.Context, eventType, message, severity string)
+// credentialSuffixes are env var name suffixes that indicate credentials.
+var credentialSuffixes = []string{
+	"_SECRET",
+	"_TOKEN",
+	"_API_KEY",
+	"_PASSWORD",
 }
 
 // Executor runs hook commands for lifecycle events.
@@ -66,7 +74,8 @@ func NewExecutor(cfg *Config, sessionID, workDir, phase string) *Executor {
 func (e *Executor) SetPhase(phase string) { e.phase = phase }
 
 // PreToolUse runs PreToolUse hooks and returns the most restrictive decision.
-// deny > ask > allow. First "deny" short-circuits. Fail-open on errors/timeouts.
+// deny > ask > allow. First "deny" short-circuits.
+// On error/timeout: respects hook's OnError field ("allow" default, "deny" for fail-closed).
 func (e *Executor) PreToolUse(ctx context.Context, toolName string, input json.RawMessage) (Decision, error) {
 	groups := e.matchingGroups(EventPreToolUse, toolName)
 	if len(groups) == 0 {
@@ -80,9 +89,11 @@ func (e *Executor) PreToolUse(ctx context.Context, toolName string, input json.R
 		for _, hook := range group.Hooks {
 			result, err := e.runHook(ctx, hook, DefaultTimeoutPreToolUse, payload)
 			if err != nil {
-				// Fail-open: log and continue
 				e.logger.Printf("warning: PreToolUse hook %q: %v", hook.Command, err)
-				continue
+				if hook.OnError == "deny" {
+					return DecisionDeny, nil // fail-closed for security hooks
+				}
+				continue // fail-open (default)
 			}
 			switch result.Decision {
 			case DecisionDeny:
@@ -178,21 +189,38 @@ func (e *Executor) matchingGroups(event Event, toolName string) []HookGroup {
 }
 
 // safeEnv returns os.Environ() with credential-bearing env vars stripped.
+// Matches by exact prefix on the key name and by suffix patterns like _SECRET, _TOKEN.
 func safeEnv() []string {
 	var filtered []string
 	for _, kv := range os.Environ() {
-		skip := false
-		for _, prefix := range credentialPrefixes {
-			if strings.HasPrefix(kv, prefix+"=") || strings.HasPrefix(kv, prefix+"_") {
-				skip = true
-				break
-			}
+		eqIdx := strings.IndexByte(kv, '=')
+		if eqIdx < 0 {
+			continue
 		}
-		if !skip {
-			filtered = append(filtered, kv)
+		key := kv[:eqIdx]
+		upper := strings.ToUpper(key)
+
+		if isCredentialKey(upper) {
+			continue
 		}
+		filtered = append(filtered, kv)
 	}
 	return filtered
+}
+
+// isCredentialKey returns true if the env var name looks like a credential.
+func isCredentialKey(key string) bool {
+	for _, prefix := range credentialPrefixes {
+		if key == prefix {
+			return true
+		}
+	}
+	for _, suffix := range credentialSuffixes {
+		if strings.HasSuffix(key, suffix) {
+			return true
+		}
+	}
+	return false
 }
 
 // runHook executes a single hook command with timeout and JSON stdin/stdout.

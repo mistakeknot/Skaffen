@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 	"time"
 )
@@ -149,6 +150,32 @@ exit 1`)
 	}
 }
 
+func TestExecutorCrashFailClosed(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("skip on windows")
+	}
+	script := writeScript(t, `#!/bin/sh
+exit 1`)
+
+	cfg := &Config{
+		Hooks: map[Event][]HookGroup{
+			EventPreToolUse: {{
+				Matcher: "*",
+				Hooks:   []HookDef{{Type: "command", Command: script, Timeout: 5, OnError: "deny"}},
+			}},
+		},
+	}
+	exec := NewExecutor(cfg, "test-session", "/tmp", "build")
+
+	result, err := exec.PreToolUse(context.Background(), "bash", json.RawMessage(`{}`))
+	if err != nil {
+		t.Fatalf("crash with on_error=deny should not return error: %v", err)
+	}
+	if result != DecisionDeny {
+		t.Errorf("crash with on_error=deny: decision = %q, want %q (fail-closed)", result, DecisionDeny)
+	}
+}
+
 func TestExecutorFirstDenyShortCircuits(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("skip on windows")
@@ -273,6 +300,40 @@ echo 'not json at all'`)
 	}
 	if result != DecisionAllow {
 		t.Errorf("invalid JSON: decision = %q, want %q (fail-open)", result, DecisionAllow)
+	}
+}
+
+func TestSafeEnvStripsCredentials(t *testing.T) {
+	// Set test env vars that should be stripped
+	t.Setenv("ANTHROPIC_API_KEY", "secret1")
+	t.Setenv("MY_CUSTOM_SECRET", "secret2")    // suffix _SECRET
+	t.Setenv("GITLAB_TOKEN", "secret3")         // prefix match
+	t.Setenv("APP_API_KEY", "secret4")          // suffix _API_KEY
+	t.Setenv("DB_PASSWORD", "secret5")          // suffix _PASSWORD
+	t.Setenv("SAFE_VARIABLE", "visible")        // should NOT be stripped
+	t.Setenv("SKAFFEN_TEST_MARKER", "visible2") // should NOT be stripped
+
+	env := safeEnv()
+	envMap := make(map[string]bool)
+	for _, kv := range env {
+		eqIdx := strings.IndexByte(kv, '=')
+		if eqIdx > 0 {
+			envMap[kv[:eqIdx]] = true
+		}
+	}
+
+	// Should be stripped
+	for _, key := range []string{"ANTHROPIC_API_KEY", "MY_CUSTOM_SECRET", "GITLAB_TOKEN", "APP_API_KEY", "DB_PASSWORD"} {
+		if envMap[key] {
+			t.Errorf("expected %s to be stripped from env", key)
+		}
+	}
+
+	// Should be present
+	for _, key := range []string{"SAFE_VARIABLE", "SKAFFEN_TEST_MARKER"} {
+		if !envMap[key] {
+			t.Errorf("expected %s to be present in env", key)
+		}
 	}
 }
 
