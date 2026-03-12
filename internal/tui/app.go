@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
+	"regexp"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -121,13 +123,15 @@ func newAppModel(cfg Config) *appModel {
 	if cfg.Verbose {
 		cf.SetVerbose(true)
 	}
+	pm := newPromptModel()
+	pm.workDir = cfg.WorkDir
 	return &appModel{
 		viewport:  vp,
 		md:        markdown.New(80),
 		compact:   cf,
 		keys:      keys.NewDefault(keys.WithVim()),
 		status:    newStatusModel(),
-		prompt:    newPromptModel(),
+		prompt:    pm,
 		agent:     cfg.Agent,
 		trust:     cfg.Trust,
 		workDir:   cfg.WorkDir,
@@ -175,7 +179,7 @@ func (m *appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			cmds = append(cmds, cmd)
 			break
 		}
-		// Delegate to prompt when not running
+		// Delegate to prompt (including file picker) when not running
 		if !m.running {
 			var cmd tea.Cmd
 			m.prompt, cmd = m.prompt.Update(msg)
@@ -191,11 +195,12 @@ func (m *appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			break
 		}
 		m.running = true
-		// Render user message
+		// Render user message (original text with @mentions)
 		userStyle := lipgloss.NewStyle().Foreground(theme.Current().Semantic().Primary.Color()).Bold(true)
 		m.viewport.AppendContent("\n" + userStyle.Render("You") + "\n" + msg.Text + "\n")
-		// Start agent
-		cmds = append(cmds, m.runAgent(msg.Text))
+		// Expand @file mentions before sending to agent
+		expanded := expandAtMentions(msg.Text, m.workDir)
+		cmds = append(cmds, m.runAgent(expanded))
 
 	case streamEventMsg:
 		m.handleStreamEvent(agent.StreamEvent(msg))
@@ -230,6 +235,11 @@ func (m *appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.approvalReply <- allowed
 		m.approvalReply = nil
+
+	case filePickerSelectedMsg, filePickerCancelMsg:
+		var cmd tea.Cmd
+		m.prompt, cmd = m.prompt.Update(msg)
+		cmds = append(cmds, cmd)
 
 	case agentDoneMsg:
 		m.running = false
@@ -293,6 +303,39 @@ func (m *appModel) runAgent(prompt string) tea.Cmd {
 		}
 		return agentDoneMsg{Response: result.Response}
 	}
+}
+
+// atMentionRe matches @path tokens in user input.
+var atMentionRe = regexp.MustCompile(`@([\w./_-][\w./_-]*)`)
+
+const maxAtFileSize = 50 * 1024 // 50KB
+
+// expandAtMentions replaces @path tokens with file content blocks.
+// Paths are resolved relative to workDir. Files that don't exist or are
+// too large are left as-is.
+func expandAtMentions(text, workDir string) string {
+	if !strings.Contains(text, "@") {
+		return text
+	}
+	return atMentionRe.ReplaceAllStringFunc(text, func(match string) string {
+		path := match[1:] // strip leading @
+		fullPath := path
+		if !filepath.IsAbs(path) && workDir != "" {
+			fullPath = filepath.Join(workDir, path)
+		}
+		info, err := os.Stat(fullPath)
+		if err != nil || info.IsDir() {
+			return match // leave as-is
+		}
+		if info.Size() > maxAtFileSize {
+			return match // too large, leave as-is
+		}
+		content, err := os.ReadFile(fullPath)
+		if err != nil {
+			return match
+		}
+		return fmt.Sprintf("[File: %s]\n%s\n[/File]", path, string(content))
+	})
 }
 
 // renderDiffPreview generates a diff preview for edit and write tool calls.

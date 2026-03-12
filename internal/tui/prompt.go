@@ -10,13 +10,16 @@ import (
 )
 
 type promptModel struct {
-	input textinput.Model
-	lines []string
+	input   textinput.Model
+	lines   []string
+	picker  filePickerModel
+	picking bool
+	workDir string
 }
 
 func newPromptModel() promptModel {
 	ti := textinput.New()
-	ti.Placeholder = "Ask anything... (Enter to send, Shift+Enter for newline)"
+	ti.Placeholder = "Ask anything... (Enter to send, Shift+Enter for newline, @ to mention files)"
 	ti.Focus()
 	ti.CharLimit = 4096
 	return promptModel{input: ti}
@@ -27,6 +30,32 @@ func (p promptModel) Init() tea.Cmd {
 }
 
 func (p promptModel) Update(msg tea.Msg) (promptModel, tea.Cmd) {
+	// Handle file picker messages
+	switch msg.(type) {
+	case filePickerSelectedMsg:
+		sel := msg.(filePickerSelectedMsg)
+		p.picking = false
+		// Insert @path at current cursor position
+		v := p.input.Value()
+		// Remove trailing @ that triggered the picker
+		if strings.HasSuffix(v, "@") {
+			v = v[:len(v)-1]
+		}
+		p.input.SetValue(v + "@" + sel.Path + " ")
+		p.input.CursorEnd()
+		return p, nil
+	case filePickerCancelMsg:
+		p.picking = false
+		return p, nil
+	}
+
+	// Delegate to picker when active
+	if p.picking {
+		var cmd tea.Cmd
+		p.picker, cmd = p.picker.Update(msg)
+		return p, cmd
+	}
+
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {
@@ -43,6 +72,21 @@ func (p promptModel) Update(msg tea.Msg) (promptModel, tea.Cmd) {
 			p.lines = append(p.lines, p.input.Value())
 			p.input.SetValue("")
 			return p, nil
+		default:
+			// Check for @ trigger: if the rune typed is '@', activate picker
+			if len(msg.Runes) == 1 && msg.Runes[0] == '@' {
+				// Let textinput handle the '@' character first
+				var cmd tea.Cmd
+				p.input, cmd = p.input.Update(msg)
+				// Then open the picker
+				root := p.workDir
+				if root == "" {
+					root = "."
+				}
+				p.picker = newFilePicker(root)
+				p.picking = true
+				return p, cmd
+			}
 		}
 	}
 
@@ -71,7 +115,17 @@ func (p promptModel) View(width int, running bool) string {
 	}
 	display += p.input.View()
 
-	return border.Render(display)
+	result := border.Render(display)
+
+	// Show file picker overlay above prompt if active
+	if p.picking {
+		pickerView := p.picker.View(width)
+		if pickerView != "" {
+			result = pickerView + "\n" + result
+		}
+	}
+
+	return result
 }
 
 func (p promptModel) fullText() string {
@@ -87,4 +141,5 @@ func (p promptModel) fullText() string {
 func (p *promptModel) Reset() {
 	p.input.SetValue("")
 	p.lines = nil
+	p.picking = false
 }
