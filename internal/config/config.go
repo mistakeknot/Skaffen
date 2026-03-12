@@ -73,6 +73,24 @@ func (c *Config) PluginPaths() []string {
 	return paths
 }
 
+// CommandDirs returns command directories to scan for custom slash commands.
+// Returns user-global first, then per-project (for merge precedence).
+// Returns only directories that exist on disk.
+func (c *Config) CommandDirs() []string {
+	var dirs []string
+	userDir := filepath.Join(c.userDir, "commands")
+	if dirExists(userDir) {
+		dirs = append(dirs, userDir)
+	}
+	if c.projectDir != "" {
+		projDir := filepath.Join(c.projectDir, ".skaffen", "commands")
+		if dirExists(projDir) {
+			dirs = append(dirs, projDir)
+		}
+	}
+	return dirs
+}
+
 // SessionDir returns the user-global sessions directory (always ~/.skaffen/sessions).
 func (c *Config) SessionDir() string { return filepath.Join(c.userDir, "sessions") }
 

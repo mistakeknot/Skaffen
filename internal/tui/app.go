@@ -12,6 +12,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/mistakeknot/Skaffen/internal/agent"
+	"github.com/mistakeknot/Skaffen/internal/command"
 	"github.com/mistakeknot/Skaffen/internal/git"
 	"github.com/mistakeknot/Skaffen/internal/session"
 	"github.com/mistakeknot/Skaffen/internal/trust"
@@ -34,9 +35,10 @@ type Config struct {
 	Session    *session.JSONLSession // for context compaction
 	SessionID  string
 	Verbose    bool
-	WorkDir    string
-	SkaffenVer string
-	MasaqVer   string
+	WorkDir        string
+	SkaffenVer     string
+	MasaqVer       string
+	CustomCommands map[string]command.Def
 }
 
 // Run starts the TUI REPL.
@@ -136,6 +138,9 @@ type appModel struct {
 	// Settings overlay
 	settingsOpen    bool
 	settingsOverlay msettings.Model
+
+	// Custom slash commands loaded from disk
+	customCmds map[string]command.Def
 }
 
 func newAppModel(cfg Config) *appModel {
@@ -143,6 +148,7 @@ func newAppModel(cfg Config) *appModel {
 	cf := compact.New(80)
 	pm := newPromptModel()
 	pm.workDir = cfg.WorkDir
+	pm.customCmds = cfg.CustomCommands
 	// Initialize git helper if workDir is a git repo
 	var g *git.Git
 	if cfg.WorkDir != "" {
@@ -190,6 +196,7 @@ func newAppModel(cfg Config) *appModel {
 		phase:      "build",
 		modelName:  "opus",
 		logo:       newLogoModel(skVer, mqVer),
+		customCmds: cfg.CustomCommands,
 	}
 }
 

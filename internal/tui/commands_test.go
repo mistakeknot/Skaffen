@@ -7,6 +7,7 @@ import (
 	"github.com/mistakeknot/Masaq/compact"
 	"github.com/mistakeknot/Masaq/viewport"
 	"github.com/mistakeknot/Skaffen/internal/agent"
+	"github.com/mistakeknot/Skaffen/internal/command"
 	"github.com/mistakeknot/Skaffen/internal/provider"
 	"github.com/mistakeknot/Skaffen/internal/session"
 )
@@ -450,5 +451,138 @@ func TestParseShellEscape(t *testing.T) {
 		if cmd != tt.wantCmd {
 			t.Errorf("ParseShellEscape(%q): cmd = %q, want %q", tt.input, cmd, tt.wantCmd)
 		}
+	}
+}
+
+func TestExecuteCustomCommand_Template(t *testing.T) {
+	m := newTestModel()
+	m.customCmds = map[string]command.Def{
+		"review": {
+			Name:        "review",
+			Description: "Review code",
+			Type:        command.TypeTemplate,
+			Template:    "Please review the code.",
+			Source:      "user",
+		},
+	}
+	result := m.executeCommand(&Command{Name: "review"})
+	if result.IsError {
+		t.Fatalf("template command should not error: %s", result.Message)
+	}
+	if result.Message != "Please review the code." {
+		t.Errorf("Message = %q, want template text", result.Message)
+	}
+}
+
+func TestExecuteCustomCommand_Script(t *testing.T) {
+	m := newTestModel()
+	m.workDir = t.TempDir()
+	m.customCmds = map[string]command.Def{
+		"greet": {
+			Name:        "greet",
+			Description: "Say hello",
+			Type:        command.TypeScript,
+			Script:      "echo hello world",
+			Source:      "project",
+		},
+	}
+	result := m.executeCommand(&Command{Name: "greet"})
+	if result.IsError {
+		t.Fatalf("script command should not error: %s", result.Message)
+	}
+	if !strings.Contains(result.Message, "hello world") {
+		t.Errorf("Message = %q, want 'hello world'", result.Message)
+	}
+}
+
+func TestExecuteCustomCommand_ScriptError(t *testing.T) {
+	m := newTestModel()
+	m.workDir = t.TempDir()
+	m.customCmds = map[string]command.Def{
+		"fail": {
+			Name:   "fail",
+			Type:   command.TypeScript,
+			Script: "exit 1",
+			Source:  "user",
+		},
+	}
+	result := m.executeCommand(&Command{Name: "fail"})
+	if !result.IsError {
+		t.Fatal("failing script should return error")
+	}
+}
+
+func TestExecuteCustomCommand_UnknownFallback(t *testing.T) {
+	m := newTestModel()
+	m.customCmds = map[string]command.Def{}
+	result := m.executeCommand(&Command{Name: "nonexistent"})
+	if !result.IsError {
+		t.Fatal("unknown command should return error")
+	}
+	if !strings.Contains(result.Message, "Unknown command") {
+		t.Errorf("Message = %q, want unknown command error", result.Message)
+	}
+}
+
+func TestHelpIncludesCustomCommands(t *testing.T) {
+	m := newTestModel()
+	m.customCmds = map[string]command.Def{
+		"review": {
+			Name:        "review",
+			Description: "Review changes",
+			Type:        command.TypeTemplate,
+			Template:    "review",
+			Source:      "user",
+		},
+	}
+	result := m.executeCommand(&Command{Name: "help"})
+	if !strings.Contains(result.Message, "/review") {
+		t.Error("help should include custom command /review")
+	}
+	if !strings.Contains(result.Message, "Review changes") {
+		t.Error("help should include custom command description")
+	}
+}
+
+func TestCustomCommandDoesNotOverrideBuiltin(t *testing.T) {
+	m := newTestModel()
+	m.customCmds = map[string]command.Def{
+		"help": {
+			Name:     "help",
+			Type:     command.TypeTemplate,
+			Template: "custom help",
+			Source:   "user",
+		},
+	}
+	result := m.executeCommand(&Command{Name: "help"})
+	// Built-in help should win since it's in the switch/case
+	if !strings.Contains(result.Message, "Available commands") {
+		t.Error("built-in /help should take precedence over custom /help")
+	}
+}
+
+func TestCompleterIncludesCustomCommands(t *testing.T) {
+	custom := map[string]command.Def{
+		"deploy": {
+			Name:        "deploy",
+			Description: "Deploy to prod",
+			Type:        command.TypeScript,
+			Script:      "deploy.sh",
+			Source:      "project",
+		},
+	}
+	cc := newCmdCompleter(custom)
+	found := false
+	for _, e := range cc.commands {
+		if e.name == "deploy" {
+			found = true
+			if e.desc != "Deploy to prod" {
+				t.Errorf("deploy desc = %q, want 'Deploy to prod'", e.desc)
+			}
+			break
+		}
+	}
+	if !found {
+		t.Error("completer should include custom command 'deploy'")
 	}
 }

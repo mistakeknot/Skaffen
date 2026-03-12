@@ -11,6 +11,7 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/mistakeknot/Skaffen/internal/command"
 	"github.com/mistakeknot/Skaffen/internal/session"
 	msettings "github.com/mistakeknot/Masaq/settings"
 )
@@ -70,7 +71,17 @@ func KnownCommands() map[string]string {
 
 // FormatHelp renders the help text for all commands in sorted order.
 func FormatHelp() string {
+	return formatHelpWithCustom(nil)
+}
+
+// formatHelpWithCustom renders help text for built-in + custom commands.
+func formatHelpWithCustom(custom map[string]command.Def) string {
 	cmds := KnownCommands()
+	for name, def := range custom {
+		if _, exists := cmds[name]; !exists {
+			cmds[name] = def.Description
+		}
+	}
 	names := make([]string, 0, len(cmds))
 	for name := range cmds {
 		names = append(names, name)
@@ -89,7 +100,7 @@ func FormatHelp() string {
 func (m *appModel) executeCommand(cmd *Command) CommandResult {
 	switch cmd.Name {
 	case "help":
-		return CommandResult{Message: FormatHelp()}
+		return CommandResult{Message: formatHelpWithCustom(m.customCmds)}
 
 	case "quit":
 		return CommandResult{Message: "Goodbye!", Quit: true}
@@ -163,8 +174,56 @@ func (m *appModel) executeCommand(cmd *Command) CommandResult {
 		return m.execListSessions()
 
 	default:
+		// Check custom commands loaded from disk
+		if def, ok := m.customCmds[cmd.Name]; ok {
+			return m.execCustomCommand(def, cmd.Args)
+		}
 		return CommandResult{
 			Message: fmt.Sprintf("Unknown command /%s. Type /help for available commands.", cmd.Name),
+			IsError: true,
+		}
+	}
+}
+
+// execCustomCommand dispatches a disk-based custom command.
+func (m *appModel) execCustomCommand(def command.Def, args []string) CommandResult {
+	switch def.Type {
+	case command.TypeTemplate:
+		// Template commands inject text as a user prompt.
+		// The caller (Update) handles submitting the returned message as input.
+		return CommandResult{Message: def.Template}
+	case command.TypeScript:
+		// Script commands run via shell with a timeout.
+		ctx, cancel := context.WithTimeout(context.Background(), shellTimeout)
+		defer cancel()
+
+		cmd := exec.CommandContext(ctx, "bash", "-c", def.Script)
+		cmd.Dir = m.workDir
+		out, err := cmd.CombinedOutput()
+
+		output := string(out)
+		if len(output) > shellMaxOutput {
+			output = output[:shellMaxOutput] + "\n... (truncated)"
+		}
+		if ctx.Err() == context.DeadlineExceeded {
+			return CommandResult{
+				Message: fmt.Sprintf("/%s timed out after %s:\n%s", def.Name, shellTimeout, output),
+				IsError: true,
+			}
+		}
+		if err != nil {
+			return CommandResult{
+				Message: fmt.Sprintf("/%s failed: %v\n%s", def.Name, err, output),
+				IsError: true,
+			}
+		}
+		if output == "" {
+			return CommandResult{Message: fmt.Sprintf("/%s completed (no output).", def.Name)}
+		}
+		return CommandResult{Message: output}
+	default:
+		return CommandResult{
+			Message: fmt.Sprintf("Unknown command type %q for /%s", def.Type, def.Name),
 			IsError: true,
 		}
 	}

@@ -15,6 +15,7 @@ import (
 
 	"github.com/mistakeknot/Masaq/theme"
 	"github.com/mistakeknot/Skaffen/internal/agent"
+	"github.com/mistakeknot/Skaffen/internal/command"
 	"github.com/mistakeknot/Skaffen/internal/config"
 	"github.com/mistakeknot/Skaffen/internal/contextfiles"
 	"github.com/mistakeknot/Skaffen/internal/evidence"
@@ -368,19 +369,23 @@ func runTUI() error {
 	// Trust evaluator
 	trustEval := trust.NewEvaluator(nil)
 
+	// Load custom slash commands from disk
+	customCmds := command.LoadAll(cfg.CommandDirs()...)
+
 	// Create agent
 	a := agent.New(p, reg, opts...)
 
 	// Run TUI
 	return tui.Run(tui.Config{
-		Agent:      a,
-		Trust:      trustEval,
-		Session:    tuiSession,
-		SessionID:  sessionID,
-		Verbose:    false,
-		WorkDir:    cfg.WorkDir(),
-		SkaffenVer: skaffenVersion(),
-		MasaqVer:   masaqVersion(),
+		Agent:          a,
+		Trust:          trustEval,
+		Session:        tuiSession,
+		SessionID:      sessionID,
+		Verbose:        false,
+		WorkDir:        cfg.WorkDir(),
+		SkaffenVer:     skaffenVersion(),
+		MasaqVer:       masaqVersion(),
+		CustomCommands: customCmds,
 	})
 }
 

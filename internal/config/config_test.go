@@ -241,6 +241,51 @@ func TestSessionDirAlwaysUserGlobal(t *testing.T) {
 	}
 }
 
+func TestCommandDirs(t *testing.T) {
+	root := t.TempDir()
+
+	userDir := filepath.Join(root, "user")
+	userCmds := filepath.Join(userDir, "commands")
+	if err := os.MkdirAll(userCmds, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	projDir := filepath.Join(root, "project")
+	projCmds := filepath.Join(projDir, ".skaffen", "commands")
+	if err := os.MkdirAll(projCmds, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := &Config{
+		userDir:    userDir,
+		projectDir: projDir,
+		workDir:    projDir,
+	}
+
+	dirs := cfg.CommandDirs()
+	if len(dirs) != 2 {
+		t.Fatalf("CommandDirs = %v, want 2 dirs", dirs)
+	}
+	if dirs[0] != userCmds {
+		t.Errorf("dirs[0] = %q, want user commands dir", dirs[0])
+	}
+	if dirs[1] != projCmds {
+		t.Errorf("dirs[1] = %q, want project commands dir", dirs[1])
+	}
+}
+
+func TestCommandDirsNone(t *testing.T) {
+	cfg := &Config{
+		userDir:    "/nonexistent/user",
+		projectDir: "",
+		workDir:    "/tmp",
+	}
+	dirs := cfg.CommandDirs()
+	if len(dirs) != 0 {
+		t.Fatalf("CommandDirs = %v, want 0 dirs", dirs)
+	}
+}
+
 func TestFileExists(t *testing.T) {
 	dir := t.TempDir()
 	f := filepath.Join(dir, "test.txt")
