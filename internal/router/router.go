@@ -112,6 +112,11 @@ func (r *DefaultRouter) SelectModel(phase tool.Phase) (string, string) {
 		model, reason = r.budget.MaybeDegrade(model, reason)
 	}
 
+	// Record routing decision to Intercore (fire-and-forget)
+	if r.ic != nil {
+		r.ic.RecordDecision(r.buildDecisionRecord(phase, model, reason))
+	}
+
 	return model, reason
 }
 
@@ -166,6 +171,21 @@ func (r *DefaultRouter) ContextWindow(model string) int {
 		return w
 	}
 	return 200000 // safe default
+}
+
+// buildDecisionRecord creates a DecisionRecord from the current routing state.
+func (r *DefaultRouter) buildDecisionRecord(phase tool.Phase, model, reason string) DecisionRecord {
+	rec := DecisionRecord{
+		Agent:     "skaffen",
+		Model:     model,
+		Rule:      reason,
+		Phase:     string(phase),
+		SessionID: r.sessionID,
+	}
+	if r.lastOverride != nil {
+		rec.Complexity = r.lastOverride.Tier
+	}
+	return rec
 }
 
 // resolveModelAlias converts short aliases to canonical model IDs.

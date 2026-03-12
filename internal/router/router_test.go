@@ -240,3 +240,37 @@ func TestNewWithIC_SessionID(t *testing.T) {
 		t.Errorf("sessionID = %q, want my-session", r.sessionID)
 	}
 }
+
+func TestBuildDecisionRecord(t *testing.T) {
+	r := New(&Config{})
+	r.sessionID = "test-session"
+	rec := r.buildDecisionRecord(tool.PhaseBuild, "claude-sonnet-4-6", "phase-default")
+	if rec.Agent != "skaffen" {
+		t.Errorf("agent = %q, want skaffen", rec.Agent)
+	}
+	if rec.Model != "claude-sonnet-4-6" {
+		t.Errorf("model = %q", rec.Model)
+	}
+	if rec.Rule != "phase-default" {
+		t.Errorf("rule = %q", rec.Rule)
+	}
+	if rec.Phase != "build" {
+		t.Errorf("phase = %q", rec.Phase)
+	}
+	if rec.SessionID != "test-session" {
+		t.Errorf("session = %q", rec.SessionID)
+	}
+}
+
+func TestBuildDecisionRecordWithComplexity(t *testing.T) {
+	r := New(&Config{
+		Complexity: &ComplexityConfig{Mode: "shadow"},
+	})
+	r.sessionID = "test-session"
+	r.SetInputTokens(5000) // Will classify as C5
+	r.SelectModel(tool.PhaseBuild) // Populates lastOverride
+	rec := r.buildDecisionRecord(tool.PhaseBuild, ModelSonnet, "phase-default")
+	if rec.Complexity != 5 {
+		t.Errorf("complexity = %d, want 5", rec.Complexity)
+	}
+}
