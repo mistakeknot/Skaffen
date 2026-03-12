@@ -6,6 +6,9 @@ import (
 
 	"github.com/mistakeknot/Masaq/compact"
 	"github.com/mistakeknot/Masaq/viewport"
+	"github.com/mistakeknot/Skaffen/internal/agent"
+	"github.com/mistakeknot/Skaffen/internal/provider"
+	"github.com/mistakeknot/Skaffen/internal/session"
 )
 
 func TestParseSlashCommand(t *testing.T) {
@@ -98,6 +101,7 @@ func newTestModel() *appModel {
 	return &appModel{
 		compact:    compact.New(80),
 		viewport:   viewport.New(80, 20),
+		session:    session.New("test", "", "", 20),
 		settings:   defaultSettings(),
 		phase:      "build",
 		modelName:  "opus",
@@ -134,19 +138,50 @@ func TestExecuteCommand_Clear(t *testing.T) {
 	}
 }
 
-func TestExecuteCommand_Compact(t *testing.T) {
+func TestExecuteCommand_CompactSmallContext(t *testing.T) {
 	m := newTestModel()
-	m.compact.SetVerbose(true)
-	m.settings.Verbose = true
+	result := m.executeCommand(&Command{Name: "compact"})
+	if result.IsError {
+		t.Fatalf("compact on small context should not error: %s", result.Message)
+	}
+	if !strings.Contains(result.Message, "nothing to compact") {
+		t.Fatalf("should say nothing to compact, got: %s", result.Message)
+	}
+}
+
+func TestExecuteCommand_CompactLargeContext(t *testing.T) {
+	m := newTestModel()
+	m.contextPct = 75.0
+	m.turns = 10
+	// Add enough messages to trigger compaction
+	for i := 0; i < 20; i++ {
+		m.session.Save(agent.Turn{
+			Messages: []provider.Message{
+				{Role: provider.RoleUser, Content: []provider.ContentBlock{{Type: "text", Text: "hello"}}},
+				{Role: provider.RoleAssistant, Content: []provider.ContentBlock{{Type: "text", Text: "world"}}},
+			},
+		})
+	}
+	before := m.session.MessageCount()
 	result := m.executeCommand(&Command{Name: "compact"})
 	if result.IsError {
 		t.Fatalf("compact should not error: %s", result.Message)
 	}
-	if m.compact.IsVerbose() {
-		t.Fatal("compact should have set verbose=false on formatter")
+	after := m.session.MessageCount()
+	if after >= before {
+		t.Fatalf("compact should reduce messages: before=%d, after=%d", before, after)
 	}
-	if m.settings.Verbose {
-		t.Fatal("compact should have set settings.Verbose=false")
+	if !strings.Contains(result.Message, "Compacted") {
+		t.Fatalf("should report compaction, got: %s", result.Message)
+	}
+}
+
+func TestExecuteCommand_CompactNoSession(t *testing.T) {
+	m := newTestModel()
+	m.session = nil
+	result := m.executeCommand(&Command{Name: "compact"})
+	if !result.IsError {
+		t.Fatal("compact without session should be an error")
 	}
 }
 

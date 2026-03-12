@@ -51,7 +51,7 @@ func KnownCommands() map[string]string {
 		"advance":  "Advance to next OODARC phase",
 		"clear":    "Clear viewport",
 		"commit":   "Auto-commit current changes",
-		"compact":  "Switch to compact tool call display",
+		"compact":  "Compact context (free tokens by summarizing old turns)",
 		"diff":     "Show git diff",
 		"help":     "Show available commands",
 		"model":    "Show or switch model (opus, sonnet, haiku)",
@@ -99,9 +99,7 @@ func (m *appModel) executeCommand(cmd *Command) CommandResult {
 		return CommandResult{Message: "Viewport cleared."}
 
 	case "compact":
-		m.compact.SetVerbose(false)
-		m.settings.Verbose = false
-		return CommandResult{Message: "Switched to compact display."}
+		return m.execCompact()
 
 	case "verbose":
 		m.compact.SetVerbose(true)
@@ -352,6 +350,35 @@ func (m *appModel) execListSessions() CommandResult {
 	}
 	b.WriteString("\nResume with: skaffen -r <session-id>")
 	return CommandResult{Message: b.String()}
+}
+
+const compactKeepRecent = 4 // keep last 4 messages (2 turns) after compaction
+
+func (m *appModel) execCompact() CommandResult {
+	if m.session == nil {
+		return CommandResult{Message: "No session available for compaction.", IsError: true}
+	}
+	beforeCount := m.session.MessageCount()
+	if beforeCount <= compactKeepRecent+1 {
+		return CommandResult{Message: fmt.Sprintf("Context is small (%d messages) — nothing to compact.", beforeCount)}
+	}
+
+	// Build a simple summary from the kept messages' context
+	summary := fmt.Sprintf("Previous conversation had %d messages covering %d turns.", beforeCount, m.turns)
+	before, after := m.session.Compact(summary, compactKeepRecent)
+
+	beforePct := m.contextPct
+	// Estimate new context %: rough proportional reduction
+	if before > 0 {
+		m.contextPct = m.contextPct * float64(after) / float64(before)
+	}
+
+	return CommandResult{
+		Message: fmt.Sprintf(
+			"Compacted: %d → %d messages (%.0f%% → ~%.0f%% context)",
+			before, after, beforePct, m.contextPct,
+		),
+	}
 }
 
 // commandResultMsg wraps a CommandResult for the Bubble Tea message loop.

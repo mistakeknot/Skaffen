@@ -201,6 +201,75 @@ func TestConcurrentSaves(t *testing.T) {
 	}
 }
 
+func TestMessageCount(t *testing.T) {
+	dir := t.TempDir()
+	s := session.New("count", dir, "sys", 20)
+	if s.MessageCount() != 0 {
+		t.Fatal("empty session should have 0 messages")
+	}
+	s.Save(agent.Turn{
+		Phase: tool.PhaseBuild,
+		Messages: []provider.Message{
+			{Role: provider.RoleUser, Content: []provider.ContentBlock{{Type: "text", Text: "hi"}}},
+			{Role: provider.RoleAssistant, Content: []provider.ContentBlock{{Type: "text", Text: "hello"}}},
+		},
+	})
+	if s.MessageCount() != 2 {
+		t.Fatalf("after 1 turn: MessageCount = %d, want 2", s.MessageCount())
+	}
+}
+
+func TestCompactReducesMessages(t *testing.T) {
+	dir := t.TempDir()
+	s := session.New("comp", dir, "sys", 100)
+
+	// Add 20 messages (10 turns)
+	for i := 0; i < 10; i++ {
+		s.Save(agent.Turn{
+			Phase: tool.PhaseBuild,
+			Messages: []provider.Message{
+				{Role: provider.RoleUser, Content: []provider.ContentBlock{{Type: "text", Text: "q"}}},
+				{Role: provider.RoleAssistant, Content: []provider.ContentBlock{{Type: "text", Text: "a"}}},
+			},
+		})
+	}
+	if s.MessageCount() != 20 {
+		t.Fatalf("before compact: %d, want 20", s.MessageCount())
+	}
+
+	before, after := s.Compact("summary of 10 turns", 4)
+	if before != 20 {
+		t.Fatalf("before = %d, want 20", before)
+	}
+	// 1 summary + 4 recent = 5
+	if after != 5 {
+		t.Fatalf("after = %d, want 5", after)
+	}
+	// Verify summary message is first
+	msgs := s.Messages()
+	if len(msgs[0].Content) == 0 || msgs[0].Content[0].Text == "" {
+		t.Fatal("first message should be summary")
+	}
+	if msgs[0].Role != provider.RoleUser {
+		t.Fatalf("summary role = %q, want user", msgs[0].Role)
+	}
+}
+
+func TestCompactSmallContextNoOp(t *testing.T) {
+	dir := t.TempDir()
+	s := session.New("small", dir, "sys", 100)
+	s.Save(agent.Turn{
+		Phase: tool.PhaseBuild,
+		Messages: []provider.Message{
+			{Role: provider.RoleUser, Content: []provider.ContentBlock{{Type: "text", Text: "hi"}}},
+		},
+	})
+	before, after := s.Compact("summary", 4)
+	if before != after {
+		t.Fatalf("small context should be no-op: before=%d, after=%d", before, after)
+	}
+}
+
 func TestLoadNonexistentFile(t *testing.T) {
 	dir := t.TempDir()
 	s := session.New("nofile", dir, "sys", 20)

@@ -13,6 +13,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/mistakeknot/Skaffen/internal/agent"
 	"github.com/mistakeknot/Skaffen/internal/git"
+	"github.com/mistakeknot/Skaffen/internal/session"
 	"github.com/mistakeknot/Skaffen/internal/trust"
 	"github.com/mistakeknot/Masaq/breadcrumb"
 	"github.com/mistakeknot/Masaq/compact"
@@ -30,6 +31,7 @@ import (
 type Config struct {
 	Agent      *agent.Agent
 	Trust      *trust.Evaluator
+	Session    *session.JSONLSession // for context compaction
 	SessionID  string
 	Verbose    bool
 	WorkDir    string
@@ -108,6 +110,7 @@ type appModel struct {
 	prompt        promptModel
 	agent         *agent.Agent
 	trust         *trust.Evaluator
+	session       *session.JSONLSession
 	git           *git.Git
 	program       *tea.Program
 	workDir       string
@@ -178,6 +181,7 @@ func newAppModel(cfg Config) *appModel {
 		prompt:     pm,
 		agent:      cfg.Agent,
 		trust:      cfg.Trust,
+		session:    cfg.Session,
 		git:        g,
 		workDir:    cfg.WorkDir,
 		settings:   s,
@@ -482,6 +486,15 @@ func (m *appModel) handleStreamEvent(ev agent.StreamEvent) {
 		m.turns = ev.TurnNumber
 		if ev.Usage.InputTokens > 0 {
 			m.contextPct = float64(ev.Usage.InputTokens) / 200000.0 * 100
+		}
+		// Auto-compact when context exceeds 80%
+		if m.settings.AutoCompact && m.contextPct > 80 && m.session != nil {
+			result := m.execCompact()
+			if !result.IsError && result.Message != "" {
+				c := theme.Current().Semantic()
+				infoStyle := lipgloss.NewStyle().Foreground(c.FgDim.Color())
+				m.viewport.AppendContent("\n" + infoStyle.Render("Auto-compact: "+result.Message) + "\n")
+			}
 		}
 	case agent.StreamPhaseChange:
 		m.phase = ev.Phase

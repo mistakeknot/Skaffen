@@ -304,13 +304,14 @@ func runTUI() error {
 	workDir, _ := os.Getwd()
 	systemPrompt := buildSystemPrompt(workDir, *flagSystem)
 
+	var tuiSession *session.JSONLSession
 	if *flagSession != "" {
 		dir := filepath.Join(os.Getenv("HOME"), ".skaffen", "sessions")
-		sess := session.New(*flagSession, dir, systemPrompt, 20)
-		if err := sess.Load(); err != nil {
+		tuiSession = session.New(*flagSession, dir, systemPrompt, 20)
+		if err := tuiSession.Load(); err != nil {
 			fmt.Fprintf(os.Stderr, "skaffen: warning: load session: %v\n", err)
 		}
-		opts = append(opts, agent.WithSession(sess))
+		opts = append(opts, agent.WithSession(tuiSession))
 	} else if systemPrompt != "" {
 		opts = append(opts, agent.WithSession(&agent.NoOpSession{Prompt: systemPrompt}))
 	}
@@ -330,6 +331,7 @@ func runTUI() error {
 	return tui.Run(tui.Config{
 		Agent:      a,
 		Trust:      trustEval,
+		Session:    tuiSession,
 		SessionID:  sessionID,
 		Verbose:    false,
 		WorkDir:    workDir,

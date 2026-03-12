@@ -16,6 +16,7 @@ type settings struct {
 	ShowToolResults bool   // show successful tool results, not just errors
 	DiffPreview     bool   // show inline diff preview on edit/write approval
 	AutoScroll      bool   // viewport follows new content
+	AutoCompact     bool   // auto-compact context when threshold exceeded
 	Timestamps      bool   // show timestamps on messages
 	Theme           string // active theme name
 	ColorMode       string // "dark" or "light"
@@ -27,6 +28,7 @@ func defaultSettings() settings {
 		ShowToolResults: false,
 		DiffPreview:     true,
 		AutoScroll:      true,
+		AutoCompact:     true,
 		Timestamps:      false,
 		Theme:           theme.Current().Name,
 		ColorMode:       theme.CurrentMode().String(),
@@ -98,6 +100,20 @@ var settingsRegistry = []settingEntry{
 				return err
 			}
 			s.AutoScroll = b
+			return nil
+		},
+	},
+	{
+		Key:         "auto-compact",
+		Description: "Auto-compact context when >80% full",
+		EntryType:   msettings.TypeBool,
+		Get:         func(s *settings) string { return fmtBool(s.AutoCompact) },
+		Set: func(s *settings, val string) error {
+			b, err := parseBool(val)
+			if err != nil {
+				return err
+			}
+			s.AutoCompact = b
 			return nil
 		},
 	},

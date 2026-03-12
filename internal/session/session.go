@@ -135,6 +135,43 @@ func (s *JSONLSession) Load() error {
 	return nil
 }
 
+// MessageCount returns the number of messages in the conversation history.
+func (s *JSONLSession) MessageCount() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return len(s.messages)
+}
+
+// Compact replaces the conversation history with a single summary message,
+// preserving only the most recent keepRecent messages for continuity.
+// Returns the message count before and after compaction.
+func (s *JSONLSession) Compact(summary string, keepRecent int) (before, after int) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	before = len(s.messages)
+	if before <= keepRecent+1 {
+		after = before
+		return // nothing to compact
+	}
+
+	summaryMsg := provider.Message{
+		Role: provider.RoleUser,
+		Content: []provider.ContentBlock{
+			{Type: "text", Text: "[Context summary from earlier conversation]\n\n" + summary},
+		},
+	}
+
+	var compacted []provider.Message
+	compacted = append(compacted, summaryMsg)
+	if keepRecent > 0 && keepRecent < before {
+		compacted = append(compacted, s.messages[before-keepRecent:]...)
+	}
+	s.messages = compacted
+	after = len(s.messages)
+	return
+}
+
 // truncate keeps the conversation within maxTurns bounds.
 // Keeps the first message (context anchor) + last maxTurns*2 messages.
 func (s *JSONLSession) truncate() {
