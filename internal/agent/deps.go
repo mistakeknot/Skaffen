@@ -14,6 +14,7 @@ type (
 	ToolApprover    = agentloop.ToolApprover
 	BudgetState     = agentloop.BudgetState
 	RenderReporter  = agentloop.RenderReporter
+	HookRunner      = agentloop.HookRunner
 )
 
 // Re-export stream event type constants.

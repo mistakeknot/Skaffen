@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 
 	"github.com/mistakeknot/Skaffen/internal/agentloop"
+	"github.com/mistakeknot/Skaffen/internal/hooks"
 	"github.com/mistakeknot/Skaffen/internal/provider"
 	"github.com/mistakeknot/Skaffen/internal/tool"
 )
@@ -21,6 +22,7 @@ type Agent struct {
 	sessionID string // for evidence attribution
 	streamCB  StreamCallback
 	approver  ToolApprover
+	hookExec  *hooks.Executor // lifecycle hooks (nil = disabled)
 
 	maxTurns int // safety limit, default 100
 }
@@ -50,6 +52,9 @@ func WithSessionID(id string) Option { return func(a *Agent) { a.sessionID = id 
 
 // WithStreamCallback sets a callback that receives real-time streaming events.
 func WithStreamCallback(cb StreamCallback) Option { return func(a *Agent) { a.streamCB = cb } }
+
+// WithHooks sets the lifecycle hook executor.
+func WithHooks(h *hooks.Executor) Option { return func(a *Agent) { a.hookExec = h } }
 
 // New creates an Agent with the given provider, tool registry, and options.
 func New(p provider.Provider, reg *tool.Registry, opts ...Option) *Agent {
@@ -132,6 +137,9 @@ func (a *Agent) Run(ctx context.Context, task string) (*RunResult, error) {
 	}
 	if a.streamCB != nil {
 		loopOpts = append(loopOpts, agentloop.WithStreamCallback(a.streamCB))
+	}
+	if a.hookExec != nil {
+		loopOpts = append(loopOpts, agentloop.WithHooks(&hookAdapter{exec: a.hookExec}))
 	}
 
 	loop := agentloop.New(a.provider, loopReg, loopOpts...)
@@ -256,4 +264,19 @@ func (ea *emitterAdapter) Emit(ev agentloop.Evidence) error {
 		Model:              ev.Model,
 		ModelReason:        ev.ModelReason,
 	})
+}
+
+// hookAdapter bridges hooks.Executor → agentloop.HookRunner.
+// This matches the routerAdapter/sessionAdapter/emitterAdapter pattern.
+type hookAdapter struct {
+	exec *hooks.Executor
+}
+
+func (a *hookAdapter) PreToolUse(ctx context.Context, toolName string, input json.RawMessage) (string, error) {
+	decision, err := a.exec.PreToolUse(ctx, toolName, input)
+	return string(decision), err
+}
+
+func (a *hookAdapter) PostToolUse(ctx context.Context, toolName string, input json.RawMessage, result string, isError bool) {
+	a.exec.PostToolUse(ctx, toolName, input, result, isError)
 }
