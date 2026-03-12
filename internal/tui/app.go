@@ -12,6 +12,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/mistakeknot/Skaffen/internal/agent"
+	"github.com/mistakeknot/Skaffen/internal/git"
 	"github.com/mistakeknot/Skaffen/internal/trust"
 	"github.com/mistakeknot/Masaq/compact"
 	"github.com/mistakeknot/Masaq/diff"
@@ -101,6 +102,7 @@ type appModel struct {
 	prompt        promptModel
 	agent         *agent.Agent
 	trust         *trust.Evaluator
+	git           *git.Git
 	program       *tea.Program
 	workDir       string
 	phase         string
@@ -125,6 +127,14 @@ func newAppModel(cfg Config) *appModel {
 	}
 	pm := newPromptModel()
 	pm.workDir = cfg.WorkDir
+	// Initialize git helper if workDir is a git repo
+	var g *git.Git
+	if cfg.WorkDir != "" {
+		g = git.New(cfg.WorkDir)
+		if !g.IsRepo() {
+			g = nil
+		}
+	}
 	return &appModel{
 		viewport:  vp,
 		md:        markdown.New(80),
@@ -134,6 +144,7 @@ func newAppModel(cfg Config) *appModel {
 		prompt:    pm,
 		agent:     cfg.Agent,
 		trust:     cfg.Trust,
+		git:       g,
 		workDir:   cfg.WorkDir,
 		phase:     "build",
 		modelName: "claude",
@@ -204,6 +215,14 @@ func (m *appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.running {
 			break
 		}
+		// Check for slash commands before sending to agent
+		if cmd := ParseCommand(msg.Text); cmd != nil {
+			cmdStyle := lipgloss.NewStyle().Foreground(theme.Current().Semantic().FgDim.Color())
+			m.viewport.AppendContent("\n" + cmdStyle.Render("/"+cmd.Name) + "\n")
+			cmds = append(cmds, m.runCommand(cmd))
+			m.prompt.Reset()
+			break
+		}
 		m.running = true
 		// Render user message (original text with @mentions)
 		userStyle := lipgloss.NewStyle().Foreground(theme.Current().Semantic().Primary.Color()).Bold(true)
@@ -250,6 +269,17 @@ func (m *appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		var cmd tea.Cmd
 		m.prompt, cmd = m.prompt.Update(msg)
 		cmds = append(cmds, cmd)
+
+	case commandResultMsg:
+		if msg.IsError {
+			errStyle := lipgloss.NewStyle().Foreground(theme.Current().Semantic().Error.Color())
+			m.viewport.AppendContent(errStyle.Render(msg.Message) + "\n")
+		} else {
+			m.viewport.AppendContent(msg.Message + "\n")
+		}
+		if msg.Quit {
+			return m, tea.Quit
+		}
 
 	case agentDoneMsg:
 		m.running = false

@@ -14,6 +14,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/mistakeknot/Masaq/theme"
 	"github.com/mistakeknot/Skaffen/internal/agent"
 	"github.com/mistakeknot/Skaffen/internal/evidence"
 	"github.com/mistakeknot/Skaffen/internal/mcp"
@@ -39,13 +40,18 @@ var (
 	flagSession  = flag.String("session", "", "Session ID for persistence (creates ~/.skaffen/sessions/<id>.jsonl)")
 	flagBudget   = flag.Int("budget", 0, "Per-session token budget (0 = unlimited)")
 	flagMode     = flag.String("mode", "tui", "Execution mode: tui (default), print")
-	flagResume   = flag.Bool("c", false, "Resume last session")
-	flagResumeID = flag.String("r", "", "Resume specific session by ID")
-	flagPlugins  = flag.String("plugins", "", "Path to plugins.toml (default: ~/.skaffen/plugins.toml)")
+	flagResume    = flag.Bool("c", false, "Resume last session")
+	flagResumeID  = flag.String("r", "", "Resume specific session by ID")
+	flagPlugins   = flag.String("plugins", "", "Path to plugins.toml (default: ~/.skaffen/plugins.toml)")
+	flagColorMode = flag.String("color-mode", "", "Color mode: dark, light (default: auto-detect)")
+	flagTheme     = flag.String("theme", "", "Theme: tokyonight, catppuccin (default: Tokyo Night)")
 )
 
 func main() {
 	flag.Parse()
+
+	// Theme & color mode — apply before any rendering
+	setupTheme()
 
 	// Subcommand routing
 	if flag.NArg() > 0 {
@@ -361,6 +367,31 @@ func loadMCPPlugins(ctx context.Context, reg *tool.Registry) *mcp.Manager {
 	fmt.Fprintf(os.Stderr, "skaffen: loaded %d MCP plugin(s), %d tool(s)\n",
 		mgr.PluginCount(), mgr.ToolCount())
 	return mgr
+}
+
+// setupTheme configures the Masaq theme and color mode from CLI flags.
+// Falls back to DetectMode() for color mode, TokyoNight for theme.
+func setupTheme() {
+	// Color mode: CLI flag > env var > terminal detection
+	if *flagColorMode != "" {
+		switch strings.ToLower(*flagColorMode) {
+		case "light":
+			theme.SetMode(theme.Light)
+		default:
+			theme.SetMode(theme.Dark)
+		}
+	} else {
+		theme.SetMode(theme.DetectMode())
+	}
+
+	// Theme selection
+	if *flagTheme != "" {
+		if t, ok := theme.ThemeByName(*flagTheme); ok {
+			theme.SetCurrent(t)
+		} else {
+			fmt.Fprintf(os.Stderr, "skaffen: unknown theme %q, using default\n", *flagTheme)
+		}
+	}
 }
 
 func printVersion() {

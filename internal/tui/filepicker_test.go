@@ -3,6 +3,7 @@ package tui
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -324,7 +325,7 @@ func TestExpandAtMentionsMultiple(t *testing.T) {
 
 func containsAll(s string, subs ...string) bool {
 	for _, sub := range subs {
-		if !contains(s, sub) {
+		if !strings.Contains(s, sub) {
 			return false
 		}
 	}
