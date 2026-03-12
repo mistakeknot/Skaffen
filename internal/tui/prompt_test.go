@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"os"
 	"strings"
 	"testing"
 
@@ -144,5 +145,104 @@ func TestPromptCharLimit(t *testing.T) {
 	p := newPromptModel()
 	if p.input.CharLimit != 4096 {
 		t.Errorf("char limit = %d, want 4096", p.input.CharLimit)
+	}
+}
+
+func TestPromptCtrlGReturnsCmd(t *testing.T) {
+	p := newPromptModel()
+	p.input.SetValue("some text")
+	_, cmd := p.Update(tea.KeyMsg{Type: tea.KeyCtrlG})
+	if cmd == nil {
+		t.Fatal("Ctrl+G should return a command")
+	}
+}
+
+func TestOpenEditorFallbackChain(t *testing.T) {
+	// Save and restore env
+	origVisual := os.Getenv("VISUAL")
+	origEditor := os.Getenv("EDITOR")
+	defer func() {
+		os.Setenv("VISUAL", origVisual)
+		os.Setenv("EDITOR", origEditor)
+	}()
+
+	// With VISUAL set, openEditor should return a command
+	os.Setenv("VISUAL", "true") // 'true' exits 0 immediately
+	os.Setenv("EDITOR", "")
+	cmd := openEditor("")
+	if cmd == nil {
+		t.Fatal("openEditor with VISUAL should return a command")
+	}
+
+	// With only EDITOR set
+	os.Setenv("VISUAL", "")
+	os.Setenv("EDITOR", "true")
+	cmd = openEditor("")
+	if cmd == nil {
+		t.Fatal("openEditor with EDITOR should return a command")
+	}
+
+	// With neither set (falls back to vi)
+	os.Setenv("VISUAL", "")
+	os.Setenv("EDITOR", "")
+	cmd = openEditor("")
+	if cmd == nil {
+		t.Fatal("openEditor with no env should return a command (vi fallback)")
+	}
+}
+
+func TestOpenEditorReturnsExecCmd(t *testing.T) {
+	origVisual := os.Getenv("VISUAL")
+	origEditor := os.Getenv("EDITOR")
+	defer func() {
+		os.Setenv("VISUAL", origVisual)
+		os.Setenv("EDITOR", origEditor)
+	}()
+
+	os.Setenv("VISUAL", "true")
+	os.Setenv("EDITOR", "")
+
+	// openEditor returns a tea.Cmd wrapping tea.ExecProcess
+	// We can only verify it returns non-nil — the actual exec
+	// requires the Bubble Tea runtime to suspend/restore alt screen.
+	cmd := openEditor("hello from test")
+	if cmd == nil {
+		t.Fatal("openEditor should return a command")
+	}
+}
+
+func TestEditorResultMsgInApp(t *testing.T) {
+	m := newTestModel()
+	// Simulate successful editor result
+	m.Update(editorResultMsg{Text: "edited text"})
+	if m.prompt.input.Value() != "edited text" {
+		t.Errorf("prompt should contain edited text, got %q", m.prompt.input.Value())
+	}
+}
+
+func TestEditorResultMsgError(t *testing.T) {
+	m := newTestModel()
+	m.Update(editorResultMsg{Err: os.ErrNotExist})
+	// Should append error to viewport, not crash
+	view := m.viewport.View()
+	if !strings.Contains(view, "Editor error") {
+		t.Fatal("editor error should appear in viewport")
+	}
+}
+
+func TestEditorResultMsgEmpty(t *testing.T) {
+	m := newTestModel()
+	m.prompt.input.SetValue("original")
+	m.Update(editorResultMsg{Text: ""})
+	// Empty result should not overwrite prompt
+	if m.prompt.input.Value() != "original" {
+		t.Errorf("empty editor result should not change prompt, got %q", m.prompt.input.Value())
+	}
+}
+
+func TestPromptPlaceholderMentionsCtrlG(t *testing.T) {
+	p := newPromptModel()
+	if !strings.Contains(p.input.Placeholder, "Ctrl+G") {
+		t.Fatal("placeholder should mention Ctrl+G for editor")
 	}
 }

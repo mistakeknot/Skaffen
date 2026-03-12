@@ -1,6 +1,8 @@
 package tui
 
 import (
+	"os"
+	"os/exec"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/textinput"
@@ -21,7 +23,7 @@ type promptModel struct {
 
 func newPromptModel() promptModel {
 	ti := textinput.New()
-	ti.Placeholder = "Ask anything... (Enter to send, Shift+Enter for newline, @ to mention files)"
+	ti.Placeholder = "Ask anything... (Enter to send, Shift+Enter for newline, @ for files, Ctrl+G for editor)"
 	ti.Focus()
 	ti.CharLimit = 4096
 	return promptModel{input: ti}
@@ -93,6 +95,8 @@ func (p promptModel) Update(msg tea.Msg) (promptModel, tea.Cmd) {
 			p.lines = append(p.lines, p.input.Value())
 			p.input.SetValue("")
 			return p, nil
+		case "ctrl+g":
+			return p, openEditor(p.fullText())
 		default:
 			// Check for / trigger at start of empty input (no accumulated lines)
 			if len(msg.Runes) == 1 && msg.Runes[0] == '/' &&
@@ -185,4 +189,45 @@ func (p *promptModel) Reset() {
 	p.lines = nil
 	p.picking = false
 	p.completing = false
+}
+
+// editorResultMsg carries the result of an external editor session.
+type editorResultMsg struct {
+	Text string
+	Err  error
+}
+
+// openEditor launches $VISUAL/$EDITOR on a temp file containing the current
+// prompt text. Bubble Tea suspends the alt screen while the editor runs.
+func openEditor(currentText string) tea.Cmd {
+	editor := os.Getenv("VISUAL")
+	if editor == "" {
+		editor = os.Getenv("EDITOR")
+	}
+	if editor == "" {
+		editor = "vi"
+	}
+
+	f, err := os.CreateTemp("", "skaffen-*.md")
+	if err != nil {
+		return func() tea.Msg { return editorResultMsg{Err: err} }
+	}
+	if currentText != "" {
+		f.WriteString(currentText)
+	}
+	f.Close()
+	path := f.Name()
+
+	c := exec.Command(editor, path)
+	return tea.ExecProcess(c, func(err error) tea.Msg {
+		defer os.Remove(path)
+		if err != nil {
+			return editorResultMsg{Err: err}
+		}
+		content, readErr := os.ReadFile(path)
+		if readErr != nil {
+			return editorResultMsg{Err: readErr}
+		}
+		return editorResultMsg{Text: strings.TrimRight(string(content), "\n")}
+	})
 }

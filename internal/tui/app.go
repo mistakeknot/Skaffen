@@ -371,6 +371,17 @@ func (m *appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case msettings.DismissedMsg:
 		m.settingsOpen = false
 
+	case editorResultMsg:
+		if msg.Err != nil {
+			errStyle := lipgloss.NewStyle().Foreground(theme.Current().Semantic().Error.Color())
+			m.viewport.AppendContent(errStyle.Render(fmt.Sprintf("Editor error: %v", msg.Err)) + "\n")
+			break
+		}
+		if strings.TrimSpace(msg.Text) != "" {
+			m.prompt.input.SetValue(msg.Text)
+			m.prompt.input.CursorEnd()
+		}
+
 	case filePickerSelectedMsg, filePickerCancelMsg,
 		cmdCompleterSelectedMsg, cmdCompleterCancelMsg:
 		var cmd tea.Cmd
