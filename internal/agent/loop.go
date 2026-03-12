@@ -5,7 +5,7 @@ import (
 
 	"github.com/mistakeknot/Skaffen/internal/provider"
 	"github.com/mistakeknot/Skaffen/internal/tool"
-	"github.com/mistakeknot/masaq/priompt"
+	"github.com/mistakeknot/Masaq/priompt"
 )
 
 // buildAssistantMessage constructs the assistant message from a collected response.

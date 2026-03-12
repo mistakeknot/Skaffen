@@ -8,7 +8,7 @@ import (
 	"github.com/mistakeknot/Skaffen/internal/provider"
 	"github.com/mistakeknot/Skaffen/internal/session"
 	"github.com/mistakeknot/Skaffen/internal/tool"
-	"github.com/mistakeknot/masaq/priompt"
+	"github.com/mistakeknot/Masaq/priompt"
 )
 
 func defaultSections() []priompt.Element {

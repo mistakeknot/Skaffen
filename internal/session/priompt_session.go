@@ -6,7 +6,7 @@ import (
 	"github.com/mistakeknot/Skaffen/internal/agent"
 	"github.com/mistakeknot/Skaffen/internal/provider"
 	"github.com/mistakeknot/Skaffen/internal/tool"
-	"github.com/mistakeknot/masaq/priompt"
+	"github.com/mistakeknot/Masaq/priompt"
 )
 
 // PriomptSession wraps a JSONLSession and uses priority-based prompt

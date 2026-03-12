@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/charmbracelet/lipgloss"
-	"github.com/mistakeknot/masaq/theme"
+	"github.com/mistakeknot/Masaq/theme"
 )
 
 type statusModel struct {

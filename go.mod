@@ -7,7 +7,7 @@ require (
 	github.com/charmbracelet/bubbles v0.20.0
 	github.com/charmbracelet/bubbletea v1.3.4
 	github.com/charmbracelet/lipgloss v1.1.0
-	github.com/mistakeknot/masaq v0.0.0
+	github.com/mistakeknot/Masaq v0.0.0
 	github.com/modelcontextprotocol/go-sdk v1.4.0
 )
 
@@ -49,4 +49,4 @@ require (
 	golang.org/x/text v0.16.0 // indirect
 )
 
-replace github.com/mistakeknot/masaq => ../../masaq
+replace github.com/mistakeknot/Masaq => ../../masaq

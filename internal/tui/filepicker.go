@@ -8,7 +8,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/mistakeknot/masaq/theme"
+	"github.com/mistakeknot/Masaq/theme"
 )
 
 // filePickerSelectedMsg is sent when the user selects a file.

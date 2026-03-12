@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/mistakeknot/Skaffen/internal/provider"
-	"github.com/mistakeknot/masaq/priompt"
+	"github.com/mistakeknot/Masaq/priompt"
 )
 
 // Loop executes a universal Decide->Act agent loop without phase concepts.

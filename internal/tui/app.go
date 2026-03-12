@@ -13,13 +13,13 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/mistakeknot/Skaffen/internal/agent"
 	"github.com/mistakeknot/Skaffen/internal/trust"
-	"github.com/mistakeknot/masaq/compact"
-	"github.com/mistakeknot/masaq/diff"
-	"github.com/mistakeknot/masaq/keys"
-	"github.com/mistakeknot/masaq/markdown"
-	"github.com/mistakeknot/masaq/question"
-	"github.com/mistakeknot/masaq/theme"
-	"github.com/mistakeknot/masaq/viewport"
+	"github.com/mistakeknot/Masaq/compact"
+	"github.com/mistakeknot/Masaq/diff"
+	"github.com/mistakeknot/Masaq/keys"
+	"github.com/mistakeknot/Masaq/markdown"
+	"github.com/mistakeknot/Masaq/question"
+	"github.com/mistakeknot/Masaq/theme"
+	"github.com/mistakeknot/Masaq/viewport"
 )
 
 // Config holds TUI configuration.

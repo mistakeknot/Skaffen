@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/charmbracelet/lipgloss"
-	"github.com/mistakeknot/masaq/theme"
+	"github.com/mistakeknot/Masaq/theme"
 )
 
 // MessageRole identifies who sent a message.

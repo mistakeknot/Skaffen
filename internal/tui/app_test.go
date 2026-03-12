@@ -12,7 +12,7 @@ import (
 	"github.com/mistakeknot/Skaffen/internal/agent"
 	"github.com/mistakeknot/Skaffen/internal/provider"
 	"github.com/mistakeknot/Skaffen/internal/trust"
-	"github.com/mistakeknot/masaq/question"
+	"github.com/mistakeknot/Masaq/question"
 )
 
 // --- helpers ---
