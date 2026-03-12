@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"os/signal"
 	"runtime"
@@ -17,6 +18,7 @@ import (
 	"github.com/mistakeknot/Skaffen/internal/agent"
 	"github.com/mistakeknot/Skaffen/internal/command"
 	"github.com/mistakeknot/Skaffen/internal/config"
+	"github.com/mistakeknot/Skaffen/internal/hooks"
 	"github.com/mistakeknot/Skaffen/internal/contextfiles"
 	"github.com/mistakeknot/Skaffen/internal/evidence"
 	"github.com/mistakeknot/Skaffen/internal/mcp"
@@ -270,6 +272,12 @@ func runPrint() error {
 	emitter := evidence.New(cfg.EvidenceDir(), sessionID)
 	opts = append(opts, agent.WithEmitter(emitter), agent.WithSessionID(sessionID))
 
+	// Lifecycle hooks — only gate in headless mode (no trust evaluator)
+	if hookExec := loadHooks(cfg, sessionID, string(phase)); hookExec != nil {
+		hookExec.SessionStart(ctx, "print")
+		opts = append(opts, agent.WithHooks(hookExec))
+	}
+
 	a := agent.New(p, reg, opts...)
 
 	// Run agent loop
@@ -369,6 +377,12 @@ func runTUI() error {
 	// Trust evaluator
 	trustEval := trust.NewEvaluator(nil)
 
+	// Lifecycle hooks — pre-filter before trust evaluator
+	if hookExec := loadHooks(cfg, sessionID, string(phase)); hookExec != nil {
+		hookExec.SessionStart(context.Background(), "tui")
+		opts = append(opts, agent.WithHooks(hookExec))
+	}
+
 	// Load custom slash commands from disk
 	customCmds := command.LoadAll(cfg.CommandDirs()...)
 
@@ -417,6 +431,33 @@ func loadMCPPluginsFromConfig(ctx context.Context, reg *tool.Registry, pluginsCf
 	fmt.Fprintf(os.Stderr, "skaffen: loaded %d MCP plugin(s), %d tool(s)\n",
 		mgr.PluginCount(), mgr.ToolCount())
 	return mgr
+}
+
+// loadHooks loads and merges hook configs (user-global + per-project),
+// returning an Executor ready for use. Returns nil if no hooks are configured.
+func loadHooks(cfg *config.Config, sessionID, phase string) *hooks.Executor {
+	hookPaths := cfg.HookPaths()
+	if len(hookPaths) == 0 {
+		return nil
+	}
+
+	base, err := hooks.LoadConfig(hookPaths[0])
+	if err != nil {
+		log.Printf("skaffen: warning: hook config: %v", err)
+		return nil
+	}
+	merged := base
+	if len(hookPaths) > 1 {
+		project, err := hooks.LoadConfig(hookPaths[1])
+		if err != nil {
+			log.Printf("skaffen: warning: project hook config: %v", err)
+		} else {
+			merged = hooks.MergeConfig(base, project)
+		}
+	}
+
+	workDir, _ := os.Getwd()
+	return hooks.NewExecutor(merged, sessionID, workDir, phase)
 }
 
 // setupTheme configures the Masaq theme and color mode from CLI flags.
