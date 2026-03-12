@@ -1,11 +1,14 @@
 package tui
 
 import (
+	"context"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/mistakeknot/Skaffen/internal/session"
@@ -359,5 +362,66 @@ func (m *appModel) runCommand(cmd *Command) tea.Cmd {
 	result := m.executeCommand(cmd)
 	return func() tea.Msg {
 		return commandResultMsg(result)
+	}
+}
+
+// ParseShellEscape checks if input starts with ! and returns the command.
+// Returns ("", false) if not a shell escape.
+// Returns ("", true) for bare "!" with no command.
+func ParseShellEscape(input string) (string, bool) {
+	input = strings.TrimSpace(input)
+	if !strings.HasPrefix(input, "!") {
+		return "", false
+	}
+	cmd := strings.TrimSpace(input[1:])
+	return cmd, true
+}
+
+const (
+	shellTimeout    = 30 * time.Second
+	shellMaxOutput  = 10240 // 10KB
+)
+
+// shellResultMsg carries the result of a shell escape command.
+type shellResultMsg struct {
+	Command  string
+	Output   string
+	ExitCode int
+	Err      error
+	TimedOut bool
+}
+
+// runShellCommand executes a shell command and returns a tea.Cmd that sends the result.
+func (m *appModel) runShellCommand(command string) tea.Cmd {
+	workDir := m.workDir
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(context.Background(), shellTimeout)
+		defer cancel()
+
+		cmd := exec.CommandContext(ctx, "bash", "-c", command)
+		cmd.Dir = workDir
+		out, err := cmd.CombinedOutput()
+
+		output := string(out)
+		if len(output) > shellMaxOutput {
+			output = output[:shellMaxOutput] + "\n... (truncated)"
+		}
+
+		exitCode := 0
+		timedOut := ctx.Err() == context.DeadlineExceeded
+		if err != nil {
+			if exitErr, ok := err.(*exec.ExitError); ok {
+				exitCode = exitErr.ExitCode()
+			} else if !timedOut {
+				return shellResultMsg{Command: command, Err: err}
+			}
+		}
+
+		return shellResultMsg{
+			Command:  command,
+			Output:   output,
+			ExitCode: exitCode,
+			TimedOut: timedOut,
+		}
 	}
 }

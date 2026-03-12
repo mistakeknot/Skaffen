@@ -736,3 +736,76 @@ func TestSettingsOverlayKeysDelegated(t *testing.T) {
 		t.Fatalf("after down key, overlay cursor = %d, want 1", m.settingsOverlay.Cursor())
 	}
 }
+
+func TestShellEscapeRunsCommand(t *testing.T) {
+	m := setup(t)
+	// Submit a shell command
+	m.Update(submitMsg{Text: "!echo hello-from-shell"})
+	if !m.running {
+		t.Fatal("running should be true while shell command executes")
+	}
+	// Simulate the result arriving
+	m.Update(shellResultMsg{
+		Command:  "echo hello-from-shell",
+		Output:   "hello-from-shell\n",
+		ExitCode: 0,
+	})
+	if m.running {
+		t.Fatal("running should be false after shell result")
+	}
+	view := m.viewport.View()
+	if !strings.Contains(view, "hello-from-shell") {
+		t.Fatal("viewport should contain shell output")
+	}
+}
+
+func TestShellEscapeNonZeroExit(t *testing.T) {
+	m := setup(t)
+	m.Update(shellResultMsg{
+		Command:  "false",
+		Output:   "",
+		ExitCode: 1,
+	})
+	view := m.viewport.View()
+	if !strings.Contains(view, "exit code: 1") {
+		t.Fatal("viewport should show exit code for non-zero exit")
+	}
+}
+
+func TestShellEscapeTimeout(t *testing.T) {
+	m := setup(t)
+	m.Update(shellResultMsg{
+		Command:  "sleep 60",
+		Output:   "",
+		TimedOut: true,
+	})
+	view := m.viewport.View()
+	if !strings.Contains(view, "timed out") {
+		t.Fatal("viewport should show timeout message")
+	}
+}
+
+func TestShellEscapeError(t *testing.T) {
+	m := setup(t)
+	m.Update(shellResultMsg{
+		Command: "bad",
+		Err:     fmt.Errorf("exec: not found"),
+	})
+	view := m.viewport.View()
+	if !strings.Contains(view, "Shell error") {
+		t.Fatal("viewport should show shell error")
+	}
+}
+
+func TestShellEscapeBareExclamation(t *testing.T) {
+	m := setup(t)
+	m.Update(submitMsg{Text: "!"})
+	// Should show usage help, not set running
+	if m.running {
+		t.Fatal("bare ! should not set running")
+	}
+	view := m.viewport.View()
+	if !strings.Contains(view, "Usage: !") {
+		t.Fatal("bare ! should show usage help")
+	}
+}

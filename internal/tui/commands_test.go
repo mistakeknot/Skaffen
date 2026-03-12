@@ -390,3 +390,30 @@ func TestExecuteCommand_Unknown(t *testing.T) {
 		t.Fatal("should mention unknown command")
 	}
 }
+
+func TestParseShellEscape(t *testing.T) {
+	tests := []struct {
+		input   string
+		wantCmd string
+		wantOk  bool
+	}{
+		{"!ls", "ls", true},
+		{"!git status", "git status", true},
+		{"! git status", "git status", true},  // space after !
+		{"!", "", true},                        // bare !
+		{"!!double", "!double", true},          // extra ! preserved
+		{"/help", "", false},                   // slash command, not shell
+		{"hello", "", false},                   // plain text
+		{"  !pwd  ", "pwd", true},              // leading/trailing whitespace
+		{"", "", false},                        // empty
+	}
+	for _, tt := range tests {
+		cmd, ok := ParseShellEscape(tt.input)
+		if ok != tt.wantOk {
+			t.Errorf("ParseShellEscape(%q): ok = %v, want %v", tt.input, ok, tt.wantOk)
+		}
+		if cmd != tt.wantCmd {
+			t.Errorf("ParseShellEscape(%q): cmd = %q, want %q", tt.input, cmd, tt.wantCmd)
+		}
+	}
+}

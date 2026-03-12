@@ -264,6 +264,23 @@ func (m *appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.running {
 			break
 		}
+		// Check for shell escape (! prefix) before slash commands
+		if shellCmd, isShell := ParseShellEscape(msg.Text); isShell {
+			c := theme.Current().Semantic()
+			if shellCmd == "" {
+				// Bare "!" — show usage help
+				helpStyle := lipgloss.NewStyle().Foreground(c.FgDim.Color())
+				m.viewport.AppendContent("\n" + helpStyle.Render("Usage: !<command> — run a shell command") + "\n")
+				m.prompt.Reset()
+				break
+			}
+			shellStyle := lipgloss.NewStyle().Foreground(c.FgDim.Color())
+			m.viewport.AppendContent("\n" + shellStyle.Render("! "+shellCmd) + "\n")
+			m.running = true
+			cmds = append(cmds, m.runShellCommand(shellCmd))
+			m.prompt.Reset()
+			break
+		}
 		// Check for slash commands before sending to agent
 		if cmd := ParseCommand(msg.Text); cmd != nil {
 			cmdStyle := lipgloss.NewStyle().Foreground(theme.Current().Semantic().FgDim.Color())
@@ -340,7 +357,8 @@ func (m *appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case msettings.DismissedMsg:
 		m.settingsOpen = false
 
-	case filePickerSelectedMsg, filePickerCancelMsg:
+	case filePickerSelectedMsg, filePickerCancelMsg,
+		cmdCompleterSelectedMsg, cmdCompleterCancelMsg:
 		var cmd tea.Cmd
 		m.prompt, cmd = m.prompt.Update(msg)
 		cmds = append(cmds, cmd)
@@ -355,6 +373,27 @@ func (m *appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.Quit {
 			return m, tea.Quit
 		}
+
+	case shellResultMsg:
+		m.running = false
+		c := theme.Current().Semantic()
+		if msg.Err != nil {
+			errStyle := lipgloss.NewStyle().Foreground(c.Error.Color())
+			m.viewport.AppendContent(errStyle.Render(fmt.Sprintf("Shell error: %v", msg.Err)) + "\n")
+		} else {
+			if msg.Output != "" {
+				outputStyle := lipgloss.NewStyle().Foreground(c.FgDim.Color())
+				m.viewport.AppendContent(outputStyle.Render(msg.Output))
+			}
+			if msg.TimedOut {
+				warnStyle := lipgloss.NewStyle().Foreground(c.Warning.Color())
+				m.viewport.AppendContent(warnStyle.Render("\n(timed out after 30s)") + "\n")
+			} else if msg.ExitCode != 0 {
+				errStyle := lipgloss.NewStyle().Foreground(c.Error.Color())
+				m.viewport.AppendContent(errStyle.Render(fmt.Sprintf("\nexit code: %d", msg.ExitCode)) + "\n")
+			}
+		}
+		m.prompt.Reset()
 
 	case agentDoneMsg:
 		m.running = false

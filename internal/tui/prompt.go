@@ -10,11 +10,13 @@ import (
 )
 
 type promptModel struct {
-	input   textinput.Model
-	lines   []string
-	picker  filePickerModel
-	picking bool
-	workDir string
+	input      textinput.Model
+	lines      []string
+	picker     filePickerModel
+	picking    bool
+	completer  cmdCompleterModel
+	completing bool
+	workDir    string
 }
 
 func newPromptModel() promptModel {
@@ -47,12 +49,31 @@ func (p promptModel) Update(msg tea.Msg) (promptModel, tea.Cmd) {
 	case filePickerCancelMsg:
 		p.picking = false
 		return p, nil
+	case cmdCompleterSelectedMsg:
+		sel := msg.(cmdCompleterSelectedMsg)
+		p.completing = false
+		// Replace input with the full slash command
+		p.input.SetValue("/" + sel.Name + " ")
+		p.input.CursorEnd()
+		return p, nil
+	case cmdCompleterCancelMsg:
+		p.completing = false
+		// Clear the "/" that triggered the completer
+		p.input.SetValue("")
+		return p, nil
 	}
 
 	// Delegate to picker when active
 	if p.picking {
 		var cmd tea.Cmd
 		p.picker, cmd = p.picker.Update(msg)
+		return p, cmd
+	}
+
+	// Delegate to completer when active
+	if p.completing {
+		var cmd tea.Cmd
+		p.completer, cmd = p.completer.Update(msg)
 		return p, cmd
 	}
 
@@ -73,12 +94,20 @@ func (p promptModel) Update(msg tea.Msg) (promptModel, tea.Cmd) {
 			p.input.SetValue("")
 			return p, nil
 		default:
-			// Check for @ trigger: if the rune typed is '@', activate picker
-			if len(msg.Runes) == 1 && msg.Runes[0] == '@' {
-				// Let textinput handle the '@' character first
+			// Check for / trigger at start of empty input (no accumulated lines)
+			if len(msg.Runes) == 1 && msg.Runes[0] == '/' &&
+				len(p.lines) == 0 && p.input.Value() == "" {
+				// Let textinput handle the '/' character first
 				var cmd tea.Cmd
 				p.input, cmd = p.input.Update(msg)
-				// Then open the picker
+				p.completer = newCmdCompleter()
+				p.completing = true
+				return p, cmd
+			}
+			// Check for @ trigger
+			if len(msg.Runes) == 1 && msg.Runes[0] == '@' {
+				var cmd tea.Cmd
+				p.input, cmd = p.input.Update(msg)
 				root := p.workDir
 				if root == "" {
 					root = "."
@@ -130,6 +159,14 @@ func (p promptModel) View(width int, running bool) string {
 		}
 	}
 
+	// Show command completer below prompt input
+	if p.completing {
+		completerView := p.completer.View(width)
+		if completerView != "" {
+			result = result + "\n" + completerView
+		}
+	}
+
 	return result
 }
 
@@ -147,4 +184,5 @@ func (p *promptModel) Reset() {
 	p.input.SetValue("")
 	p.lines = nil
 	p.picking = false
+	p.completing = false
 }
