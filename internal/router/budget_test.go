@@ -105,6 +105,88 @@ func TestBudgetCumulativeRecording(t *testing.T) {
 	}
 }
 
+func TestBudgetContextTracking(t *testing.T) {
+	bt := newBudgetTracker(&BudgetConfig{
+		MaxTokens: 1000, Mode: "graceful", DegradeAt: 0.8, Tracking: "context",
+	})
+	// In context mode, cache tokens count toward budget
+	bt.Record(provider.Usage{
+		InputTokens:              100,
+		OutputTokens:             100,
+		CacheCreationInputTokens: 200,
+		CacheReadInputTokens:     300,
+	})
+	state := bt.State()
+	// 100 + 100 + 200 + 300 = 700
+	if state.Spent != 700 {
+		t.Errorf("context tracking: spent = %d, want 700", state.Spent)
+	}
+	if state.Tracking != "context" {
+		t.Errorf("tracking = %q, want context", state.Tracking)
+	}
+}
+
+func TestBudgetBillingTracking_IgnoresCache(t *testing.T) {
+	bt := newBudgetTracker(&BudgetConfig{
+		MaxTokens: 1000, Mode: "graceful", DegradeAt: 0.8, Tracking: "billing",
+	})
+	bt.Record(provider.Usage{
+		InputTokens:              100,
+		OutputTokens:             100,
+		CacheCreationInputTokens: 200,
+		CacheReadInputTokens:     300,
+	})
+	state := bt.State()
+	// billing mode: only 100 + 100 = 200 (cache tokens ignored)
+	if state.Spent != 200 {
+		t.Errorf("billing tracking: spent = %d, want 200", state.Spent)
+	}
+	if state.Tracking != "billing" {
+		t.Errorf("tracking = %q, want billing", state.Tracking)
+	}
+}
+
+func TestBudgetDefaultTracking_IsBilling(t *testing.T) {
+	bt := newBudgetTracker(&BudgetConfig{
+		MaxTokens: 1000, Mode: "graceful", DegradeAt: 0.8,
+	})
+	// No Tracking field set — should default to billing
+	bt.Record(provider.Usage{
+		InputTokens:              100,
+		OutputTokens:             100,
+		CacheCreationInputTokens: 500,
+		CacheReadInputTokens:     500,
+	})
+	state := bt.State()
+	// Default billing: 100 + 100 = 200, NOT 1200
+	if state.Spent != 200 {
+		t.Errorf("default tracking: spent = %d, want 200", state.Spent)
+	}
+	if state.Tracking != "billing" {
+		t.Errorf("default tracking mode = %q, want billing", state.Tracking)
+	}
+}
+
+func TestBudgetContextTracking_DegradeAtThreshold(t *testing.T) {
+	bt := newBudgetTracker(&BudgetConfig{
+		MaxTokens: 1000, Mode: "graceful", DegradeAt: 0.8, Tracking: "context",
+	})
+	// Push to 80% via cache tokens: 100+100+200+400 = 800
+	bt.Record(provider.Usage{
+		InputTokens:              100,
+		OutputTokens:             100,
+		CacheCreationInputTokens: 200,
+		CacheReadInputTokens:     400,
+	})
+	model, reason := bt.MaybeDegrade(ModelOpus, "phase-default")
+	if model != ModelHaiku {
+		t.Errorf("context at 80%%: model = %q, want %q", model, ModelHaiku)
+	}
+	if reason != "budget-degrade" {
+		t.Errorf("context at 80%%: reason = %q, want budget-degrade", reason)
+	}
+}
+
 func TestBudgetHardStopUnderBudget(t *testing.T) {
 	bt := newBudgetTracker(&BudgetConfig{
 		MaxTokens: 1000, Mode: "hard-stop", DegradeAt: 0.8,

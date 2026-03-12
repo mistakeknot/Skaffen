@@ -12,6 +12,7 @@ type BudgetState struct {
 	Max        int     `json:"max"`
 	Percentage float64 `json:"percentage"`
 	Mode       string  `json:"mode"`
+	Tracking   string  `json:"tracking"` // "billing" or "context"
 }
 
 // BudgetTracker tracks cumulative token usage against a budget.
@@ -19,6 +20,7 @@ type BudgetTracker struct {
 	maxTokens int
 	degradeAt float64
 	mode      string // "graceful", "hard-stop", "advisory"
+	tracking  string // "billing" (default), "context"
 	spent     int
 	mu        sync.Mutex
 }
@@ -32,18 +34,30 @@ func newBudgetTracker(cfg *BudgetConfig) *BudgetTracker {
 	if degradeAt == 0 {
 		degradeAt = 0.8
 	}
+	tracking := cfg.Tracking
+	if tracking == "" {
+		tracking = "billing"
+	}
 	return &BudgetTracker{
 		maxTokens: cfg.MaxTokens,
 		degradeAt: degradeAt,
 		mode:      mode,
+		tracking:  tracking,
 	}
 }
 
 // Record adds token consumption from a single turn.
+// In "billing" mode (default): sums InputTokens + OutputTokens.
+// In "context" mode: sums InputTokens + OutputTokens + CacheCreationInputTokens + CacheReadInputTokens,
+// reflecting the effective context the model sees rather than what it costs.
 func (bt *BudgetTracker) Record(usage provider.Usage) {
 	bt.mu.Lock()
 	defer bt.mu.Unlock()
-	bt.spent += usage.InputTokens + usage.OutputTokens
+	spent := usage.InputTokens + usage.OutputTokens
+	if bt.tracking == "context" {
+		spent += usage.CacheCreationInputTokens + usage.CacheReadInputTokens
+	}
+	bt.spent += spent
 }
 
 // MaybeDegrade returns a (possibly degraded) model and reason.
@@ -89,5 +103,6 @@ func (bt *BudgetTracker) State() BudgetState {
 		Max:        bt.maxTokens,
 		Percentage: pct,
 		Mode:       bt.mode,
+		Tracking:   bt.tracking,
 	}
 }

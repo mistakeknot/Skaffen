@@ -22,6 +22,7 @@ type BudgetConfig struct {
 	MaxTokens int     `json:"max_tokens"`
 	Mode      string  `json:"mode"`       // "graceful" (default), "hard-stop", "advisory"
 	DegradeAt float64 `json:"degrade_at"` // 0-1, default 0.8
+	Tracking  string  `json:"tracking"`   // "billing" (default), "context"
 }
 
 // ComplexityConfig controls prompt complexity classification.
