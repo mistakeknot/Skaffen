@@ -268,11 +268,11 @@ func (m *appModel) View() string {
 	statusView := m.status.View(m.phase, m.modelName, m.totalCost, m.contextPct, m.turns)
 
 	if m.approving {
-		return lipgloss.JoinVertical(lipgloss.Left, vpView, statusView, m.approvalQ.View())
+		return lipgloss.JoinVertical(lipgloss.Left, vpView, m.approvalQ.View(), statusView)
 	}
 
 	promptView := m.prompt.View(m.width, m.running)
-	return lipgloss.JoinVertical(lipgloss.Left, vpView, statusView, promptView)
+	return lipgloss.JoinVertical(lipgloss.Left, vpView, promptView, statusView)
 }
 
 func (m *appModel) handleStreamEvent(ev agent.StreamEvent) {
