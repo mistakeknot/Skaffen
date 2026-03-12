@@ -81,6 +81,11 @@ func runPrint() error {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 
+	ic, err := checkIntercore()
+	if err != nil {
+		return err
+	}
+
 	// Validate phase
 	phase := tool.Phase(*flagPhase)
 	switch phase {
@@ -163,19 +168,19 @@ func runPrint() error {
 		}
 	}
 
-	modelRouter := router.New(routerCfg)
+	// Session ID — used for both session persistence and evidence
+	sessionID := *flagSession
+	if sessionID == "" {
+		sessionID = fmt.Sprintf("skaffen-%d", os.Getpid())
+	}
+
+	modelRouter := router.NewWithIC(routerCfg, ic, sessionID)
 
 	// Configure agent
 	opts := []agent.Option{
 		agent.WithMaxTurns(*flagMaxTurns),
 		agent.WithStartPhase(phase),
 		agent.WithRouter(modelRouter),
-	}
-
-	// Session ID — used for both session persistence and evidence
-	sessionID := *flagSession
-	if sessionID == "" {
-		sessionID = fmt.Sprintf("skaffen-%d", os.Getpid())
 	}
 
 	if *flagSession != "" {
@@ -213,6 +218,11 @@ func runPrint() error {
 }
 
 func runTUI() error {
+	ic, err := checkIntercore()
+	if err != nil {
+		return err
+	}
+
 	// Resolve provider (same logic as runPrint)
 	providerName := *flagProvider
 	if providerName == "" {
@@ -269,13 +279,13 @@ func runTUI() error {
 			routerCfg.Phases[ph] = *flagModel
 		}
 	}
-	modelRouter := router.New(routerCfg)
-
 	// Session
 	sessionID := *flagSession
 	if sessionID == "" {
 		sessionID = fmt.Sprintf("skaffen-%d", os.Getpid())
 	}
+
+	modelRouter := router.NewWithIC(routerCfg, ic, sessionID)
 
 	phase := tool.Phase(*flagPhase)
 
@@ -318,6 +328,19 @@ func runTUI() error {
 		Verbose:   false,
 		WorkDir:   workDir,
 	})
+}
+
+// checkIntercore validates that ic (Intercore CLI) is available and healthy.
+// Skaffen v0.3+ requires Intercore for evidence and routing.
+func checkIntercore() (*router.ICClient, error) {
+	ic, err := router.NewICClient()
+	if err != nil {
+		return nil, fmt.Errorf("intercore required: %w\nInstall: go install github.com/mistakeknot/intercore/cmd/ic@latest", err)
+	}
+	if err := ic.Health(); err != nil {
+		return nil, fmt.Errorf("intercore unhealthy: %w\nEnsure ic database is initialized: ic sentinel check startup", err)
+	}
+	return ic, nil
 }
 
 // loadMCPPlugins loads configured MCP plugins into the registry.
