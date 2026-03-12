@@ -159,6 +159,13 @@ func (m *appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case tea.KeyMsg:
 		if msg.String() == "ctrl+c" {
+			// Drain approval channel so the agent goroutine doesn't block
+			// forever on <-reply after p.Run() exits.
+			if m.approving && m.approvalReply != nil {
+				m.approvalReply <- false
+				m.approvalReply = nil
+				m.approving = false
+			}
 			return m, tea.Quit
 		}
 		// When showing approval overlay, delegate keys to question widget

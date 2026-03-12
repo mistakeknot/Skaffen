@@ -125,7 +125,16 @@ func TestAppModelCtrlCQuits(t *testing.T) {
 
 func TestCtrlCQuitsWhileApproving(t *testing.T) {
 	m := setup(t)
-	m.approving = true
+	reply := make(chan bool, 1)
+	m.Update(toolApprovalRequestMsg{
+		ToolName: "Bash",
+		Input:    json.RawMessage(`{}`),
+		Reply:    reply,
+	})
+	if !m.approving {
+		t.Fatal("should be in approving state")
+	}
+
 	_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyCtrlC})
 	if cmd == nil {
 		t.Fatal("ctrl+c should quit even during approval")
@@ -133,6 +142,23 @@ func TestCtrlCQuitsWhileApproving(t *testing.T) {
 	msg := cmd()
 	if _, ok := msg.(tea.QuitMsg); !ok {
 		t.Fatalf("expected QuitMsg during approval, got %T", msg)
+	}
+
+	// The reply channel must be drained so the agent goroutine doesn't deadlock.
+	select {
+	case result := <-reply:
+		if result {
+			t.Fatal("ctrl+c should send false (deny) on the reply channel")
+		}
+	default:
+		t.Fatal("reply channel should have been drained by ctrl+c handler")
+	}
+
+	if m.approving {
+		t.Fatal("approving should be false after ctrl+c")
+	}
+	if m.approvalReply != nil {
+		t.Fatal("approvalReply should be nil after ctrl+c")
 	}
 }
 
