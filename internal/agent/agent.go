@@ -73,3 +73,9 @@ func (a *Agent) AdvancePhase() error {
 func (a *Agent) CurrentPhase() tool.Phase {
 	return a.fsm.Current()
 }
+
+// SetStreamCallback replaces the stream callback after construction.
+// This allows the TUI to wire events once the tea.Program is available.
+func (a *Agent) SetStreamCallback(cb StreamCallback) {
+	a.streamCB = cb
+}

@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"context"
 	"fmt"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -26,6 +27,14 @@ type Config struct {
 func Run(cfg Config) error {
 	m := newAppModel(cfg)
 	p := tea.NewProgram(m, tea.WithAltScreen(), tea.WithMouseCellMotion())
+	m.program = p
+	// Wire StreamCallback → tea.Program.Send so agent events reach the
+	// Bubble Tea message loop from the background goroutine.
+	if m.agent != nil {
+		m.agent.SetStreamCallback(func(ev agent.StreamEvent) {
+			p.Send(streamEventMsg(ev))
+		})
+	}
 	_, err := p.Run()
 	return err
 }
@@ -54,6 +63,7 @@ type appModel struct {
 	prompt        promptModel
 	agent         *agent.Agent
 	trust         *trust.Evaluator
+	program       *tea.Program
 	workDir       string
 	phase         string
 	turns         int
@@ -179,11 +189,17 @@ func (m *appModel) handleStreamEvent(ev agent.StreamEvent) {
 }
 
 func (m *appModel) runAgent(prompt string) tea.Cmd {
+	a := m.agent
 	return func() tea.Msg {
-		// This runs in a goroutine. The agent streams events via callback
-		// which must be funneled through the tea.Program via Send().
-		// For now, since the program reference isn't wired, return a stub.
-		_ = prompt
-		return agentDoneMsg{Response: "Agent loop not wired yet"}
+		if a == nil {
+			return agentDoneMsg{Err: fmt.Errorf("no agent configured")}
+		}
+		// Runs in a goroutine. StreamCallback was wired in Run() to call
+		// p.Send(streamEventMsg), so events reach Update() automatically.
+		result, err := a.Run(context.Background(), prompt)
+		if err != nil {
+			return agentDoneMsg{Err: err}
+		}
+		return agentDoneMsg{Response: result.Response}
 	}
 }
