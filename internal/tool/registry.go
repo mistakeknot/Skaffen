@@ -55,6 +55,21 @@ func (r *Registry) Register(t Tool) {
 	r.gates[PhaseBuild][t.Name()] = true
 }
 
+// RegisterForPhases adds a tool to the registry, gated to specific phases.
+// If phases is nil or empty, defaults to build-only (same as Register).
+func (r *Registry) RegisterForPhases(t Tool, phases []Phase) {
+	r.tools[t.Name()] = t
+	if len(phases) == 0 {
+		phases = []Phase{PhaseBuild}
+	}
+	for _, phase := range phases {
+		if r.gates[phase] == nil {
+			r.gates[phase] = make(map[string]bool)
+		}
+		r.gates[phase][t.Name()] = true
+	}
+}
+
 // Tools returns tool definitions available for the given phase.
 func (r *Registry) Tools(phase Phase) []ToolDef {
 	allowed := r.gates[phase]

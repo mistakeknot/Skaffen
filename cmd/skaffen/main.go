@@ -12,9 +12,11 @@ import (
 	"runtime/debug"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/mistakeknot/Skaffen/internal/agent"
 	"github.com/mistakeknot/Skaffen/internal/evidence"
+	"github.com/mistakeknot/Skaffen/internal/mcp"
 	"github.com/mistakeknot/Skaffen/internal/provider"
 	"github.com/mistakeknot/Skaffen/internal/router"
 	"github.com/mistakeknot/Skaffen/internal/session"
@@ -39,6 +41,7 @@ var (
 	flagMode     = flag.String("mode", "tui", "Execution mode: tui (default), print")
 	flagResume   = flag.Bool("c", false, "Resume last session")
 	flagResumeID = flag.String("r", "", "Resume specific session by ID")
+	flagPlugins  = flag.String("plugins", "", "Path to plugins.toml (default: ~/.skaffen/plugins.toml)")
 )
 
 func main() {
@@ -126,6 +129,12 @@ func runPrint() error {
 	// Initialize tool registry
 	reg := tool.NewRegistry()
 	tool.RegisterBuiltins(reg)
+
+	// Load MCP plugins
+	mcpMgr := loadMCPPlugins(ctx, reg)
+	if mcpMgr != nil {
+		defer mcpMgr.Shutdown()
+	}
 
 	// Load routing config (optional file, env vars always checked)
 	routingPath := filepath.Join(os.Getenv("HOME"), ".skaffen", "routing.json")
@@ -231,6 +240,14 @@ func runTUI() error {
 	reg := tool.NewRegistry()
 	tool.RegisterBuiltins(reg)
 
+	// Load MCP plugins (use timeout context since TUI manages its own context)
+	mcpCtx, mcpCancel := context.WithTimeout(context.Background(), 30*time.Second)
+	mcpMgr := loadMCPPlugins(mcpCtx, reg)
+	mcpCancel()
+	if mcpMgr != nil {
+		defer mcpMgr.Shutdown()
+	}
+
 	// Router
 	routingPath := filepath.Join(os.Getenv("HOME"), ".skaffen", "routing.json")
 	routerCfg, err := router.LoadConfig(routingPath)
@@ -301,6 +318,30 @@ func runTUI() error {
 		Verbose:   false,
 		WorkDir:   workDir,
 	})
+}
+
+// loadMCPPlugins loads configured MCP plugins into the registry.
+// Returns the manager (may be nil if no plugins configured) — caller must defer Shutdown().
+func loadMCPPlugins(ctx context.Context, reg *tool.Registry) *mcp.Manager {
+	pluginsPath := *flagPlugins
+	if pluginsPath == "" {
+		pluginsPath = filepath.Join(os.Getenv("HOME"), ".skaffen", "plugins.toml")
+	}
+	pluginsCfg, err := mcp.LoadConfig(pluginsPath)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "skaffen: warning: plugins config: %v\n", err)
+		return nil
+	}
+	if len(pluginsCfg) == 0 {
+		return nil
+	}
+	mgr := mcp.NewManager(pluginsCfg, reg)
+	if err := mgr.LoadAll(ctx); err != nil {
+		fmt.Fprintf(os.Stderr, "skaffen: warning: MCP plugins: %v\n", err)
+	}
+	fmt.Fprintf(os.Stderr, "skaffen: loaded %d MCP plugin(s), %d tool(s)\n",
+		mgr.PluginCount(), mgr.ToolCount())
+	return mgr
 }
 
 func printVersion() {

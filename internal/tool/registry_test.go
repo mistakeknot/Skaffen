@@ -172,3 +172,50 @@ func TestRegistry_Get(t *testing.T) {
 		t.Error("Get('nonexistent') should return false")
 	}
 }
+
+func TestRegistry_RegisterForPhases(t *testing.T) {
+	r := NewRegistry()
+	custom := &stubTool{name: "mcp_search"}
+	r.RegisterForPhases(custom, []Phase{PhaseBrainstorm, PhaseBuild})
+
+	// Available in brainstorm
+	names := toolNames(r.Tools(PhaseBrainstorm))
+	if !names["mcp_search"] {
+		t.Error("mcp_search should be in brainstorm")
+	}
+
+	// Available in build
+	names = toolNames(r.Tools(PhaseBuild))
+	if !names["mcp_search"] {
+		t.Error("mcp_search should be in build")
+	}
+
+	// NOT available in review
+	names = toolNames(r.Tools(PhaseReview))
+	if names["mcp_search"] {
+		t.Error("mcp_search should not be in review")
+	}
+
+	// NOT available in ship
+	names = toolNames(r.Tools(PhaseShip))
+	if names["mcp_search"] {
+		t.Error("mcp_search should not be in ship")
+	}
+}
+
+func TestRegistry_RegisterForPhases_Empty(t *testing.T) {
+	r := NewRegistry()
+	custom := &stubTool{name: "mcp_nophase"}
+	r.RegisterForPhases(custom, nil)
+
+	// Default: build only
+	names := toolNames(r.Tools(PhaseBuild))
+	if !names["mcp_nophase"] {
+		t.Error("nil phases should default to build")
+	}
+
+	names = toolNames(r.Tools(PhaseBrainstorm))
+	if names["mcp_nophase"] {
+		t.Error("should not be in brainstorm with nil phases")
+	}
+}
