@@ -1,10 +1,12 @@
 package router
 
 import (
+	"context"
 	"fmt"
 	"os/exec"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // ICClient wraps the ic (Intercore) CLI binary for routing operations.
@@ -57,10 +59,15 @@ type DecisionRecord struct {
 }
 
 // RecordDecision fires `ic route record` in the background (fire-and-forget).
+// Uses a 5-second timeout to prevent zombie accumulation on shutdown.
 func (c *ICClient) RecordDecision(rec DecisionRecord) {
 	args := c.buildRecordArgs(rec)
-	cmd := exec.Command(c.icPath, args...)
-	go cmd.Run() // fire-and-forget
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		cmd := exec.CommandContext(ctx, c.icPath, args...)
+		cmd.Run() // ignore errors — recording is best-effort
+	}()
 }
 
 func (c *ICClient) buildRecordArgs(rec DecisionRecord) []string {

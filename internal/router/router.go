@@ -61,9 +61,9 @@ func NewWithIC(cfg *Config, ic *ICClient, sessionID string) *DefaultRouter {
 	r.sessionID = sessionID
 	if ic != nil {
 		r.overrides = make(map[string]string)
-		for _, phase := range []string{"brainstorm", "plan", "build", "review", "ship"} {
-			if model := ic.QueryOverride(phase); model != "" {
-				r.overrides[phase] = model
+		for phase := range phaseDefaults {
+			if model := ic.QueryOverride(string(phase)); model != "" {
+				r.overrides[string(phase)] = model
 			}
 		}
 	}

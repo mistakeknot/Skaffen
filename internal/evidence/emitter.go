@@ -37,14 +37,13 @@ func New(dir, sessionID string) *JSONLEmitter {
 // Emit writes an evidence event to the JSONL file and optionally to intercore.
 func (e *JSONLEmitter) Emit(ev agent.Evidence) error {
 	e.mu.Lock()
-	defer e.mu.Unlock()
-
-	// Write to JSONL
-	if err := e.appendJSONL(ev); err != nil {
+	err := e.appendJSONL(ev)
+	e.mu.Unlock()
+	if err != nil {
 		return err
 	}
 
-	// Bridge to intercore (best-effort, don't fail on ic errors)
+	// Bridge to intercore outside lock — best-effort, don't block JSONL writes
 	if e.icPath != "" {
 		e.bridgeToIntercore(ev)
 	}

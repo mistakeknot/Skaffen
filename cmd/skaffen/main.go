@@ -81,10 +81,7 @@ func runPrint() error {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 
-	ic, err := checkIntercore()
-	if err != nil {
-		return err
-	}
+	ic := checkIntercore()
 
 	// Validate phase
 	phase := tool.Phase(*flagPhase)
@@ -218,10 +215,7 @@ func runPrint() error {
 }
 
 func runTUI() error {
-	ic, err := checkIntercore()
-	if err != nil {
-		return err
-	}
+	ic := checkIntercore()
 
 	// Resolve provider (same logic as runPrint)
 	providerName := *flagProvider
@@ -330,17 +324,19 @@ func runTUI() error {
 	})
 }
 
-// checkIntercore validates that ic (Intercore CLI) is available and healthy.
-// Skaffen v0.3+ requires Intercore for evidence and routing.
-func checkIntercore() (*router.ICClient, error) {
+// checkIntercore detects the ic (Intercore CLI) for evidence and routing integration.
+// Returns nil client (not error) if ic is unavailable — Skaffen degrades gracefully.
+func checkIntercore() *router.ICClient {
 	ic, err := router.NewICClient()
 	if err != nil {
-		return nil, fmt.Errorf("intercore required: %w\nInstall: go install github.com/mistakeknot/intercore/cmd/ic@latest", err)
+		fmt.Fprintf(os.Stderr, "skaffen: warning: intercore unavailable: %v\n", err)
+		return nil
 	}
 	if err := ic.Health(); err != nil {
-		return nil, fmt.Errorf("intercore unhealthy: %w\nEnsure ic database is initialized: ic sentinel check startup", err)
+		fmt.Fprintf(os.Stderr, "skaffen: warning: intercore unhealthy: %v\n", err)
+		return nil
 	}
-	return ic, nil
+	return ic
 }
 
 // loadMCPPlugins loads configured MCP plugins into the registry.
