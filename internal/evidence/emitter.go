@@ -77,17 +77,51 @@ func (e *JSONLEmitter) appendJSONL(ev agent.Evidence) error {
 	return f.Sync()
 }
 
-// bridgeToIntercore shells out to `ic events record` (best-effort).
-func (e *JSONLEmitter) bridgeToIntercore(ev agent.Evidence) {
-	data, err := json.Marshal(ev)
+// interspectPayload wraps evidence for ic events record --source=interspect.
+type interspectPayload struct {
+	AgentName string          `json:"agent_name"`
+	Context   json.RawMessage `json:"context"`
+}
+
+// BridgeArgs returns the ic CLI args for bridging an evidence event.
+// Exported for testing.
+func (e *JSONLEmitter) BridgeArgs(ev agent.Evidence) []string {
+	contextJSON, err := json.Marshal(ev)
 	if err != nil {
-		return
+		return nil
+	}
+	payload := interspectPayload{
+		AgentName: "skaffen",
+		Context:   contextJSON,
+	}
+	payloadJSON, err := json.Marshal(payload)
+	if err != nil {
+		return nil
 	}
 
-	// Fire-and-forget: ic events record --source=skaffen --data='...'
-	cmd := exec.Command(e.icPath, "events", "record",
-		"--source=skaffen",
-		fmt.Sprintf("--data=%s", string(data)),
-	)
+	eventType := "turn_complete"
+	if ev.Outcome == "success" && ev.StopReason == "end_turn" {
+		eventType = "session_end"
+	}
+
+	args := []string{
+		"events", "record",
+		"--source=interspect",
+		"--type=" + eventType,
+		"--payload=" + string(payloadJSON),
+	}
+	if ev.SessionID != "" {
+		args = append(args, "--session="+ev.SessionID)
+	}
+	return args
+}
+
+// bridgeToIntercore shells out to `ic events record` (best-effort).
+func (e *JSONLEmitter) bridgeToIntercore(ev agent.Evidence) {
+	args := e.BridgeArgs(ev)
+	if args == nil {
+		return
+	}
+	cmd := exec.Command(e.icPath, args...)
 	cmd.Run() // ignore errors — intercore bridge is best-effort
 }

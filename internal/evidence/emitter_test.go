@@ -156,3 +156,86 @@ func TestEmitNoIcBinary(t *testing.T) {
 		t.Errorf("Emit without ic should succeed: %v", err)
 	}
 }
+
+func TestBridgeArgs(t *testing.T) {
+	e := evidence.New(t.TempDir(), "bridge-test")
+	ev := makeEvidence(1)
+	args := e.BridgeArgs(ev)
+
+	if args == nil {
+		t.Fatal("BridgeArgs returned nil")
+	}
+
+	// Verify source is interspect (not skaffen)
+	foundSource := false
+	for _, a := range args {
+		if a == "--source=interspect" {
+			foundSource = true
+		}
+		if a == "--source=skaffen" {
+			t.Error("source should be interspect, not skaffen")
+		}
+		if strings.HasPrefix(a, "--data=") {
+			t.Error("should use --payload=, not --data=")
+		}
+	}
+	if !foundSource {
+		t.Error("missing --source=interspect")
+	}
+
+	// Verify payload contains agent_name
+	for _, a := range args {
+		if strings.HasPrefix(a, "--payload=") {
+			payload := strings.TrimPrefix(a, "--payload=")
+			if !strings.Contains(payload, `"agent_name"`) {
+				t.Error("payload missing agent_name")
+			}
+			if !strings.Contains(payload, `"skaffen"`) {
+				t.Error("payload agent_name should be skaffen")
+			}
+			if !strings.Contains(payload, `"context"`) {
+				t.Error("payload missing context field")
+			}
+		}
+	}
+
+	// Verify event type
+	foundType := false
+	for _, a := range args {
+		if a == "--type=turn_complete" {
+			foundType = true
+		}
+	}
+	if !foundType {
+		t.Error("missing --type=turn_complete")
+	}
+
+	// Verify session
+	foundSession := false
+	for _, a := range args {
+		if a == "--session=test-session" {
+			foundSession = true
+		}
+	}
+	if !foundSession {
+		t.Error("missing --session=test-session")
+	}
+}
+
+func TestBridgeArgsSessionEnd(t *testing.T) {
+	e := evidence.New(t.TempDir(), "bridge-end")
+	ev := makeEvidence(1)
+	ev.Outcome = "success"
+	ev.StopReason = "end_turn"
+	args := e.BridgeArgs(ev)
+
+	foundType := false
+	for _, a := range args {
+		if a == "--type=session_end" {
+			foundType = true
+		}
+	}
+	if !foundType {
+		t.Error("expected --type=session_end for success+end_turn")
+	}
+}
