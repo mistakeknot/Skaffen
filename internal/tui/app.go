@@ -25,11 +25,13 @@ import (
 
 // Config holds TUI configuration.
 type Config struct {
-	Agent     *agent.Agent
-	Trust     *trust.Evaluator
-	SessionID string
-	Verbose   bool
-	WorkDir   string
+	Agent      *agent.Agent
+	Trust      *trust.Evaluator
+	SessionID  string
+	Verbose    bool
+	WorkDir    string
+	SkaffenVer string
+	MasaqVer   string
 }
 
 // Run starts the TUI REPL.
@@ -105,12 +107,18 @@ type appModel struct {
 	git           *git.Git
 	program       *tea.Program
 	workDir       string
+	settings      settings
+	skaffenVer    string
+	masaqVer      string
 	phase         string
 	turns         int
 	totalCost     float64
 	contextPct    float64
 	modelName     string
 	running       bool
+
+	// Logo animation (renders at top of viewport, animates until first keypress)
+	logo logoModel
 
 	// Tool approval overlay
 	approving     bool
@@ -122,9 +130,6 @@ type appModel struct {
 func newAppModel(cfg Config) *appModel {
 	vp := viewport.New(80, 20)
 	cf := compact.New(80)
-	if cfg.Verbose {
-		cf.SetVerbose(true)
-	}
 	pm := newPromptModel()
 	pm.workDir = cfg.WorkDir
 	// Initialize git helper if workDir is a git repo
@@ -135,24 +140,40 @@ func newAppModel(cfg Config) *appModel {
 			g = nil
 		}
 	}
+	skVer := cfg.SkaffenVer
+	if skVer == "" {
+		skVer = "dev"
+	}
+	mqVer := cfg.MasaqVer
+	if mqVer == "" {
+		mqVer = "dev"
+	}
+	s := defaultSettings()
+	if cfg.Verbose {
+		s.Verbose = true
+	}
 	return &appModel{
-		viewport:  vp,
-		md:        markdown.New(80),
-		compact:   cf,
-		keys:      keys.NewDefault(keys.WithVim()),
-		status:    newStatusModel(),
-		prompt:    pm,
-		agent:     cfg.Agent,
-		trust:     cfg.Trust,
-		git:       g,
-		workDir:   cfg.WorkDir,
-		phase:     "build",
-		modelName: "claude",
+		viewport:   vp,
+		md:         markdown.New(80),
+		compact:    cf,
+		keys:       keys.NewDefault(keys.WithVim()),
+		status:     newStatusModel(),
+		prompt:     pm,
+		agent:      cfg.Agent,
+		trust:      cfg.Trust,
+		git:        g,
+		workDir:    cfg.WorkDir,
+		settings:   s,
+		skaffenVer: skVer,
+		masaqVer:   mqVer,
+		phase:      "build",
+		modelName:  "claude",
+		logo:       newLogoModel(skVer, mqVer),
 	}
 }
 
 func (m *appModel) Init() tea.Cmd {
-	return m.prompt.Init()
+	return tea.Batch(m.prompt.Init(), m.logo.tick())
 }
 
 func (m *appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -171,6 +192,13 @@ func (m *appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.md = markdown.New(m.width)
 		m.compact = compact.New(m.width)
 		m.status.width = m.width
+		m.logo.width = m.width
+
+	case logoTickMsg:
+		if m.logo.active {
+			m.logo.frame++
+			cmds = append(cmds, m.logo.tick())
+		}
 
 	case tea.KeyMsg:
 		if msg.String() == "ctrl+c" {
@@ -182,6 +210,10 @@ func (m *appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.approving = false
 			}
 			return m, tea.Quit
+		}
+		// Stop logo animation on first typed character (not scroll keys)
+		if m.logo.active && !isScrollKey(msg) {
+			m.logo.stop()
 		}
 		// When showing approval overlay, delegate keys to question widget
 		if m.approving {
@@ -241,8 +273,10 @@ func (m *appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		summary := m.compact.FormatToolCall(msg.ToolName, string(msg.Input), "", false)
 		m.viewport.AppendContent("\n" + summary)
 		// Show diff preview for file-modifying tools
-		if preview := renderDiffPreview(msg.ToolName, msg.Input, m.width); preview != "" {
-			m.viewport.AppendContent("\n" + preview)
+		if m.settings.DiffPreview {
+			if preview := renderDiffPreview(msg.ToolName, msg.Input, m.width); preview != "" {
+				m.viewport.AppendContent("\n" + preview)
+			}
 		}
 		m.approvalQ = question.New(
 			fmt.Sprintf("Allow %s?", msg.ToolName),
@@ -294,15 +328,27 @@ func (m *appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m *appModel) View() string {
+	logoView := m.logo.View()
 	vpView := m.viewport.View()
 	statusView := m.status.View(m.phase, m.modelName, m.totalCost, m.contextPct, m.turns)
 
+	// Logo sits above viewport, taking space from viewport height
+	logoHeight := strings.Count(logoView, "\n")
+	vpHeight := m.height - 4 - logoHeight // 1 status + 3 prompt + logo
+	if vpHeight < 1 {
+		vpHeight = 1
+	}
+	if m.viewport.Height() != vpHeight {
+		m.viewport.SetSize(m.width, vpHeight)
+		vpView = m.viewport.View()
+	}
+
 	if m.approving {
-		return lipgloss.JoinVertical(lipgloss.Left, vpView, m.approvalQ.View(), statusView)
+		return lipgloss.JoinVertical(lipgloss.Left, logoView, vpView, m.approvalQ.View(), statusView)
 	}
 
 	promptView := m.prompt.View(m.width, m.running)
-	return lipgloss.JoinVertical(lipgloss.Left, vpView, promptView, statusView)
+	return lipgloss.JoinVertical(lipgloss.Left, logoView, vpView, promptView, statusView)
 }
 
 func (m *appModel) handleStreamEvent(ev agent.StreamEvent) {
@@ -315,8 +361,8 @@ func (m *appModel) handleStreamEvent(ev agent.StreamEvent) {
 		summary := m.compact.FormatToolCall(ev.ToolName, ev.ToolParams, "", false)
 		m.viewport.AppendContent("\n" + summary)
 	case agent.StreamToolComplete:
-		if ev.IsError {
-			summary := m.compact.FormatToolCall(ev.ToolName, ev.ToolParams, ev.ToolResult, true)
+		if ev.IsError || m.settings.ShowToolResults {
+			summary := m.compact.FormatToolCall(ev.ToolName, ev.ToolParams, ev.ToolResult, ev.IsError)
 			m.viewport.AppendContent("\n" + summary)
 		}
 	case agent.StreamTurnComplete:

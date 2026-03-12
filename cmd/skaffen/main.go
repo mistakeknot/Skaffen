@@ -322,11 +322,13 @@ func runTUI() error {
 
 	// Run TUI
 	return tui.Run(tui.Config{
-		Agent:     a,
-		Trust:     trustEval,
-		SessionID: sessionID,
-		Verbose:   false,
-		WorkDir:   workDir,
+		Agent:      a,
+		Trust:      trustEval,
+		SessionID:  sessionID,
+		Verbose:    false,
+		WorkDir:    workDir,
+		SkaffenVer: skaffenVersion(),
+		MasaqVer:   masaqVersion(),
 	})
 }
 
@@ -394,10 +396,26 @@ func setupTheme() {
 	}
 }
 
-func printVersion() {
-	version := "dev"
+func skaffenVersion() string {
 	if info, ok := debug.ReadBuildInfo(); ok && info.Main.Version != "" {
-		version = info.Main.Version
+		return info.Main.Version
 	}
-	fmt.Printf("skaffen %s (%s)\n", version, runtime.Version())
+	return "dev"
+}
+
+func masaqVersion() string {
+	if info, ok := debug.ReadBuildInfo(); ok {
+		for _, dep := range info.Deps {
+			if strings.HasSuffix(dep.Path, "Masaq") {
+				if dep.Version != "" {
+					return dep.Version
+				}
+			}
+		}
+	}
+	return "dev"
+}
+
+func printVersion() {
+	fmt.Printf("skaffen %s (%s)\n", skaffenVersion(), runtime.Version())
 }

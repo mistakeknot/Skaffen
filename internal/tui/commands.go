@@ -44,16 +44,23 @@ func ParseCommand(input string) *Command {
 // KnownCommands returns the list of supported slash commands with descriptions.
 func KnownCommands() map[string]string {
 	return map[string]string{
-		"compact":  "Switch to compact tool call display",
-		"verbose":  "Switch to verbose tool call display",
-		"phase":    "Show current OODARC phase",
 		"advance":  "Advance to next OODARC phase",
-		"undo":     "Undo the last git commit",
+		"clear":    "Clear viewport",
 		"commit":   "Auto-commit current changes",
-		"ship":     "Push changes to remote",
-		"sessions": "List saved sessions",
+		"compact":  "Switch to compact tool call display",
+		"diff":     "Show git diff",
 		"help":     "Show available commands",
+		"model":    "Show current model",
+		"phase":    "Show current OODARC phase",
 		"quit":     "Exit Skaffen",
+		"sessions": "List saved sessions",
+		"settings": "Show or change settings",
+		"ship":     "Push changes to remote",
+		"status":   "Show session status summary",
+		"theme":    "Switch theme (e.g. /theme catppuccin)",
+		"undo":     "Undo the last git commit",
+		"verbose":  "Switch to verbose tool call display",
+		"version":  "Show version info",
 	}
 }
 
@@ -75,7 +82,6 @@ func FormatHelp() string {
 }
 
 // executeCommand runs a slash command and returns the result.
-// This method lives on appModel so handlers can access TUI state (phase, compact, git, etc.).
 func (m *appModel) executeCommand(cmd *Command) CommandResult {
 	switch cmd.Name {
 	case "help":
@@ -84,13 +90,28 @@ func (m *appModel) executeCommand(cmd *Command) CommandResult {
 	case "quit":
 		return CommandResult{Message: "Goodbye!", Quit: true}
 
+	case "clear":
+		m.viewport.SetContent("")
+		return CommandResult{Message: "Viewport cleared."}
+
 	case "compact":
 		m.compact.SetVerbose(false)
+		m.settings.Verbose = false
 		return CommandResult{Message: "Switched to compact display."}
 
 	case "verbose":
 		m.compact.SetVerbose(true)
+		m.settings.Verbose = true
 		return CommandResult{Message: "Switched to verbose display."}
+
+	case "model":
+		return CommandResult{Message: fmt.Sprintf("Model: %s", m.modelName)}
+
+	case "version":
+		return CommandResult{Message: fmt.Sprintf("Skaffen %s / Masaq %s", m.skaffenVer, m.masaqVer)}
+
+	case "status":
+		return m.execStatus()
 
 	case "phase":
 		if m.agent == nil {
@@ -115,6 +136,18 @@ func (m *appModel) executeCommand(cmd *Command) CommandResult {
 			Message: PhaseTransition(old, newPhase),
 		}
 
+	case "settings":
+		return m.execSettings(cmd.Args)
+
+	case "theme":
+		if len(cmd.Args) == 0 {
+			return m.execSettings([]string{"theme"})
+		}
+		return m.execSettings([]string{"theme", cmd.Args[0]})
+
+	case "diff":
+		return m.execGitDiff()
+
 	case "undo":
 		return m.execGitUndo()
 
@@ -133,6 +166,72 @@ func (m *appModel) executeCommand(cmd *Command) CommandResult {
 			IsError: true,
 		}
 	}
+}
+
+func (m *appModel) execStatus() CommandResult {
+	var b strings.Builder
+	b.WriteString(fmt.Sprintf("Phase: %s  Model: %s  Turns: %d\n", m.phase, m.modelName, m.turns))
+	if m.contextPct > 0 {
+		b.WriteString(fmt.Sprintf("Context: %.0f%%", m.contextPct))
+	}
+	if m.totalCost > 0 {
+		if m.contextPct > 0 {
+			b.WriteString(fmt.Sprintf("  Cost: $%.4f", m.totalCost))
+		} else {
+			b.WriteString(fmt.Sprintf("Cost: $%.4f", m.totalCost))
+		}
+	}
+	if m.git != nil {
+		branch, _ := m.git.CurrentBranch()
+		if branch != "" {
+			b.WriteString(fmt.Sprintf("\nBranch: %s", branch))
+		}
+		has, _ := m.git.HasChanges()
+		if has {
+			b.WriteString(" (dirty)")
+		}
+	}
+	return CommandResult{Message: b.String()}
+}
+
+func (m *appModel) execSettings(args []string) CommandResult {
+	// /settings — show all
+	if len(args) == 0 {
+		return CommandResult{Message: FormatSettings(&m.settings)}
+	}
+	// /settings <key> — show one
+	if len(args) == 1 {
+		for _, e := range settingsRegistry {
+			if e.Key == args[0] {
+				return CommandResult{Message: fmt.Sprintf("%s = %s (%s)", e.Key, e.Get(&m.settings), e.Description)}
+			}
+		}
+		return CommandResult{Message: fmt.Sprintf("Unknown setting %q. Type /settings for list.", args[0]), IsError: true}
+	}
+	// /settings <key> <value> — set
+	msg, err := ApplySetting(&m.settings, args[0], args[1])
+	if err != nil {
+		return CommandResult{Message: err.Error(), IsError: true}
+	}
+	// Sync compact formatter when verbose setting changes
+	if args[0] == "verbose" {
+		m.compact.SetVerbose(m.settings.Verbose)
+	}
+	return CommandResult{Message: msg}
+}
+
+func (m *appModel) execGitDiff() CommandResult {
+	if m.git == nil {
+		return CommandResult{Message: "Git not available (no working directory).", IsError: true}
+	}
+	d, err := m.git.Diff()
+	if err != nil {
+		return CommandResult{Message: fmt.Sprintf("Git diff failed: %v", err), IsError: true}
+	}
+	if strings.TrimSpace(d) == "" {
+		return CommandResult{Message: "No changes."}
+	}
+	return CommandResult{Message: d}
 }
 
 func (m *appModel) execGitUndo() CommandResult {
@@ -210,7 +309,6 @@ func (m *appModel) execListSessions() CommandResult {
 }
 
 // commandResultMsg wraps a CommandResult for the Bubble Tea message loop.
-// This allows slash command execution to follow the same Cmd pattern as agent runs.
 type commandResultMsg CommandResult
 
 // runCommand returns a tea.Cmd that executes a slash command and sends the result.
