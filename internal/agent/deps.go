@@ -1,11 +1,32 @@
 package agent
 
 import (
+	"github.com/mistakeknot/Skaffen/internal/agentloop"
 	"github.com/mistakeknot/Skaffen/internal/provider"
 	"github.com/mistakeknot/Skaffen/internal/tool"
 )
 
+// Re-export types from agentloop that don't use tool.Phase.
+type (
+	StreamEventType = agentloop.StreamEventType
+	StreamEvent     = agentloop.StreamEvent
+	StreamCallback  = agentloop.StreamCallback
+	ToolApprover    = agentloop.ToolApprover
+	BudgetState     = agentloop.BudgetState
+	RenderReporter  = agentloop.RenderReporter
+)
+
+// Re-export stream event type constants.
+const (
+	StreamText         = agentloop.StreamText
+	StreamToolStart    = agentloop.StreamToolStart
+	StreamToolComplete = agentloop.StreamToolComplete
+	StreamTurnComplete = agentloop.StreamTurnComplete
+	StreamPhaseChange  = agentloop.StreamPhaseChange
+)
+
 // Router selects which model to use per turn and tracks token budget.
+// This is the OODARC-specific interface that accepts tool.Phase.
 type Router interface {
 	SelectModel(phase tool.Phase) (model string, reason string)
 	RecordUsage(usage provider.Usage)
@@ -13,30 +34,15 @@ type Router interface {
 	ContextWindow(model string) int
 }
 
-// RenderReporter provides prompt composition metadata for evidence emission.
-// Implemented by PriomptSession; checked via type assertion in the agent loop.
-type RenderReporter interface {
-	ExcludedElements() []string
-	ExcludedStableElements() []string
-	PromptTokens() int
-	RenderStableTokens() int
-}
-
 // Session persists conversation state.
-// Stubbed here — real implementation comes in F5.
+// This is the OODARC-specific interface that accepts tool.Phase.
 type Session interface {
-	// SystemPrompt returns the system prompt for the current phase.
-	// The budget parameter is the estimated token budget available for the prompt.
-	// Implementations that don't use priority packing can ignore the budget.
 	SystemPrompt(phase tool.Phase, budget int) string
-	// Save persists a turn to the session log.
 	Save(turn Turn) error
-	// Messages returns the conversation history (for session resume).
 	Messages() []provider.Message
 }
 
 // Emitter receives structured evidence per turn.
-// Stubbed here — real implementation comes in F6.
 type Emitter interface {
 	Emit(event Evidence) error
 }
@@ -51,16 +57,16 @@ type Turn struct {
 
 // Evidence captures one turn's structured data for the reflect step.
 type Evidence struct {
-	Timestamp  string     `json:"timestamp"`
-	SessionID  string     `json:"session_id,omitempty"`
-	Phase      tool.Phase `json:"phase"`
-	TurnNumber int        `json:"turn"`
-	ToolCalls  []string   `json:"tool_calls,omitempty"`
-	TokensIn   int        `json:"tokens_in"`
-	TokensOut  int        `json:"tokens_out"`
-	StopReason string     `json:"stop_reason"`
+	Timestamp          string     `json:"timestamp"`
+	SessionID          string     `json:"session_id,omitempty"`
+	Phase              tool.Phase `json:"phase"`
+	TurnNumber         int        `json:"turn"`
+	ToolCalls          []string   `json:"tool_calls,omitempty"`
+	TokensIn           int        `json:"tokens_in"`
+	TokensOut          int        `json:"tokens_out"`
+	StopReason         string     `json:"stop_reason"`
 	DurationMs         int64      `json:"duration_ms,omitempty"`
-	Outcome            string     `json:"outcome,omitempty"` // success, failure, timeout
+	Outcome            string     `json:"outcome,omitempty"`
 	BudgetSpent        int        `json:"budget_spent,omitempty"`
 	BudgetMax          int        `json:"budget_max,omitempty"`
 	BudgetPercentage   float64    `json:"budget_pct,omitempty"`
@@ -72,6 +78,14 @@ type Evidence struct {
 	ExcludedStable     []string   `json:"excluded_stable,omitempty"`
 	Model              string     `json:"model,omitempty"`
 	ModelReason        string     `json:"model_reason,omitempty"`
+}
+
+// RunResult holds the outcome of a completed agent run.
+type RunResult struct {
+	Response string
+	Usage    provider.Usage
+	Turns    int
+	Phase    tool.Phase
 }
 
 // NoOpRouter always returns the default model.
@@ -94,8 +108,8 @@ func (r *NoOpRouter) ContextWindow(_ string) int { return 200000 }
 type NoOpSession struct{ Prompt string }
 
 func (s *NoOpSession) SystemPrompt(_ tool.Phase, _ int) string { return s.Prompt }
-func (s *NoOpSession) Save(_ Turn) error                 { return nil }
-func (s *NoOpSession) Messages() []provider.Message      { return nil }
+func (s *NoOpSession) Save(_ Turn) error                       { return nil }
+func (s *NoOpSession) Messages() []provider.Message            { return nil }
 
 // NoOpEmitter discards all evidence.
 type NoOpEmitter struct{}

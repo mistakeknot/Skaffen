@@ -1,0 +1,161 @@
+package agentloop
+
+import (
+	"encoding/json"
+
+	"github.com/mistakeknot/Skaffen/internal/provider"
+)
+
+// SelectionHints carries optional context for model routing.
+// Phase is an opaque string — empty for non-phased consumers.
+type SelectionHints struct {
+	Phase    string // optional — empty for non-phased consumers
+	Urgency  string // "interactive", "batch", "background"
+	TaskType string // "code", "chat", "analysis"
+}
+
+// PromptHints carries optional context for system prompt generation.
+type PromptHints struct {
+	Phase  string // optional
+	Budget int
+	Model  string
+}
+
+// Router selects which model to use per turn and tracks token budget.
+type Router interface {
+	SelectModel(hints SelectionHints) (model string, reason string)
+	RecordUsage(usage provider.Usage)
+	BudgetState() BudgetState
+	ContextWindow(model string) int
+}
+
+// BudgetState holds budget tracking information.
+type BudgetState struct {
+	Spent      int
+	Max        int
+	Percentage float64
+}
+
+// Session persists conversation state.
+type Session interface {
+	SystemPrompt(hints PromptHints) string
+	Save(turn Turn) error
+	Messages() []provider.Message
+}
+
+// Emitter receives structured evidence per turn.
+type Emitter interface {
+	Emit(event Evidence) error
+}
+
+// RenderReporter provides prompt composition metadata for evidence emission.
+// Implemented by PriomptSession; checked via type assertion in the agent loop.
+type RenderReporter interface {
+	ExcludedElements() []string
+	ExcludedStableElements() []string
+	PromptTokens() int
+	RenderStableTokens() int
+}
+
+// Turn captures one loop iteration for session persistence.
+type Turn struct {
+	Phase     string // opaque — set by agent layer for OODARC, empty for non-phased
+	Messages  []provider.Message
+	Usage     provider.Usage
+	ToolCalls int
+}
+
+// Evidence captures one turn's structured data for the reflect step.
+type Evidence struct {
+	Timestamp          string   `json:"timestamp"`
+	SessionID          string   `json:"session_id,omitempty"`
+	Phase              string   `json:"phase"`
+	TurnNumber         int      `json:"turn"`
+	ToolCalls          []string `json:"tool_calls,omitempty"`
+	TokensIn           int      `json:"tokens_in"`
+	TokensOut          int      `json:"tokens_out"`
+	StopReason         string   `json:"stop_reason"`
+	DurationMs         int64    `json:"duration_ms,omitempty"`
+	Outcome            string   `json:"outcome,omitempty"`
+	BudgetSpent        int      `json:"budget_spent,omitempty"`
+	BudgetMax          int      `json:"budget_max,omitempty"`
+	BudgetPercentage   float64  `json:"budget_pct,omitempty"`
+	ComplexityTier     int      `json:"complexity_tier,omitempty"`
+	ComplexityOverride bool     `json:"complexity_override,omitempty"`
+	PromptTokens       int      `json:"prompt_tokens,omitempty"`
+	StableTokens       int      `json:"stable_tokens,omitempty"`
+	ExcludedElements   []string `json:"excluded_elements,omitempty"`
+	ExcludedStable     []string `json:"excluded_stable,omitempty"`
+	Model              string   `json:"model,omitempty"`
+	ModelReason        string   `json:"model_reason,omitempty"`
+}
+
+// ToolApprover is called before executing a tool call. It blocks until
+// the caller (typically the TUI) returns an approval decision. Returning
+// false skips execution and feeds an error result back to the model.
+type ToolApprover func(toolName string, input json.RawMessage) (allow bool)
+
+// StreamEventType identifies the kind of stream event.
+type StreamEventType int
+
+const (
+	StreamText         StreamEventType = iota // Partial text from the model
+	StreamToolStart                           // A tool call has begun
+	StreamToolComplete                        // A tool call has finished executing
+	StreamTurnComplete                        // The turn is complete (usage available)
+	StreamPhaseChange                         // The OODARC phase has changed
+)
+
+// StreamEvent carries real-time data from the agent loop to the TUI.
+type StreamEvent struct {
+	Type       StreamEventType
+	Text       string
+	ToolName   string
+	ToolParams string
+	ToolResult string
+	IsError    bool
+	Phase      string
+	Usage      provider.Usage
+	TurnNumber int
+}
+
+// StreamCallback receives events during the agent loop.
+type StreamCallback func(StreamEvent)
+
+// RunResult holds the outcome of a completed agent run.
+type RunResult struct {
+	Response string
+	Usage    provider.Usage
+	Turns    int
+	Phase    string // opaque — set by agent layer
+}
+
+// --- NoOp implementations ---
+
+// NoOpRouter always returns the default model.
+type NoOpRouter struct{ Model string }
+
+func (r *NoOpRouter) SelectModel(_ SelectionHints) (string, string) {
+	if r.Model == "" {
+		return "claude-sonnet-4-20250514", "default"
+	}
+	return r.Model, "configured"
+}
+
+func (r *NoOpRouter) RecordUsage(_ provider.Usage) {}
+
+func (r *NoOpRouter) BudgetState() BudgetState { return BudgetState{} }
+
+func (r *NoOpRouter) ContextWindow(_ string) int { return 200000 }
+
+// NoOpSession discards all state.
+type NoOpSession struct{ Prompt string }
+
+func (s *NoOpSession) SystemPrompt(_ PromptHints) string     { return s.Prompt }
+func (s *NoOpSession) Save(_ Turn) error                     { return nil }
+func (s *NoOpSession) Messages() []provider.Message          { return nil }
+
+// NoOpEmitter discards all evidence.
+type NoOpEmitter struct{}
+
+func (e *NoOpEmitter) Emit(_ Evidence) error { return nil }
