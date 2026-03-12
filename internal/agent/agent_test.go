@@ -376,3 +376,114 @@ func TestBuildAssistantMessage(t *testing.T) {
 		t.Errorf("block 1 = %+v", msg.Content[1])
 	}
 }
+
+// --- estimateMessageTokens Tests ---
+
+func TestEstimateMessageTokensEmpty(t *testing.T) {
+	if n := estimateMessageTokens(nil); n != 0 {
+		t.Errorf("nil messages = %d, want 0", n)
+	}
+	if n := estimateMessageTokens([]provider.Message{}); n != 0 {
+		t.Errorf("empty messages = %d, want 0", n)
+	}
+}
+
+func TestEstimateMessageTokensText(t *testing.T) {
+	msgs := []provider.Message{
+		{Role: provider.RoleUser, Content: []provider.ContentBlock{
+			{Type: "text", Text: "Hello, world! How are you doing today?"},
+		}},
+		{Role: provider.RoleAssistant, Content: []provider.ContentBlock{
+			{Type: "text", Text: "I am fine, thanks for asking!"},
+		}},
+	}
+	n := estimateMessageTokens(msgs)
+	// "Hello, world! How are you doing today?" = 38 chars / 4 = 9
+	// "I am fine, thanks for asking!" = 29 chars / 4 = 7
+	// Total = 16
+	if n != 16 {
+		t.Errorf("text messages = %d, want 16", n)
+	}
+}
+
+func TestEstimateMessageTokensShortText(t *testing.T) {
+	msgs := []provider.Message{
+		{Role: provider.RoleUser, Content: []provider.ContentBlock{
+			{Type: "text", Text: "Hi"},
+		}},
+	}
+	n := estimateMessageTokens(msgs)
+	// "Hi" = 2 chars / 4 = 0, but CharHeuristic returns min 1 for non-empty
+	if n != 1 {
+		t.Errorf("short text = %d, want 1 (min per block)", n)
+	}
+}
+
+func TestEstimateMessageTokensToolUse(t *testing.T) {
+	msgs := []provider.Message{
+		{Role: provider.RoleAssistant, Content: []provider.ContentBlock{
+			{Type: "tool_use", Name: "read_file", Input: json.RawMessage(`{"path":"/tmp/foo.go"}`)},
+		}},
+	}
+	n := estimateMessageTokens(msgs)
+	// "read_file" = 9 chars / 4 = 2
+	// `{"path":"/tmp/foo.go"}` = 22 chars / 4 = 5
+	// Total = 7
+	if n != 7 {
+		t.Errorf("tool_use = %d, want 7", n)
+	}
+}
+
+func TestEstimateMessageTokensToolResult(t *testing.T) {
+	msgs := []provider.Message{
+		{Role: provider.RoleUser, Content: []provider.ContentBlock{
+			{Type: "tool_result", ResultContent: "file contents here with some text"},
+		}},
+	}
+	n := estimateMessageTokens(msgs)
+	// "file contents here with some text" = 33 chars / 4 = 8
+	if n != 8 {
+		t.Errorf("tool_result = %d, want 8", n)
+	}
+}
+
+func TestBudgetComputation(t *testing.T) {
+	// Short conversation: budget should be positive
+	msgs := []provider.Message{
+		{Role: provider.RoleUser, Content: []provider.ContentBlock{
+			{Type: "text", Text: "Write a function that adds two numbers"},
+		}},
+	}
+	windowSize := 200000
+	outputReserve := 8192
+	msgTokens := estimateMessageTokens(msgs)
+	budget := windowSize - outputReserve - msgTokens
+	if budget <= 0 {
+		t.Errorf("short conversation budget = %d, want positive", budget)
+	}
+	if budget > windowSize {
+		t.Errorf("budget %d > window %d", budget, windowSize)
+	}
+}
+
+func TestBudgetComputationLargeConversation(t *testing.T) {
+	// Generate a conversation large enough to exhaust the window
+	var msgs []provider.Message
+	bigText := make([]byte, 200000*4) // ~200k tokens worth of chars
+	for i := range bigText {
+		bigText[i] = 'a'
+	}
+	msgs = append(msgs, provider.Message{
+		Role: provider.RoleUser,
+		Content: []provider.ContentBlock{
+			{Type: "text", Text: string(bigText)},
+		},
+	})
+	windowSize := 200000
+	outputReserve := 8192
+	msgTokens := estimateMessageTokens(msgs)
+	budget := windowSize - outputReserve - msgTokens
+	if budget > 0 {
+		t.Errorf("huge conversation budget = %d, want <= 0", budget)
+	}
+}

@@ -8,6 +8,7 @@ import (
 
 	"github.com/mistakeknot/Skaffen/internal/provider"
 	"github.com/mistakeknot/Skaffen/internal/tool"
+	"github.com/mistakeknot/masaq/priompt"
 )
 
 // RunResult holds the outcome of a completed agent run.
@@ -39,11 +40,19 @@ func (a *Agent) Run(ctx context.Context, task string) (*RunResult, error) {
 	for turn < a.maxTurns {
 		turn++
 
-		// Orient: select model, get tools for phase, get system prompt
+		// Orient: select model, get tools for phase, compute prompt budget
 		model, _ := a.router.SelectModel(a.fsm.Current())
 		tools := a.registry.Tools(a.fsm.Current())
-		systemPrompt := a.session.SystemPrompt(a.fsm.Current())
 		providerTools := convertToolDefs(tools)
+
+		windowSize := a.router.ContextWindow(model)
+		outputReserve := 8192
+		msgTokens := estimateMessageTokens(messages)
+		promptBudget := windowSize - outputReserve - msgTokens
+		if promptBudget < 0 {
+			promptBudget = 0
+		}
+		systemPrompt := a.session.SystemPrompt(a.fsm.Current(), promptBudget)
 
 		cfg := provider.Config{
 			Model:     model,
@@ -98,7 +107,7 @@ func (a *Agent) Run(ctx context.Context, task string) (*RunResult, error) {
 			outcome = "tool_use"
 		}
 		spent, bmax, bpct := a.router.BudgetState()
-		a.emitter.Emit(Evidence{
+		ev := Evidence{
 			Timestamp:        time.Now().UTC().Format(time.RFC3339),
 			SessionID:        a.sessionID,
 			Phase:            a.fsm.Current(),
@@ -112,7 +121,14 @@ func (a *Agent) Run(ctx context.Context, task string) (*RunResult, error) {
 			BudgetSpent:      spent,
 			BudgetMax:        bmax,
 			BudgetPercentage: bpct,
-		})
+		}
+		if rr, ok := a.session.(RenderReporter); ok {
+			ev.PromptTokens = rr.PromptTokens()
+			ev.StableTokens = rr.RenderStableTokens()
+			ev.ExcludedElements = rr.ExcludedElements()
+			ev.ExcludedStable = rr.ExcludedStableElements()
+		}
+		a.emitter.Emit(ev)
 
 		// Compound: save turn to session (include messages for replay)
 		turnMessages := []provider.Message{assistantMsg}
@@ -271,4 +287,26 @@ func convertToolDefs(defs []tool.ToolDef) []provider.ToolDef {
 		}
 	}
 	return out
+}
+
+// estimateMessageTokens estimates total tokens for a message slice using the
+// same CharHeuristic tokenizer that priompt.Render uses internally. This
+// ensures budget computation in the loop stays consistent with prompt rendering.
+func estimateMessageTokens(msgs []provider.Message) int {
+	h := priompt.CharHeuristic{Ratio: 4}
+	total := 0
+	for _, m := range msgs {
+		for _, b := range m.Content {
+			switch b.Type {
+			case "text":
+				total += h.Count(b.Text)
+			case "tool_use":
+				total += h.Count(b.Name)
+				total += h.Count(string(b.Input))
+			case "tool_result":
+				total += h.Count(b.ResultContent)
+			}
+		}
+	}
+	return total
 }

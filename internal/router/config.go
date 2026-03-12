@@ -11,9 +11,10 @@ import (
 
 // Config holds routing configuration from JSON + env vars.
 type Config struct {
-	Phases     map[tool.Phase]string `json:"phases,omitempty"`
-	Budget     *BudgetConfig         `json:"budget,omitempty"`
-	Complexity *ComplexityConfig      `json:"complexity,omitempty"`
+	Phases         map[tool.Phase]string `json:"phases,omitempty"`
+	Budget         *BudgetConfig         `json:"budget,omitempty"`
+	Complexity     *ComplexityConfig      `json:"complexity,omitempty"`
+	ContextWindows map[string]int        `json:"context_windows,omitempty"`
 }
 
 // BudgetConfig controls per-session token budget enforcement.

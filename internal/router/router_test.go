@@ -120,6 +120,55 @@ func TestRouterLastOverride(t *testing.T) {
 	}
 }
 
+func TestContextWindowCanonicalID(t *testing.T) {
+	r := New(nil)
+	tests := []struct {
+		model string
+		want  int
+	}{
+		{ModelOpus, 200000},
+		{ModelSonnet, 200000},
+		{ModelHaiku, 200000},
+	}
+	for _, tt := range tests {
+		if w := r.ContextWindow(tt.model); w != tt.want {
+			t.Errorf("ContextWindow(%q) = %d, want %d", tt.model, w, tt.want)
+		}
+	}
+}
+
+func TestContextWindowAlias(t *testing.T) {
+	r := New(nil)
+	for _, alias := range []string{"opus", "sonnet", "haiku"} {
+		if w := r.ContextWindow(alias); w != 200000 {
+			t.Errorf("ContextWindow(%q) = %d, want 200000", alias, w)
+		}
+	}
+}
+
+func TestContextWindowUnknownModel(t *testing.T) {
+	r := New(nil)
+	if w := r.ContextWindow("unknown-model-xyz"); w != 200000 {
+		t.Errorf("ContextWindow(unknown) = %d, want 200000", w)
+	}
+}
+
+func TestContextWindowConfigOverride(t *testing.T) {
+	cfg := &Config{
+		ContextWindows: map[string]int{
+			ModelOpus: 150000,
+		},
+	}
+	r := New(cfg)
+	if w := r.ContextWindow("opus"); w != 150000 {
+		t.Errorf("ContextWindow(opus with override) = %d, want 150000", w)
+	}
+	// Sonnet should still use default
+	if w := r.ContextWindow("sonnet"); w != 200000 {
+		t.Errorf("ContextWindow(sonnet no override) = %d, want 200000", w)
+	}
+}
+
 func TestResolveModelAlias(t *testing.T) {
 	tests := []struct {
 		alias string

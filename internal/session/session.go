@@ -47,8 +47,9 @@ func New(id, dir, systemPrompt string, maxTurns int) *JSONLSession {
 	}
 }
 
-// SystemPrompt returns the system prompt.
-func (s *JSONLSession) SystemPrompt(_ tool.Phase) string {
+// SystemPrompt returns the system prompt. The budget parameter is ignored —
+// JSONLSession returns a static prompt regardless of budget.
+func (s *JSONLSession) SystemPrompt(_ tool.Phase, _ int) string {
 	return s.prompt
 }
 

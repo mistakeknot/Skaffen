@@ -118,6 +118,28 @@ func (r *DefaultRouter) LastComplexityOverride() *ComplexityOverride {
 	return r.lastOverride
 }
 
+// Default context window sizes per model (tokens).
+var defaultContextWindows = map[string]int{
+	ModelOpus:   200000,
+	ModelSonnet: 200000,
+	ModelHaiku:  200000,
+}
+
+// ContextWindow returns the context window size for the given model.
+// Accepts both aliases ("opus") and canonical IDs ("claude-opus-4-6").
+func (r *DefaultRouter) ContextWindow(model string) int {
+	canonical := resolveModelAlias(model)
+	if r.cfg.ContextWindows != nil {
+		if w, ok := r.cfg.ContextWindows[canonical]; ok {
+			return w
+		}
+	}
+	if w, ok := defaultContextWindows[canonical]; ok {
+		return w
+	}
+	return 200000 // safe default
+}
+
 // resolveModelAlias converts short aliases to canonical model IDs.
 func resolveModelAlias(alias string) string {
 	switch alias {

@@ -10,13 +10,25 @@ type Router interface {
 	SelectModel(phase tool.Phase) (model string, reason string)
 	RecordUsage(usage provider.Usage)
 	BudgetState() (spent, max int, pct float64)
+	ContextWindow(model string) int
+}
+
+// RenderReporter provides prompt composition metadata for evidence emission.
+// Implemented by PriomptSession; checked via type assertion in the agent loop.
+type RenderReporter interface {
+	ExcludedElements() []string
+	ExcludedStableElements() []string
+	PromptTokens() int
+	RenderStableTokens() int
 }
 
 // Session persists conversation state.
 // Stubbed here — real implementation comes in F5.
 type Session interface {
 	// SystemPrompt returns the system prompt for the current phase.
-	SystemPrompt(phase tool.Phase) string
+	// The budget parameter is the estimated token budget available for the prompt.
+	// Implementations that don't use priority packing can ignore the budget.
+	SystemPrompt(phase tool.Phase, budget int) string
 	// Save persists a turn to the session log.
 	Save(turn Turn) error
 	// Messages returns the conversation history (for session resume).
@@ -54,6 +66,10 @@ type Evidence struct {
 	BudgetPercentage   float64    `json:"budget_pct,omitempty"`
 	ComplexityTier     int        `json:"complexity_tier,omitempty"`
 	ComplexityOverride bool       `json:"complexity_override,omitempty"`
+	PromptTokens       int        `json:"prompt_tokens,omitempty"`
+	StableTokens       int        `json:"stable_tokens,omitempty"`
+	ExcludedElements   []string   `json:"excluded_elements,omitempty"`
+	ExcludedStable     []string   `json:"excluded_stable,omitempty"`
 }
 
 // NoOpRouter always returns the default model.
@@ -70,10 +86,12 @@ func (r *NoOpRouter) RecordUsage(_ provider.Usage) {}
 
 func (r *NoOpRouter) BudgetState() (int, int, float64) { return 0, 0, 0 }
 
+func (r *NoOpRouter) ContextWindow(_ string) int { return 200000 }
+
 // NoOpSession discards all state.
 type NoOpSession struct{ Prompt string }
 
-func (s *NoOpSession) SystemPrompt(_ tool.Phase) string  { return s.Prompt }
+func (s *NoOpSession) SystemPrompt(_ tool.Phase, _ int) string { return s.Prompt }
 func (s *NoOpSession) Save(_ Turn) error                 { return nil }
 func (s *NoOpSession) Messages() []provider.Message      { return nil }
 

@@ -19,7 +19,7 @@ func TestEmptySession(t *testing.T) {
 	if msgs := s.Messages(); msgs != nil {
 		t.Errorf("empty session Messages() = %v, want nil", msgs)
 	}
-	if sp := s.SystemPrompt(tool.PhaseBuild); sp != "you are helpful" {
+	if sp := s.SystemPrompt(tool.PhaseBuild, 200000); sp != "you are helpful" {
 		t.Errorf("SystemPrompt = %q", sp)
 	}
 }
