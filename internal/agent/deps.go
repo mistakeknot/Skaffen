@@ -70,6 +70,8 @@ type Evidence struct {
 	StableTokens       int        `json:"stable_tokens,omitempty"`
 	ExcludedElements   []string   `json:"excluded_elements,omitempty"`
 	ExcludedStable     []string   `json:"excluded_stable,omitempty"`
+	Model              string     `json:"model,omitempty"`
+	ModelReason        string     `json:"model_reason,omitempty"`
 }
 
 // NoOpRouter always returns the default model.

@@ -41,7 +41,7 @@ func (a *Agent) Run(ctx context.Context, task string) (*RunResult, error) {
 		turn++
 
 		// Orient: select model, get tools for phase, compute prompt budget
-		model, _ := a.router.SelectModel(a.fsm.Current())
+		model, modelReason := a.router.SelectModel(a.fsm.Current())
 		tools := a.registry.Tools(a.fsm.Current())
 		providerTools := convertToolDefs(tools)
 
@@ -121,6 +121,8 @@ func (a *Agent) Run(ctx context.Context, task string) (*RunResult, error) {
 			BudgetSpent:      spent,
 			BudgetMax:        bmax,
 			BudgetPercentage: bpct,
+			Model:            model,
+			ModelReason:      modelReason,
 		}
 		if rr, ok := a.session.(RenderReporter); ok {
 			ev.PromptTokens = rr.PromptTokens()
@@ -198,10 +200,30 @@ func (a *Agent) executeTools(ctx context.Context, calls []provider.ToolCall) pro
 }
 
 // executeToolsWithCallbacks is like executeTools but emits StreamToolComplete
-// events when streamCB is set.
+// events when streamCB is set. When an approver is configured, each call is
+// gated — rejected calls return an error result to the model without executing.
 func (a *Agent) executeToolsWithCallbacks(ctx context.Context, calls []provider.ToolCall) provider.Message {
 	var blocks []provider.ContentBlock
 	for _, tc := range calls {
+		// Gate: check approval before execution
+		if a.approver != nil && !a.approver(tc.Name, tc.Input) {
+			blocks = append(blocks, provider.ContentBlock{
+				Type:          "tool_result",
+				ToolUseID:     tc.ID,
+				ResultContent: fmt.Sprintf("Tool call %q was denied by the user.", tc.Name),
+				IsError:       true,
+			})
+			if a.streamCB != nil {
+				a.streamCB(StreamEvent{
+					Type:       StreamToolComplete,
+					ToolName:   tc.Name,
+					ToolResult: fmt.Sprintf("Denied by user: %s", tc.Name),
+					IsError:    true,
+				})
+			}
+			continue
+		}
+
 		result := a.registry.Execute(ctx, a.fsm.Current(), tc.Name, tc.Input)
 		blocks = append(blocks, provider.ContentBlock{
 			Type:          "tool_result",
