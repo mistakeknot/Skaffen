@@ -22,3 +22,14 @@ func TestTrustLearnMsgFields(t *testing.T) {
 		t.Errorf("scope = %v, want ScopeSession", msg.Scope)
 	}
 }
+
+func TestTrustLearnMsgBlockDecision(t *testing.T) {
+	msg := TrustLearnMsg{
+		Pattern:  "rm *",
+		Decision: trust.Block,
+		Scope:    trust.ScopeSession,
+	}
+	if msg.Decision != trust.Block {
+		t.Errorf("decision = %v, want Block", msg.Decision)
+	}
+}
