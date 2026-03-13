@@ -24,8 +24,10 @@ import (
 	"github.com/mistakeknot/Masaq/diff"
 	"github.com/mistakeknot/Masaq/keys"
 	"github.com/mistakeknot/Masaq/markdown"
+	"github.com/mistakeknot/Masaq/meter"
 	"github.com/mistakeknot/Masaq/question"
 	msettings "github.com/mistakeknot/Masaq/settings"
+	"github.com/mistakeknot/Masaq/sparkline"
 	"github.com/mistakeknot/Masaq/statusbar"
 	"github.com/mistakeknot/Masaq/theme"
 	"github.com/mistakeknot/Masaq/viewport"
@@ -176,6 +178,10 @@ type appModel struct {
 	pinner        *skill.Pinner
 	pendingSkills []string // queued skill injections for next agent call
 
+	// Context meter and token sparkline
+	contextMeter  meter.Model
+	tokenSpark    sparkline.Model
+
 	// Subagent tracker for inline status rendering
 	subagents *subagentTracker
 }
@@ -216,27 +222,29 @@ func newAppModel(cfg Config) *appModel {
 		{Label: "ship", Status: breadcrumb.Pending},
 	})
 	return &appModel{
-		viewport:   vp,
-		md:         markdown.New(80),
-		compact:    cf,
-		keys:       keys.NewDefault(keys.WithVim()),
-		status:     newStatusBar(80),
-		crumbs:     bc,
-		prompt:     pm,
-		agent:      cfg.Agent,
-		trust:      cfg.Trust,
-		session:    cfg.Session,
-		git:        g,
-		workDir:    cfg.WorkDir,
-		settings:   s,
-		skaffenVer: skVer,
-		masaqVer:   mqVer,
-		phase:      "build",
-		modelName:  "opus",
-		logo:       newLogoModel(skVer, mqVer),
-		customCmds: cfg.CustomCommands,
-		skills:     cfg.Skills,
-		pinner:     skill.NewPinner(cfg.Skills),
+		viewport:     vp,
+		md:           markdown.New(80),
+		compact:      cf,
+		keys:         keys.NewDefault(keys.WithVim()),
+		status:       newStatusBar(80),
+		crumbs:       bc,
+		prompt:       pm,
+		agent:        cfg.Agent,
+		trust:        cfg.Trust,
+		session:      cfg.Session,
+		git:          g,
+		workDir:      cfg.WorkDir,
+		settings:     s,
+		skaffenVer:   skVer,
+		masaqVer:     mqVer,
+		phase:        "build",
+		modelName:    "opus",
+		logo:         newLogoModel(skVer, mqVer),
+		customCmds:   cfg.CustomCommands,
+		skills:       cfg.Skills,
+		pinner:       skill.NewPinner(cfg.Skills),
+		contextMeter: newContextMeter(80),
+		tokenSpark:   newTokenSparkline(80),
 	}
 }
 
@@ -251,8 +259,8 @@ func (m *appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
-		// Layout: breadcrumb=1, status=1, prompt=3, rest=viewport
-		vpHeight := m.height - 5 // 1 breadcrumb + 1 status + 3 prompt
+		// Layout: breadcrumb=1, meter=1, status=1, prompt=3, rest=viewport
+		vpHeight := m.height - 6 // 1 breadcrumb + 1 meter + 1 status + 3 prompt
 		if vpHeight < 1 {
 			vpHeight = 1
 		}
@@ -262,6 +270,9 @@ func (m *appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.status = newStatusBar(m.width)
 		m.crumbs = breadcrumb.New(m.width)
 		m.syncBreadcrumb()
+		m.contextMeter = newContextMeter(m.width)
+		m.contextMeter.SetValue(float64(contextMaxTokens)*m.contextPct/100, contextMaxTokens)
+		m.tokenSpark = newTokenSparkline(m.width)
 		m.logo.width = m.width
 
 	case logoTickMsg:
@@ -529,9 +540,13 @@ func (m *appModel) View() string {
 	statusView := m.status.View()
 	crumbView := m.crumbs.View()
 
+	// Update meter with current context usage.
+	m.contextMeter.SetValue(float64(contextMaxTokens)*m.contextPct/100, contextMaxTokens)
+	meterView := renderMeterRow(m.contextMeter, m.tokenSpark, m.width)
+
 	// Logo sits above viewport, taking space from viewport height
 	logoHeight := strings.Count(logoView, "\n")
-	vpHeight := m.height - 5 - logoHeight // 1 breadcrumb + 1 status + 3 prompt + logo
+	vpHeight := m.height - 6 - logoHeight // 1 breadcrumb + 1 meter + 1 status + 3 prompt + logo
 	if vpHeight < 1 {
 		vpHeight = 1
 	}
@@ -541,15 +556,15 @@ func (m *appModel) View() string {
 	}
 
 	if m.approving {
-		return lipgloss.JoinVertical(lipgloss.Left, logoView, vpView, m.approvalQ.View(), crumbView, statusView)
+		return lipgloss.JoinVertical(lipgloss.Left, logoView, vpView, m.approvalQ.View(), crumbView, meterView, statusView)
 	}
 
 	if m.settingsOpen {
-		return lipgloss.JoinVertical(lipgloss.Left, logoView, vpView, m.settingsOverlay.View(), crumbView, statusView)
+		return lipgloss.JoinVertical(lipgloss.Left, logoView, vpView, m.settingsOverlay.View(), crumbView, meterView, statusView)
 	}
 
 	promptView := m.prompt.View(m.width, m.running)
-	return lipgloss.JoinVertical(lipgloss.Left, logoView, vpView, promptView, crumbView, statusView)
+	return lipgloss.JoinVertical(lipgloss.Left, logoView, vpView, promptView, crumbView, meterView, statusView)
 }
 
 // drainApproval sends false to a pending approval channel so the agent
@@ -579,8 +594,10 @@ func (m *appModel) handleStreamEvent(ev agent.StreamEvent) {
 	case agent.StreamTurnComplete:
 		m.turns = ev.TurnNumber
 		if ev.Usage.InputTokens > 0 {
-			m.contextPct = float64(ev.Usage.InputTokens) / 200000.0 * 100
+			m.contextPct = float64(ev.Usage.InputTokens) / float64(contextMaxTokens) * 100
 		}
+		// Feed sparkline with input tokens per turn.
+		m.tokenSpark.Push(float64(ev.Usage.InputTokens))
 		// Auto-compact when context exceeds 80%
 		if m.settings.AutoCompact && m.contextPct > 80 && m.session != nil {
 			result := m.execCompact()

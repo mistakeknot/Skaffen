@@ -50,12 +50,12 @@ func TestStatusBarTurns(t *testing.T) {
 	}
 }
 
-func TestStatusBarContextPercent(t *testing.T) {
-	sb := newStatusBar(120)
-	updateStatusSlots(&sb, "build", "claude", 0, 75, 0, false)
-	view := sb.View()
+func TestContextMeterShowsPercentage(t *testing.T) {
+	m := newContextMeter(80)
+	m.SetValue(float64(contextMaxTokens)*0.75, contextMaxTokens)
+	view := m.View()
 	if !strings.Contains(view, "75%") {
-		t.Fatal("status bar should show context percentage")
+		t.Fatalf("context meter should show 75%%, got %q", view)
 	}
 }
 
@@ -126,5 +126,52 @@ func TestStatusBarPlanModeOff(t *testing.T) {
 	view := sb.View()
 	if strings.Contains(view, "PLAN") {
 		t.Errorf("PLAN badge should not appear when plan mode off: %q", view)
+	}
+}
+
+func TestContextMeterForecast(t *testing.T) {
+	m := newContextMeter(60)
+	m.SetValue(0, contextMaxTokens)
+	view := m.View()
+	if view == "" {
+		t.Fatal("meter should render")
+	}
+	// Forecast marker at 80% should be present (│ character)
+	if !strings.Contains(view, "│") {
+		t.Fatal("meter should show forecast marker")
+	}
+}
+
+func TestContextMeterLabel(t *testing.T) {
+	m := newContextMeter(60)
+	m.SetValue(50000, contextMaxTokens)
+	view := m.View()
+	if !strings.Contains(view, "ctx") {
+		t.Fatalf("meter should show ctx label, got %q", view)
+	}
+}
+
+func TestTokenSparklineRenders(t *testing.T) {
+	s := newTokenSparkline(80)
+	s.Push(10000)
+	s.Push(15000)
+	s.Push(12000)
+	view := s.View()
+	if view == "" {
+		t.Fatal("sparkline should render after pushes")
+	}
+}
+
+func TestMeterRowCombined(t *testing.T) {
+	m := newContextMeter(80)
+	m.SetValue(100000, contextMaxTokens)
+	s := newTokenSparkline(80)
+	s.Push(5000)
+	row := renderMeterRow(m, s, 80)
+	if row == "" {
+		t.Fatal("meter row should render")
+	}
+	if !strings.Contains(row, "│") {
+		t.Fatal("meter row should contain separator between meter and sparkline")
 	}
 }
