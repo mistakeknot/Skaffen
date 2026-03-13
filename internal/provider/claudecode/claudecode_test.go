@@ -340,3 +340,37 @@ func TestHandleAssistantMessage_EmptyText(t *testing.T) {
 		t.Fatalf("expected 0 events for empty text, got %d", len(evs))
 	}
 }
+
+func TestResolveProjectRoot_NestedGit(t *testing.T) {
+	// Create a nested git structure: parent/.git + parent/child/.git
+	tmp := t.TempDir()
+	parent := filepath.Join(tmp, "parent")
+	child := filepath.Join(parent, "child")
+	os.MkdirAll(filepath.Join(parent, ".git"), 0o755)
+	os.MkdirAll(filepath.Join(child, ".git"), 0o755)
+
+	// From child, should find parent (outermost .git)
+	root := resolveProjectRoot(child)
+	if root != parent {
+		t.Errorf("resolveProjectRoot(%q) = %q, want %q", child, root, parent)
+	}
+}
+
+func TestResolveProjectRoot_SingleGit(t *testing.T) {
+	tmp := t.TempDir()
+	os.MkdirAll(filepath.Join(tmp, ".git"), 0o755)
+	sub := filepath.Join(tmp, "sub")
+	os.MkdirAll(sub, 0o755)
+
+	// From sub (no .git), should find parent
+	root := resolveProjectRoot(sub)
+	if root != tmp {
+		t.Errorf("resolveProjectRoot(%q) = %q, want %q", sub, root, tmp)
+	}
+}
+
+func TestResolveProjectRoot_Empty(t *testing.T) {
+	if root := resolveProjectRoot(""); root != "" {
+		t.Errorf("resolveProjectRoot('') = %q, want empty", root)
+	}
+}

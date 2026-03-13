@@ -321,7 +321,8 @@ func runTUI() error {
 		}
 	}
 
-	pcfg := provider.ProviderConfig{}
+	wd, _ := os.Getwd()
+	pcfg := provider.ProviderConfig{WorkDir: wd}
 	if providerName == "anthropic" {
 		pcfg.APIKey = os.Getenv("ANTHROPIC_API_KEY")
 		if pcfg.APIKey == "" {

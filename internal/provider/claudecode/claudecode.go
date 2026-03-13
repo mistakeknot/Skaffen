@@ -6,7 +6,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 
 	"github.com/mistakeknot/Skaffen/internal/provider"
@@ -25,10 +27,18 @@ func WithModel(model string) Option {
 	return func(p *ClaudeCodeProvider) { p.model = model }
 }
 
+// WithWorkDir sets the working directory for the claude subprocess.
+// Claude Code scopes file access to this directory. Set this to the
+// project root so the subprocess can reach all project files.
+func WithWorkDir(dir string) Option {
+	return func(p *ClaudeCodeProvider) { p.workDir = dir }
+}
+
 // ClaudeCodeProvider delegates inference to a local claude binary.
 type ClaudeCodeProvider struct {
 	binaryPath string
 	model      string
+	workDir    string
 	initErr    error
 }
 
@@ -78,6 +88,15 @@ func (p *ClaudeCodeProvider) Stream(ctx context.Context, messages []provider.Mes
 		"--output-format", "stream-json",
 		"--verbose",
 	}
+	// Claude Code's --print mode can't forward interactive approval
+	// prompts back to Skaffen's TUI — it blocks waiting for input that
+	// never arrives. Bypass CC's permissions since Skaffen's trust
+	// evaluator (internal/trust/) handles tool gating via the TUI
+	// approval overlay when tools are executed through Skaffen's own
+	// registry. When using the claude-code provider, CC executes tools
+	// internally, so its own permission system is the only gate — and
+	// it can't work in --print mode.
+	args = append(args, "--permission-mode", "bypassPermissions")
 	if model := config.Model; model != "" {
 		args = append(args, "--model", model)
 	} else if p.model != "" {
@@ -86,6 +105,12 @@ func (p *ClaudeCodeProvider) Stream(ctx context.Context, messages []provider.Mes
 
 	cmd := exec.CommandContext(ctx, p.binaryPath, args...)
 	cmd.Stdin = strings.NewReader(prompt)
+	// Set working directory so Claude Code can access the full project tree.
+	// If workDir is inside a monorepo (parent .git exists), use the monorepo
+	// root so the subprocess can reach sibling directories and .beads/.
+	if dir := resolveProjectRoot(p.workDir); dir != "" {
+		cmd.Dir = dir
+	}
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
@@ -272,4 +297,28 @@ func truncate(s string, n int) string {
 		return s
 	}
 	return s[:n] + "..."
+}
+
+// resolveProjectRoot finds the outermost project root for the given directory.
+// If the directory is inside a monorepo (nested .git), it walks up to find the
+// parent that contains .git, so the Claude Code subprocess can access sibling
+// modules and shared directories like .beads/.
+func resolveProjectRoot(dir string) string {
+	if dir == "" {
+		return ""
+	}
+	// Walk up from dir, tracking the highest directory that contains .git
+	best := ""
+	cur := dir
+	for {
+		if info, err := os.Stat(filepath.Join(cur, ".git")); err == nil && info.IsDir() {
+			best = cur
+		}
+		parent := filepath.Dir(cur)
+		if parent == cur {
+			break
+		}
+		cur = parent
+	}
+	return best
 }

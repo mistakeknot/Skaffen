@@ -10,6 +10,9 @@ func init() {
 		if cfg.Model != "" {
 			opts = append(opts, WithModel(cfg.Model))
 		}
+		if cfg.WorkDir != "" {
+			opts = append(opts, WithWorkDir(cfg.WorkDir))
+		}
 		return New(opts...), nil
 	})
 }

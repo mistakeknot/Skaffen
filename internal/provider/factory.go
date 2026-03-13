@@ -7,6 +7,7 @@ type ProviderConfig struct {
 	APIKey  string // for anthropic provider
 	Model   string // model override
 	BaseURL string // API base URL override (for testing)
+	WorkDir string // working directory for subprocess providers (claude-code)
 }
 
 // Constructor creates a Provider from config.
