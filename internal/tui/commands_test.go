@@ -55,8 +55,8 @@ func TestParseSlashCommand(t *testing.T) {
 func TestKnownCommands(t *testing.T) {
 	cmds := KnownCommands()
 	required := []string{
-		"advance", "clear", "commit", "compact", "diff", "help",
-		"model", "phase", "quit", "sessions", "settings", "ship",
+		"advance", "clear", "commit", "compact", "continue", "diff", "help",
+		"model", "phase", "quit", "retry", "sessions", "settings", "ship",
 		"status", "theme", "undo", "verbose", "version",
 	}
 	for _, name := range required {
@@ -600,6 +600,35 @@ func TestExecuteCommand_RetryTruncatesLongPrompt(t *testing.T) {
 	}
 	if len(result.Message) > 80 {
 		t.Fatal("displayed message should be truncated")
+	}
+}
+
+func TestExecuteCommand_ContinueNoHistory(t *testing.T) {
+	m := newTestModel()
+	result := m.executeCommand(&Command{Name: "continue"})
+	if !result.IsError {
+		t.Fatal("continue with no previous prompt should be an error")
+	}
+	if !strings.Contains(result.Message, "No previous prompt") {
+		t.Fatalf("should mention no previous prompt, got: %s", result.Message)
+	}
+}
+
+func TestExecuteCommand_ContinueWithHistory(t *testing.T) {
+	m := newTestModel()
+	m.lastPrompt = "explain the code"
+	result := m.executeCommand(&Command{Name: "continue"})
+	if result.IsError {
+		t.Fatalf("continue should not error: %s", result.Message)
+	}
+	if !strings.Contains(result.Retry, "explain the code") {
+		t.Fatal("Retry should contain original prompt")
+	}
+	if !strings.Contains(result.Retry, "continue") {
+		t.Fatal("Retry should contain continuation instruction")
+	}
+	if !strings.Contains(result.Message, "Continuing") {
+		t.Fatalf("should mention continuing, got: %s", result.Message)
 	}
 }
 

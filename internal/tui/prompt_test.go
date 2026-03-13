@@ -249,3 +249,34 @@ func TestPromptPlaceholderMentionsHelp(t *testing.T) {
 		t.Fatal("placeholder should mention ? for help")
 	}
 }
+
+func TestPromptCtrlW_DeletesWord(t *testing.T) {
+	p := newPromptModel()
+	p.input.SetValue("hello world foo")
+	p.input.SetCursor(len("hello world foo"))
+	p, _ = p.Update(tea.KeyMsg{Type: tea.KeyCtrlW})
+	got := p.input.Value()
+	if got != "hello world " {
+		t.Fatalf("after Ctrl+W got %q, want %q", got, "hello world ")
+	}
+}
+
+func TestPromptCtrlW_DeletesWordWithTrailingSpaces(t *testing.T) {
+	p := newPromptModel()
+	p.input.SetValue("hello   ")
+	p.input.SetCursor(len("hello   "))
+	p, _ = p.Update(tea.KeyMsg{Type: tea.KeyCtrlW})
+	got := p.input.Value()
+	if got != "" {
+		t.Fatalf("after Ctrl+W got %q, want empty", got)
+	}
+}
+
+func TestPromptCtrlW_EmptyInput(t *testing.T) {
+	p := newPromptModel()
+	p.input.SetValue("")
+	p, _ = p.Update(tea.KeyMsg{Type: tea.KeyCtrlW})
+	if p.input.Value() != "" {
+		t.Fatal("Ctrl+W on empty input should remain empty")
+	}
+}

@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -199,6 +200,9 @@ type appModel struct {
 
 	// Subagent tracker for inline status rendering
 	subagents *subagentTracker
+
+	// Tool timers: track start time of in-flight tool calls by name
+	toolTimers map[string]time.Time
 }
 
 func newAppModel(cfg Config) *appModel {
@@ -647,10 +651,33 @@ func (m *appModel) handleStreamEvent(ev agent.StreamEvent) {
 	case agent.StreamToolStart:
 		summary := m.compact.FormatToolCall(ev.ToolName, ev.ToolParams, "", false)
 		m.viewport.AppendContent("\n" + summary)
+		// Start timer for this tool call
+		if m.toolTimers == nil {
+			m.toolTimers = make(map[string]time.Time)
+		}
+		m.toolTimers[ev.ToolName] = time.Now()
 	case agent.StreamToolComplete:
+		// Compute elapsed time
+		elapsed := ""
+		if start, ok := m.toolTimers[ev.ToolName]; ok {
+			d := time.Since(start)
+			if d >= time.Second {
+				elapsed = fmt.Sprintf(" (%.1fs)", d.Seconds())
+			}
+			delete(m.toolTimers, ev.ToolName)
+		}
 		if ev.IsError || m.settings.ShowToolResults {
 			summary := m.compact.FormatToolCall(ev.ToolName, ev.ToolParams, ev.ToolResult, ev.IsError)
+			if elapsed != "" {
+				c := theme.Current().Semantic()
+				summary += lipgloss.NewStyle().Foreground(c.FgDim.Color()).Render(elapsed)
+			}
 			m.viewport.AppendContent("\n" + summary)
+		} else if elapsed != "" {
+			// Even without full result display, show elapsed time for slow tools
+			c := theme.Current().Semantic()
+			timerStr := lipgloss.NewStyle().Foreground(c.FgDim.Color()).Render(elapsed)
+			m.viewport.AppendContent(timerStr)
 		}
 	case agent.StreamTurnComplete:
 		m.turns = ev.TurnNumber

@@ -130,6 +130,25 @@ func (p promptModel) Update(msg tea.Msg) (promptModel, tea.Cmd) {
 			p.lines = append(p.lines, p.input.Value())
 			p.input.SetValue("")
 			return p, nil
+		case "ctrl+w":
+			// Delete previous word (standard Unix terminal behavior)
+			v := p.input.Value()
+			pos := p.input.Position()
+			if pos > 0 {
+				before := v[:pos]
+				after := v[pos:]
+				// Skip trailing spaces, then skip non-spaces
+				i := len(before) - 1
+				for i >= 0 && before[i] == ' ' {
+					i--
+				}
+				for i >= 0 && before[i] != ' ' {
+					i--
+				}
+				p.input.SetValue(before[:i+1] + after)
+				p.input.SetCursor(i + 1)
+			}
+			return p, nil
 		case "ctrl+g":
 			return p, openEditor(p.fullText())
 		case "ctrl+r":

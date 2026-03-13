@@ -118,3 +118,35 @@ func TestPromptKeyHelpDismiss(t *testing.T) {
 		t.Fatal("key help should close after dismiss")
 	}
 }
+
+func TestKeyHelpContainsEsc(t *testing.T) {
+	kh := newKeyHelpModel()
+	view := kh.View(80)
+	if !strings.Contains(view, "Esc") {
+		t.Fatal("help should mention Esc for stopping agent")
+	}
+}
+
+func TestKeyHelpContainsCtrlW(t *testing.T) {
+	kh := newKeyHelpModel()
+	view := kh.View(80)
+	if !strings.Contains(view, "Ctrl+W") {
+		t.Fatal("help should mention Ctrl+W for word delete")
+	}
+}
+
+func TestKeyHelpContainsMouseWheel(t *testing.T) {
+	kh := newKeyHelpModel()
+	view := kh.View(80)
+	if !strings.Contains(view, "Mouse") {
+		t.Fatal("help should mention mouse wheel scrolling")
+	}
+}
+
+func TestKeyHelpContainsShellEscape(t *testing.T) {
+	kh := newKeyHelpModel()
+	view := kh.View(80)
+	if !strings.Contains(view, "!") {
+		t.Fatal("help should mention ! for shell escape")
+	}
+}

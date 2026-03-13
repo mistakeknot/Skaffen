@@ -54,6 +54,7 @@ func KnownCommands() map[string]string {
 		"advance":  "Advance to next OODARC phase",
 		"clear":    "Clear viewport",
 		"commit":   "Auto-commit current changes",
+		"continue": "Resume after Esc-stop (re-send with 'please continue')",
 		"compact":  "Compact context (free tokens by summarizing old turns)",
 		"diff":     "Show git diff",
 		"help":     "Show available commands (? for keyboard shortcuts)",
@@ -236,6 +237,15 @@ func (m *appModel) executeCommand(cmd *Command) CommandResult {
 		return CommandResult{
 			Message: fmt.Sprintf("Retrying: %s", truncate(m.lastPrompt, 60)),
 			Retry:   m.lastPrompt,
+		}
+
+	case "continue":
+		if m.lastPrompt == "" {
+			return CommandResult{Message: "No previous prompt to continue.", IsError: true}
+		}
+		return CommandResult{
+			Message: "Continuing from where you left off...",
+			Retry:   m.lastPrompt + "\n\nPlease continue from where you left off.",
 		}
 
 	case "sessions":

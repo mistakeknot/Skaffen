@@ -37,10 +37,12 @@ func newKeyHelpModel() keyHelpModel {
 				Bindings: []keyBinding{
 					{"Enter", "Send message"},
 					{"Shift+Enter", "New line"},
+					{"Ctrl+W", "Delete previous word"},
 					{"Ctrl+G", "Open editor"},
 					{"Ctrl+R", "Search history"},
-					{"/", "Slash commands"},
+					{"/", "Slash commands (with autocomplete)"},
 					{"@", "File picker"},
+					{"!", "Shell escape (!command)"},
 					{"?", "This help"},
 				},
 			},
@@ -49,12 +51,14 @@ func newKeyHelpModel() keyHelpModel {
 				Bindings: []keyBinding{
 					{"PgUp/PgDn", "Scroll viewport"},
 					{"Home/End", "Jump to top/bottom"},
-					{"Ctrl+U/D", "Half-page scroll"},
+					{"Ctrl+U/D", "Half-page scroll (vim)"},
+					{"Mouse wheel", "Scroll 3 lines"},
 				},
 			},
 			{
 				Name: "Session",
 				Bindings: []keyBinding{
+					{"Esc", "Stop current agent run"},
 					{"Shift+Tab", "Toggle plan mode"},
 					{"Ctrl+C", "Quit"},
 				},
