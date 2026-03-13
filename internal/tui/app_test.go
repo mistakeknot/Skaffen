@@ -877,3 +877,41 @@ func TestSyncBreadcrumbUnknownPhase(t *testing.T) {
 		t.Fatal("unknown phase should have no active phase")
 	}
 }
+
+// --- Esc to stop ---
+
+func TestEscStopsRunningAgent(t *testing.T) {
+	m := setup(t)
+	cancelled := false
+	m.running = true
+	m.cancelRun = func() { cancelled = true }
+
+	m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+
+	if !cancelled {
+		t.Fatal("Esc should call cancelRun when agent is running")
+	}
+}
+
+func TestEscDoesNothingWhenIdle(t *testing.T) {
+	m := setup(t)
+	m.running = false
+
+	// Should not panic even without cancelRun set
+	m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+}
+
+func TestEscInOverlayDoesNotStopAgent(t *testing.T) {
+	m := setup(t)
+	m.running = true
+	cancelled := false
+	m.cancelRun = func() { cancelled = true }
+	m.approving = true
+	m.approvalQ = question.New("test?", []question.Option{{Label: "Yes"}})
+
+	m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+
+	if cancelled {
+		t.Fatal("Esc in approval overlay should not stop the agent")
+	}
+}

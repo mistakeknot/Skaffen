@@ -3,6 +3,7 @@ package tui
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -186,6 +187,9 @@ type appModel struct {
 	// Prompt history persistence
 	historyStore *historyStore
 
+	// Cancellation for the current agent run
+	cancelRun context.CancelFunc
+
 	// Subagent tracker for inline status rendering
 	subagents *subagentTracker
 }
@@ -298,6 +302,13 @@ func (m *appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.String() == "ctrl+c" {
 			m.drainApproval()
 			return m, tea.Quit
+		}
+		// Esc stops the current agent run (but not when an overlay is showing)
+		if msg.Type == tea.KeyEsc && m.running && m.cancelRun != nil && !m.approving && !m.settingsOpen {
+			m.cancelRun()
+			infoStyle := lipgloss.NewStyle().Foreground(theme.Current().Semantic().Info.Color())
+			m.viewport.AppendContent("\n" + infoStyle.Render("Stopped.") + "\n")
+			break
 		}
 		// Plan mode toggle: Shift+Tab toggles read-only mode (only when idle)
 		if msg.String() == "shift+tab" && !m.running && !m.approving && !m.settingsOpen {
@@ -538,7 +549,8 @@ func (m *appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case agentDoneMsg:
 		m.running = false
-		if msg.Err != nil {
+		m.cancelRun = nil
+		if msg.Err != nil && !errors.Is(msg.Err, context.Canceled) {
 			errStyle := lipgloss.NewStyle().Foreground(theme.Current().Semantic().Error.Color())
 			m.viewport.AppendContent("\n" + errStyle.Render(fmt.Sprintf("Error: %v", msg.Err)) + "\n")
 		}
@@ -661,13 +673,16 @@ func (m *appModel) syncBreadcrumb() {
 
 func (m *appModel) runAgent(prompt string) tea.Cmd {
 	a := m.agent
+	ctx, cancel := context.WithCancel(context.Background())
+	m.cancelRun = cancel
 	return func() tea.Msg {
 		if a == nil {
+			cancel()
 			return agentDoneMsg{Err: fmt.Errorf("no agent configured")}
 		}
 		// Runs in a goroutine. StreamCallback was wired in Run() to call
 		// p.Send(streamEventMsg), so events reach Update() automatically.
-		result, err := a.Run(context.Background(), prompt)
+		result, err := a.Run(ctx, prompt)
 		if err != nil {
 			return agentDoneMsg{Err: err}
 		}
