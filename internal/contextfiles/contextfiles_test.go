@@ -157,3 +157,101 @@ func TestWalkUpOutsideHome(t *testing.T) {
 		t.Fatal("expected startDir in result")
 	}
 }
+
+func TestLoadFindsSkaffenMD(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "SKAFFEN.md"), []byte("# Skaffen\nBuild fast."), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	result := Load(dir)
+	if !strings.Contains(result, "Build fast.") {
+		t.Fatalf("expected SKAFFEN.md content, got: %s", result)
+	}
+	if !strings.Contains(result, "# Context:") {
+		t.Fatal("expected context header")
+	}
+}
+
+func TestLoadFindsSkaffenMDInDotSkaffen(t *testing.T) {
+	dir := t.TempDir()
+	skDir := filepath.Join(dir, ".skaffen")
+	if err := os.Mkdir(skDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(skDir, "SKAFFEN.md"), []byte("nested config"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	result := Load(dir)
+	if !strings.Contains(result, "nested config") {
+		t.Fatalf("expected .skaffen/SKAFFEN.md content, got: %s", result)
+	}
+	if !strings.Contains(result, ".skaffen/SKAFFEN.md") {
+		t.Fatal("expected path to include .skaffen/ subdirectory")
+	}
+}
+
+func TestLoadSkaffenMDPrecedence(t *testing.T) {
+	// SKAFFEN.md should appear before CLAUDE.md at the same directory level
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "SKAFFEN.md"), []byte("skaffen first"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "CLAUDE.md"), []byte("claude second"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	result := Load(dir)
+	skIdx := strings.Index(result, "skaffen first")
+	clIdx := strings.Index(result, "claude second")
+	if skIdx < 0 || clIdx < 0 {
+		t.Fatalf("expected both files, got: %s", result)
+	}
+	if skIdx >= clIdx {
+		t.Fatal("SKAFFEN.md should appear before CLAUDE.md (listed first in DefaultFileNames)")
+	}
+}
+
+func TestLoadDotSkaffenAfterTopLevel(t *testing.T) {
+	// At the same directory level, top-level SKAFFEN.md should appear
+	// before .skaffen/SKAFFEN.md (top-level = broader, .skaffen = project-specific)
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "SKAFFEN.md"), []byte("top level"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	skDir := filepath.Join(dir, ".skaffen")
+	if err := os.Mkdir(skDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(skDir, "SKAFFEN.md"), []byte("dot skaffen"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	result := Load(dir)
+	topIdx := strings.Index(result, "top level")
+	dotIdx := strings.Index(result, "dot skaffen")
+	if topIdx < 0 || dotIdx < 0 {
+		t.Fatalf("expected both files, got: %s", result)
+	}
+	if topIdx >= dotIdx {
+		t.Fatal("top-level SKAFFEN.md should appear before .skaffen/SKAFFEN.md")
+	}
+}
+
+func TestReadContextFileEmpty(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "empty.md")
+	if err := os.WriteFile(path, []byte("  \n  "), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if s := readContextFile(path); s != "" {
+		t.Fatalf("expected empty for whitespace-only file, got: %s", s)
+	}
+}
+
+func TestReadContextFileNonexistent(t *testing.T) {
+	if s := readContextFile("/nonexistent/path/file.md"); s != "" {
+		t.Fatalf("expected empty for nonexistent file, got: %s", s)
+	}
+}
