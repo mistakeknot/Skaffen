@@ -219,3 +219,117 @@ func TestRegistry_RegisterForPhases_Empty(t *testing.T) {
 		t.Error("should not be in brainstorm with nil phases")
 	}
 }
+
+// --- Plan mode tests ---
+
+func TestPlanMode_ToolsFiltered(t *testing.T) {
+	r := newRegistryWithStubs()
+	r.SetPlanMode(true)
+
+	// All phases should return only read-only tools
+	for _, phase := range []Phase{PhaseBrainstorm, PhasePlan, PhaseBuild, PhaseReview, PhaseShip} {
+		names := toolNames(r.Tools(phase))
+		for _, want := range []string{"read", "glob", "grep", "ls"} {
+			if !names[want] {
+				t.Errorf("plan mode %s: missing %q", phase, want)
+			}
+		}
+		for _, block := range []string{"write", "edit", "bash"} {
+			if names[block] {
+				t.Errorf("plan mode %s: should not have %q", phase, block)
+			}
+		}
+	}
+}
+
+func TestPlanMode_ExecuteBlocked(t *testing.T) {
+	r := newRegistryWithStubs()
+	r.SetPlanMode(true)
+
+	for _, tool := range []string{"write", "edit", "bash"} {
+		result := r.Execute(context.Background(), PhaseBuild, tool, nil)
+		if !result.IsError {
+			t.Errorf("plan mode: %q should be blocked", tool)
+		}
+		if result.Content == "" {
+			t.Errorf("plan mode: %q error should have message", tool)
+		}
+	}
+}
+
+func TestPlanMode_ExecuteAllowed(t *testing.T) {
+	r := newRegistryWithStubs()
+	r.SetPlanMode(true)
+
+	for _, tool := range []string{"read", "glob", "grep", "ls"} {
+		result := r.Execute(context.Background(), PhaseBuild, tool, nil)
+		if result.IsError {
+			t.Errorf("plan mode: %q should be allowed, got: %s", tool, result.Content)
+		}
+	}
+}
+
+func TestPlanMode_Toggle(t *testing.T) {
+	r := newRegistryWithStubs()
+
+	// Default: plan mode off
+	if r.PlanMode() {
+		t.Error("plan mode should be off by default")
+	}
+	names := toolNames(r.Tools(PhaseBuild))
+	if !names["write"] {
+		t.Error("write should be available with plan mode off")
+	}
+
+	// Enable plan mode
+	r.SetPlanMode(true)
+	if !r.PlanMode() {
+		t.Error("plan mode should be on")
+	}
+	names = toolNames(r.Tools(PhaseBuild))
+	if names["write"] {
+		t.Error("write should not be available with plan mode on")
+	}
+
+	// Disable plan mode
+	r.SetPlanMode(false)
+	if r.PlanMode() {
+		t.Error("plan mode should be off again")
+	}
+	names = toolNames(r.Tools(PhaseBuild))
+	if !names["write"] {
+		t.Error("write should be available after disabling plan mode")
+	}
+}
+
+func TestPlanMode_MCPToolsBlocked(t *testing.T) {
+	r := NewRegistry()
+	// Register a read-only tool and a write-capable MCP tool
+	r.Register(&stubTool{name: "read"})
+	mcp := &stubTool{name: "mcp_deploy"}
+	r.RegisterForPhases(mcp, []Phase{PhaseBuild})
+
+	r.SetPlanMode(true)
+
+	names := toolNames(r.Tools(PhaseBuild))
+	if names["mcp_deploy"] {
+		t.Error("MCP tool should be blocked in plan mode")
+	}
+	if !names["read"] {
+		t.Error("read should be available in plan mode")
+	}
+}
+
+func TestPlanMode_ErrorMessage(t *testing.T) {
+	r := newRegistryWithStubs()
+	r.SetPlanMode(true)
+
+	result := r.Execute(context.Background(), PhaseBuild, "write", nil)
+	if !result.IsError {
+		t.Fatal("expected error")
+	}
+	want := `tool "write" not available in plan mode (read-only)`
+	if result.Content != want {
+		t.Errorf("error message = %q, want %q", result.Content, want)
+	}
+}
