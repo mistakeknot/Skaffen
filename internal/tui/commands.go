@@ -13,6 +13,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/mistakeknot/Skaffen/internal/command"
 	"github.com/mistakeknot/Skaffen/internal/session"
+	"github.com/mistakeknot/Skaffen/internal/skill"
 	msettings "github.com/mistakeknot/Masaq/settings"
 )
 
@@ -190,6 +191,10 @@ func (m *appModel) executeCommand(cmd *Command) CommandResult {
 		if def, ok := m.customCmds[cmd.Name]; ok {
 			return m.execCustomCommand(def, cmd.Args)
 		}
+		// Check skills
+		if sd, ok := m.skills[strings.ToLower(cmd.Name)]; ok {
+			return m.execSkill(sd, cmd.Args)
+		}
 		return CommandResult{
 			Message: fmt.Sprintf("Unknown command /%s. Type /help for available commands.", cmd.Name),
 			IsError: true,
@@ -239,6 +244,61 @@ func (m *appModel) execCustomCommand(def command.Def, args []string) CommandResu
 			IsError: true,
 		}
 	}
+}
+
+// execSkill activates a skill via slash command invocation.
+// The skill body is loaded, formatted, and queued as a pending injection
+// for the next agent call.
+func (m *appModel) execSkill(d skill.Def, args []string) CommandResult {
+	// Handle --pin flag
+	pin := false
+	filteredArgs := make([]string, 0, len(args))
+	for _, a := range args {
+		if a == "--pin" {
+			pin = true
+		} else {
+			filteredArgs = append(filteredArgs, a)
+		}
+	}
+
+	// Lazy-load body
+	body, err := skill.LoadBody(&d)
+	if err != nil {
+		return CommandResult{
+			Message: fmt.Sprintf("Failed to load skill %q: %v", d.Name, err),
+			IsError: true,
+		}
+	}
+
+	// Update the cached def with the loaded body
+	d.Body = body
+	m.skills[d.Name] = d
+
+	// Check size limit
+	argStr := strings.Join(filteredArgs, " ")
+	msg, err := skill.FormatInjectionSafe(&d, argStr)
+	if err != nil {
+		return CommandResult{Message: err.Error(), IsError: true}
+	}
+
+	// Pin if requested
+	if pin {
+		if err := m.pinner.Pin(d.Name); err != nil {
+			return CommandResult{
+				Message: fmt.Sprintf("Skill activated but pin failed: %v", err),
+				IsError: true,
+			}
+		}
+	}
+
+	// Store the pending skill injection for the next runAgent call
+	m.pendingSkills = append(m.pendingSkills, msg)
+
+	status := fmt.Sprintf("[skill: %s]", d.Name)
+	if pin {
+		status += " (pinned)"
+	}
+	return CommandResult{Message: status}
 }
 
 func (m *appModel) execStatus() CommandResult {

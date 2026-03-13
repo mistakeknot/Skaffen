@@ -172,8 +172,9 @@ type appModel struct {
 	customCmds map[string]command.Def
 
 	// Skills loaded from SKILL.md files
-	skills map[string]skill.Def
-	pinner *skill.Pinner
+	skills        map[string]skill.Def
+	pinner        *skill.Pinner
+	pendingSkills []string // queued skill injections for next agent call
 
 	// Subagent tracker for inline status rendering
 	subagents *subagentTracker
@@ -363,7 +364,9 @@ func (m *appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.viewport.AppendContent("\n" + userStyle.Render("You") + "\n" + msg.Text + "\n")
 		// Expand @file mentions before sending to agent
 		expanded := expandAtMentions(msg.Text, m.workDir)
-		cmds = append(cmds, m.runAgent(expanded))
+		// Prepend any pending skill injections + pinned skill injections
+		prompt := m.buildSkillPrompt(expanded)
+		cmds = append(cmds, m.runAgent(prompt))
 
 	case streamEventMsg:
 		m.handleStreamEvent(agent.StreamEvent(msg))
@@ -447,11 +450,19 @@ func (m *appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			errStyle := lipgloss.NewStyle().Foreground(theme.Current().Semantic().Error.Color())
 			m.viewport.AppendContent(errStyle.Render(msg.Message) + "\n")
 		} else {
-			m.viewport.AppendContent(msg.Message + "\n")
+			if msg.Message != "" {
+				m.viewport.AppendContent(msg.Message + "\n")
+			}
 		}
 		if msg.Quit {
 			m.drainApproval()
 			return m, tea.Quit
+		}
+		// Auto-submit pending skills to the agent
+		if len(m.pendingSkills) > 0 && !m.running {
+			m.running = true
+			prompt := m.buildSkillPrompt("")
+			cmds = append(cmds, m.runAgent(prompt))
 		}
 
 	case shellResultMsg:
@@ -613,6 +624,36 @@ func (m *appModel) runAgent(prompt string) tea.Cmd {
 		}
 		return agentDoneMsg{Response: result.Response}
 	}
+}
+
+// buildSkillPrompt prepends pending skill injections and pinned skill bodies
+// to the user's message. Clears pendingSkills after consumption.
+func (m *appModel) buildSkillPrompt(userMessage string) string {
+	var parts []string
+
+	// Pending skill injections (from /skill-name invocation)
+	parts = append(parts, m.pendingSkills...)
+	m.pendingSkills = nil
+
+	// Pinned skills — re-inject on every turn
+	for _, name := range m.pinner.Pinned() {
+		if d, ok := m.skills[name]; ok {
+			if d.Body == "" {
+				// Lazy-load if not yet loaded
+				if body, err := skill.LoadBody(&d); err == nil {
+					d.Body = body
+					m.skills[name] = d
+				}
+			}
+			parts = append(parts, skill.FormatInjection(&d, ""))
+		}
+	}
+
+	if userMessage != "" {
+		parts = append(parts, userMessage)
+	}
+
+	return strings.Join(parts, "\n")
 }
 
 // isScrollKey returns true for keys that should scroll the viewport even
