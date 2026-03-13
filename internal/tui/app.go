@@ -365,6 +365,19 @@ func (m *appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.viewport.AppendContent("\n" + userStyle.Render("You") + "\n" + msg.Text + "\n")
 		// Expand @file mentions before sending to agent
 		expanded := expandAtMentions(msg.Text, m.workDir)
+		// Implicit trigger matching — auto-activate matching skills
+		matched := skill.MatchTriggers(m.skills, msg.Text)
+		for _, d := range matched {
+			body, err := skill.LoadBody(&d)
+			if err != nil {
+				continue
+			}
+			d.Body = body
+			m.skills[d.Name] = d
+			m.pendingSkills = append(m.pendingSkills, skill.FormatInjection(&d, ""))
+			infoStyle := lipgloss.NewStyle().Foreground(theme.Current().Semantic().FgDim.Color())
+			m.viewport.AppendContent(infoStyle.Render(fmt.Sprintf("[skill: %s]", d.Name)) + "\n")
+		}
 		// Prepend any pending skill injections + pinned skill injections
 		prompt := m.buildSkillPrompt(expanded)
 		cmds = append(cmds, m.runAgent(prompt))
