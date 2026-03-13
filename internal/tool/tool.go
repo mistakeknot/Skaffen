@@ -19,6 +19,13 @@ type ToolResult struct {
 	IsError bool   // true if execution failed
 }
 
+// PhasedTool is optionally implemented by tools that need phase-aware execution.
+// The registry checks for this interface and passes the current phase when available.
+type PhasedTool interface {
+	Tool
+	ExecuteWithPhase(ctx context.Context, phase Phase, params json.RawMessage) ToolResult
+}
+
 // Phase represents an OODARC workflow phase.
 type Phase string
 

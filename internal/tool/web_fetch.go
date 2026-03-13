@@ -17,7 +17,9 @@ import (
 
 // WebFetchTool retrieves and extracts text content from a URL.
 type WebFetchTool struct {
-	httpClient *http.Client
+	httpClient  *http.Client
+	jinaBaseURL string // empty = production (https://r.jina.ai)
+	skipSSRF    bool   // testing only: bypass URL validation
 }
 
 // NewWebFetchTool creates a WebFetchTool with SSRF-safe HTTP client.
@@ -78,8 +80,10 @@ func (t *WebFetchTool) Execute(ctx context.Context, params json.RawMessage) Tool
 		return ToolResult{Content: fmt.Sprintf("invalid URL: %v", err), IsError: true}
 	}
 
-	if err := validateURL(parsed); err != nil {
-		return ToolResult{Content: fmt.Sprintf("URL blocked: %v", err), IsError: true}
+	if !t.skipSSRF {
+		if err := validateURL(parsed); err != nil {
+			return ToolResult{Content: fmt.Sprintf("URL blocked: %v", err), IsError: true}
+		}
 	}
 
 	maxLength := p.MaxLength
@@ -134,14 +138,61 @@ func (t *WebFetchTool) fetch(ctx context.Context, rawURL string, maxLength int) 
 	var text string
 	if strings.Contains(ct, "text/html") {
 		text = extractHTML(string(bodyBytes))
-		// Heuristic: if extracted text is <10% of input, page may be JS-rendered or use unsupported encoding
-		if len(text) > 0 && len(text) < len(bodyBytes)/10 && len(bodyBytes) > 1000 {
+		// Heuristic: if extracted text is <10% of input (or empty), page may be JS-rendered
+		if len(bodyBytes) > 1000 && len(text) < len(bodyBytes)/10 {
+			// JS-rendered page — try Jina Reader as fallback
+			if jinaText, err := t.jinaFetch(ctx, rawURL, maxLength); err == nil {
+				return jinaText, nil
+			}
+			// Jina also failed — return original error
 			return "", fmt.Errorf("content extraction yielded very little text — the page may be JavaScript-rendered or use an unsupported character encoding")
 		}
 	} else {
 		text = string(bodyBytes)
 	}
 
+	if len(text) > maxLength {
+		text = text[:maxLength] + "\n\n[Content truncated at " + fmt.Sprintf("%d", maxLength) + " characters]"
+	}
+
+	return text, nil
+}
+
+// jinaFetch retrieves page content via Jina Reader (handles JS-rendered pages).
+func (t *WebFetchTool) jinaFetch(ctx context.Context, rawURL string, maxLength int) (string, error) {
+	base := t.jinaBaseURL
+	if base == "" {
+		base = "https://r.jina.ai"
+	}
+	jinaURL := base + "/" + rawURL
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, jinaURL, nil)
+	if err != nil {
+		return "", fmt.Errorf("create Jina request: %w", err)
+	}
+	req.Header.Set("User-Agent", "Skaffen/1.0 (web-fetch tool)")
+	req.Header.Set("Accept", "text/plain")
+
+	// Use a simple HTTP client for Jina (no SSRF concern — Jina is a trusted proxy)
+	client := &http.Client{Timeout: 20 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("Jina request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		io.Copy(io.Discard, io.LimitReader(resp.Body, 64<<10))
+		return "", fmt.Errorf("Jina returned HTTP %d", resp.StatusCode)
+	}
+
+	bodyBytes, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+	if err != nil {
+		return "", fmt.Errorf("read Jina response: %w", err)
+	}
+	io.Copy(io.Discard, resp.Body) // drain
+
+	text := string(bodyBytes)
 	if len(text) > maxLength {
 		text = text[:maxLength] + "\n\n[Content truncated at " + fmt.Sprintf("%d", maxLength) + " characters]"
 	}

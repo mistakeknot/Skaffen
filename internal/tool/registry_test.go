@@ -343,6 +343,69 @@ func TestPlanMode_MCPToolsBlocked(t *testing.T) {
 	}
 }
 
+// --- PhasedTool tests ---
+
+// mockPhasedTool records the phase it was called with.
+type mockPhasedTool struct {
+	calledPhase Phase
+}
+
+func (m *mockPhasedTool) Name() string                                  { return "mock_phased" }
+func (m *mockPhasedTool) Description() string                           { return "test phased tool" }
+func (m *mockPhasedTool) Schema() json.RawMessage                       { return json.RawMessage(`{}`) }
+func (m *mockPhasedTool) Execute(_ context.Context, _ json.RawMessage) ToolResult {
+	return ToolResult{Content: "non-phased"}
+}
+func (m *mockPhasedTool) ExecuteWithPhase(_ context.Context, phase Phase, _ json.RawMessage) ToolResult {
+	m.calledPhase = phase
+	return ToolResult{Content: "phased:" + string(phase)}
+}
+
+// mockPlainTool is a non-phased tool for comparison.
+type mockPlainTool struct{}
+
+func (m *mockPlainTool) Name() string                            { return "mock_plain" }
+func (m *mockPlainTool) Description() string                     { return "test plain tool" }
+func (m *mockPlainTool) Schema() json.RawMessage                 { return json.RawMessage(`{}`) }
+func (m *mockPlainTool) Execute(_ context.Context, _ json.RawMessage) ToolResult {
+	return ToolResult{Content: "plain"}
+}
+
+func TestRegistryCallsPhasedTool(t *testing.T) {
+	r := NewRegistry()
+	phased := &mockPhasedTool{}
+	r.RegisterForPhases(phased, []Phase{PhaseBrainstorm, PhaseBuild})
+
+	result := r.Execute(context.Background(), PhaseBrainstorm, "mock_phased", json.RawMessage(`{}`))
+	if result.Content != "phased:brainstorm" {
+		t.Errorf("expected 'phased:brainstorm', got %q", result.Content)
+	}
+	if phased.calledPhase != PhaseBrainstorm {
+		t.Errorf("expected phase brainstorm, got %q", phased.calledPhase)
+	}
+}
+
+func TestRegistryCallsPhasedToolBuildPhase(t *testing.T) {
+	r := NewRegistry()
+	phased := &mockPhasedTool{}
+	r.RegisterForPhases(phased, []Phase{PhaseBrainstorm, PhaseBuild})
+
+	result := r.Execute(context.Background(), PhaseBuild, "mock_phased", json.RawMessage(`{}`))
+	if result.Content != "phased:build" {
+		t.Errorf("expected 'phased:build', got %q", result.Content)
+	}
+}
+
+func TestRegistryCallsPlainToolUnchanged(t *testing.T) {
+	r := NewRegistry()
+	r.Register(&mockPlainTool{})
+
+	result := r.Execute(context.Background(), PhaseBuild, "mock_plain", json.RawMessage(`{}`))
+	if result.Content != "plain" {
+		t.Errorf("expected 'plain', got %q", result.Content)
+	}
+}
+
 func TestPlanMode_ErrorMessage(t *testing.T) {
 	r := newRegistryWithStubs()
 	r.SetPlanMode(true)

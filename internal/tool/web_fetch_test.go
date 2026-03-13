@@ -3,7 +3,10 @@ package tool
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net"
+	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"strings"
 	"testing"
@@ -244,5 +247,110 @@ func TestIsTextContent(t *testing.T) {
 				t.Errorf("isTextContent(%q) = %v, want %v", tt.ct, got, tt.want)
 			}
 		})
+	}
+}
+
+func TestWebFetchJinaFallback(t *testing.T) {
+	// Simulate a JS-rendered page (huge body, almost no extracted text)
+	jsPage := "<html><body><script>" + strings.Repeat("var x = 1;\n", 500) + "</script><noscript>Enable JS</noscript></body></html>"
+
+	primaryCalled := false
+	jinaCalled := false
+
+	// Primary server returns JS-heavy page
+	primary := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		primaryCalled = true
+		w.Header().Set("Content-Type", "text/html")
+		w.Write([]byte(jsPage))
+	}))
+	defer primary.Close()
+
+	// Jina server returns rendered markdown
+	jina := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		jinaCalled = true
+		w.Write([]byte("# Page Title\n\nThis is the rendered content from the JS page."))
+	}))
+	defer jina.Close()
+
+	tool := &WebFetchTool{
+		httpClient:  primary.Client(),
+		jinaBaseURL: jina.URL,
+		skipSSRF:    true,
+	}
+
+	result := tool.Execute(context.Background(), json.RawMessage(fmt.Sprintf(`{"url": "%s"}`, primary.URL)))
+
+	if !primaryCalled {
+		t.Error("primary fetch should have been called")
+	}
+	if !jinaCalled {
+		t.Error("Jina fallback should have been called")
+	}
+	if result.IsError {
+		t.Fatalf("expected success via Jina fallback, got error: %s", result.Content)
+	}
+	if !strings.Contains(result.Content, "rendered content") {
+		t.Errorf("expected Jina content, got: %s", result.Content)
+	}
+}
+
+func TestWebFetchJinaFallbackError(t *testing.T) {
+	jsPage := "<html><body><script>" + strings.Repeat("var x = 1;\n", 500) + "</script></body></html>"
+
+	primary := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html")
+		w.Write([]byte(jsPage))
+	}))
+	defer primary.Close()
+
+	jina := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer jina.Close()
+
+	tool := &WebFetchTool{
+		httpClient:  primary.Client(),
+		jinaBaseURL: jina.URL,
+		skipSSRF:    true,
+	}
+
+	result := tool.Execute(context.Background(), json.RawMessage(fmt.Sprintf(`{"url": "%s"}`, primary.URL)))
+
+	if !result.IsError {
+		t.Fatal("expected error when both primary and Jina fail")
+	}
+	if !strings.Contains(result.Content, "JavaScript-rendered") {
+		t.Errorf("expected JS-rendered warning, got: %s", result.Content)
+	}
+}
+
+func TestWebFetchNoFallbackForGoodContent(t *testing.T) {
+	jinaCalled := false
+
+	primary := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html")
+		w.Write([]byte("<html><body><h1>Title</h1><p>Substantial content that is long enough to pass the ratio check with plenty of text that exceeds ten percent of the total body size.</p></body></html>"))
+	}))
+	defer primary.Close()
+
+	jina := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		jinaCalled = true
+		w.Write([]byte("Should not be called"))
+	}))
+	defer jina.Close()
+
+	tool := &WebFetchTool{
+		httpClient:  primary.Client(),
+		jinaBaseURL: jina.URL,
+		skipSSRF:    true,
+	}
+
+	result := tool.Execute(context.Background(), json.RawMessage(fmt.Sprintf(`{"url": "%s"}`, primary.URL)))
+
+	if result.IsError {
+		t.Fatalf("expected success, got error: %s", result.Content)
+	}
+	if jinaCalled {
+		t.Error("Jina should NOT be called for pages with good content extraction")
 	}
 }

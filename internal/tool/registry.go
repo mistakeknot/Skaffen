@@ -133,6 +133,10 @@ func (r *Registry) Execute(ctx context.Context, phase Phase, name string, params
 		}
 	}
 
+	// If the tool implements PhasedTool, pass the phase for phase-aware behavior.
+	if pt, ok := t.(PhasedTool); ok {
+		return pt.ExecuteWithPhase(ctx, phase, params)
+	}
 	return t.Execute(ctx, params)
 }
 

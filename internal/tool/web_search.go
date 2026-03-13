@@ -8,7 +8,9 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"sort"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -16,6 +18,16 @@ import (
 type WebSearchTool struct {
 	apiKey     string
 	httpClient *http.Client
+	baseURL    string       // empty = production (https://api.exa.ai/search)
+	cache      *searchCache // lazy-initialized on first use
+}
+
+// exaSearchOpts carries optional parameters for the Exa API.
+type exaSearchOpts struct {
+	searchType     string   // "auto", "instant", "deep", etc.
+	includeDomains []string // restrict results to these domains
+	excludeDomains []string // exclude results from these domains
+	recency        string   // "day", "week", "month", "year"
 }
 
 // NewWebSearchTool creates a WebSearchTool that reads EXA_API_KEY from the environment.
@@ -29,8 +41,11 @@ func NewWebSearchTool() *WebSearchTool {
 }
 
 type webSearchParams struct {
-	Query      string `json:"query"`
-	NumResults int    `json:"num_results,omitempty"`
+	Query          string   `json:"query"`
+	NumResults     int      `json:"num_results,omitempty"`
+	Domains        []string `json:"domains,omitempty"`
+	ExcludeDomains []string `json:"exclude_domains,omitempty"`
+	Recency        string   `json:"recency,omitempty"` // "day", "week", "month", "year"
 }
 
 func (t *WebSearchTool) Name() string        { return "web_search" }
@@ -40,13 +55,38 @@ func (t *WebSearchTool) Schema() json.RawMessage {
 		"type": "object",
 		"properties": {
 			"query": {"type": "string", "description": "Natural language search query"},
-			"num_results": {"type": "integer", "description": "Number of results to return (default 5, max 10)", "default": 5, "maximum": 10}
+			"num_results": {"type": "integer", "description": "Number of results to return (default 5, max 10)", "default": 5, "maximum": 10},
+			"domains": {"type": "array", "items": {"type": "string"}, "description": "Only include results from these domains (max 10)", "maxItems": 10},
+			"exclude_domains": {"type": "array", "items": {"type": "string"}, "description": "Exclude results from these domains (max 10)", "maxItems": 10},
+			"recency": {"type": "string", "enum": ["day", "week", "month", "year"], "description": "Only include results published within this time period"}
 		},
 		"required": ["query"]
 	}`)
 }
 
 func (t *WebSearchTool) Execute(ctx context.Context, params json.RawMessage) ToolResult {
+	return t.executeWithOpts(ctx, params, exaSearchOpts{searchType: "auto"})
+}
+
+// ExecuteWithPhase implements PhasedTool, routing to the appropriate Exa search tier.
+func (t *WebSearchTool) ExecuteWithPhase(ctx context.Context, phase Phase, params json.RawMessage) ToolResult {
+	return t.executeWithOpts(ctx, params, exaSearchOpts{searchType: t.tierForPhase(phase)})
+}
+
+func (t *WebSearchTool) tierForPhase(phase Phase) string {
+	switch phase {
+	case PhaseBrainstorm:
+		return "deep"
+	case PhasePlan:
+		return "auto"
+	case PhaseBuild:
+		return "instant"
+	default:
+		return "auto"
+	}
+}
+
+func (t *WebSearchTool) executeWithOpts(ctx context.Context, params json.RawMessage, opts exaSearchOpts) ToolResult {
 	if ctx.Err() != nil {
 		return ToolResult{Content: "web search cancelled: session is shutting down", IsError: true}
 	}
@@ -74,10 +114,45 @@ func (t *WebSearchTool) Execute(ctx context.Context, params json.RawMessage) Too
 		numResults = 10
 	}
 
-	results, err := t.exaSearch(ctx, p.Query, numResults)
+	// Pass domain and recency filters from params into opts
+	domains := p.Domains
+	if len(domains) > 10 {
+		domains = domains[:10]
+	}
+	excludeDomains := p.ExcludeDomains
+	if len(excludeDomains) > 10 {
+		excludeDomains = excludeDomains[:10]
+	}
+	opts.includeDomains = domains
+	opts.excludeDomains = excludeDomains
+	opts.recency = p.Recency
+
+	// Lazy-init cache
+	if t.cache == nil {
+		t.cache = newSearchCache()
+	}
+
+	// Check cache
+	cacheKey := buildCacheKey(p.Query, numResults, opts.includeDomains, opts.excludeDomains, opts.recency, opts.searchType)
+	if cached, ok := t.cache.get(cacheKey); ok {
+		if len(cached) == 0 {
+			return ToolResult{Content: fmt.Sprintf("No results found for: %q (cached)", p.Query)}
+		}
+		return ToolResult{Content: formatSearchResults(p.Query, cached)}
+	}
+
+	baseURL := t.baseURL
+	if baseURL == "" {
+		baseURL = "https://api.exa.ai/search"
+	}
+
+	results, err := t.exaSearchWithURL(ctx, baseURL, p.Query, numResults, opts)
 	if err != nil {
 		return ToolResult{Content: fmt.Sprintf("web search failed: %v", err), IsError: true}
 	}
+
+	// Cache results (even empty ones, to avoid re-querying)
+	t.cache.put(cacheKey, results)
 
 	if len(results) == 0 {
 		return ToolResult{Content: fmt.Sprintf("No results found for: %q", p.Query)}
@@ -100,10 +175,14 @@ type exaResponse struct {
 }
 
 type exaRequest struct {
-	Query          string     `json:"query"`
-	NumResults     int        `json:"numResults"`
-	UseAutoprompt  bool       `json:"useAutoprompt"`
-	Contents       exaContents `json:"contents"`
+	Query              string      `json:"query"`
+	NumResults         int         `json:"numResults"`
+	UseAutoprompt      bool        `json:"useAutoprompt"`
+	Type               string      `json:"type,omitempty"`
+	IncludeDomains     []string    `json:"includeDomains,omitempty"`
+	ExcludeDomains     []string    `json:"excludeDomains,omitempty"`
+	StartPublishedDate string      `json:"startPublishedDate,omitempty"`
+	Contents           exaContents `json:"contents"`
 }
 
 type exaContents struct {
@@ -119,11 +198,23 @@ type exaHighlights struct {
 	NumSentences int `json:"numSentences"`
 }
 
-func (t *WebSearchTool) exaSearch(ctx context.Context, query string, numResults int) ([]exaResult, error) {
+func (t *WebSearchTool) exaSearch(ctx context.Context, query string, numResults int, opts exaSearchOpts) ([]exaResult, error) {
+	return t.exaSearchWithURL(ctx, "https://api.exa.ai/search", query, numResults, opts)
+}
+
+func (t *WebSearchTool) exaSearchWithURL(ctx context.Context, baseURL, query string, numResults int, opts exaSearchOpts) ([]exaResult, error) {
+	if numResults > 10 {
+		numResults = 10
+	}
+
 	reqBody := exaRequest{
-		Query:         query,
-		NumResults:    numResults,
-		UseAutoprompt: true,
+		Query:              query,
+		NumResults:         numResults,
+		UseAutoprompt:      true,
+		Type:               opts.searchType,
+		IncludeDomains:     opts.includeDomains,
+		ExcludeDomains:     opts.excludeDomains,
+		StartPublishedDate: recencyToDate(opts.recency),
 		Contents: exaContents{
 			Text:       exaText{MaxCharacters: 1000},
 			Highlights: exaHighlights{NumSentences: 3},
@@ -135,7 +226,7 @@ func (t *WebSearchTool) exaSearch(ctx context.Context, query string, numResults 
 		return nil, fmt.Errorf("marshal request: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://api.exa.ai/search", bytes.NewReader(body))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, baseURL, bytes.NewReader(body))
 	if err != nil {
 		return nil, fmt.Errorf("create request: %w", err)
 	}
@@ -190,4 +281,98 @@ func formatSearchResults(query string, results []exaResult) string {
 
 	fmt.Fprintf(&b, "Found %d results. Use web_fetch to read full content from any URL.", len(results))
 	return b.String()
+}
+
+const (
+	cacheMaxEntries = 50
+	cacheTTL        = 15 * time.Minute
+)
+
+// searchCache provides in-memory result caching with TTL and LRU eviction.
+type searchCache struct {
+	mu      sync.Mutex
+	entries map[string]*cacheEntry
+}
+
+type cacheEntry struct {
+	results []exaResult
+	created time.Time
+}
+
+func newSearchCache() *searchCache {
+	return &searchCache{entries: make(map[string]*cacheEntry)}
+}
+
+// get returns cached results if present and not expired.
+func (c *searchCache) get(key string) ([]exaResult, bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	e, ok := c.entries[key]
+	if !ok || time.Since(e.created) > cacheTTL {
+		if ok {
+			delete(c.entries, key) // clean up expired
+		}
+		return nil, false
+	}
+	return e.results, true
+}
+
+// put stores results, evicting the oldest entry if at capacity.
+func (c *searchCache) put(key string, results []exaResult) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	// Evict oldest if at capacity
+	if len(c.entries) >= cacheMaxEntries {
+		var oldestKey string
+		var oldestTime time.Time
+		for k, v := range c.entries {
+			if oldestKey == "" || v.created.Before(oldestTime) {
+				oldestKey = k
+				oldestTime = v.created
+			}
+		}
+		delete(c.entries, oldestKey)
+	}
+
+	c.entries[key] = &cacheEntry{results: results, created: time.Now()}
+}
+
+// buildCacheKey creates a deterministic cache key.
+// Domains are sorted before joining to ensure determinism.
+func buildCacheKey(query string, numResults int, domains, excludeDomains []string, recency, tier string) string {
+	sortedDomains := make([]string, len(domains))
+	copy(sortedDomains, domains)
+	sort.Strings(sortedDomains)
+
+	sortedExclude := make([]string, len(excludeDomains))
+	copy(sortedExclude, excludeDomains)
+	sort.Strings(sortedExclude)
+
+	return fmt.Sprintf("%s:%d:%s:%s:%s:%s",
+		strings.ToLower(strings.TrimSpace(query)),
+		numResults,
+		strings.Join(sortedDomains, ","),
+		strings.Join(sortedExclude, ","),
+		recency,
+		tier,
+	)
+}
+
+// recencyToDate converts a recency string to an ISO8601 start date.
+func recencyToDate(recency string) string {
+	var d time.Duration
+	switch recency {
+	case "day":
+		d = 24 * time.Hour
+	case "week":
+		d = 7 * 24 * time.Hour
+	case "month":
+		d = 30 * 24 * time.Hour
+	case "year":
+		d = 365 * 24 * time.Hour
+	default:
+		return ""
+	}
+	return time.Now().Add(-d).UTC().Format(time.RFC3339)
 }
