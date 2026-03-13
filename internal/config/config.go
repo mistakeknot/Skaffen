@@ -91,6 +91,53 @@ func (c *Config) CommandDirs() []string {
 	return dirs
 }
 
+// SkillDirs returns skill directories to scan, ordered lowest-to-highest precedence.
+// Later directories override earlier ones when loaded via LoadAll.
+//
+// Precedence (lowest → highest):
+//  1. ~/.skaffen/skills/              (user-global)
+//  2. ~/.skaffen/plugins/*/skills/    (user-global plugins)
+//  3. .skaffen/skills/                (per-project)
+//  4. .skaffen/plugins/*/skills/      (per-project plugins)
+//
+// Only directories that exist on disk are returned.
+// If projectDir is empty, project tiers are skipped.
+func (c *Config) SkillDirs() []string {
+	var dirs []string
+
+	// Tier 1: user-global skills
+	userSkills := filepath.Join(c.userDir, "skills")
+	if dirExists(userSkills) {
+		dirs = append(dirs, userSkills)
+	}
+
+	// Tier 2: user-global plugin skills
+	matches, _ := filepath.Glob(filepath.Join(c.userDir, "plugins", "*", "skills"))
+	for _, m := range matches {
+		if dirExists(m) {
+			dirs = append(dirs, m)
+		}
+	}
+
+	if c.projectDir != "" {
+		// Tier 3: per-project skills
+		projSkills := filepath.Join(c.projectDir, ".skaffen", "skills")
+		if dirExists(projSkills) {
+			dirs = append(dirs, projSkills)
+		}
+
+		// Tier 4: per-project plugin skills
+		projMatches, _ := filepath.Glob(filepath.Join(c.projectDir, ".skaffen", "plugins", "*", "skills"))
+		for _, m := range projMatches {
+			if dirExists(m) {
+				dirs = append(dirs, m)
+			}
+		}
+	}
+
+	return dirs
+}
+
 // HookPaths returns hook config paths to load (user-global + per-project).
 // Both are loaded; per-project hooks merge with user-global.
 // Returns only paths that exist on disk.

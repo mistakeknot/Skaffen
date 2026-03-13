@@ -286,6 +286,141 @@ func TestCommandDirsNone(t *testing.T) {
 	}
 }
 
+func TestSkillDirs_AllTiers(t *testing.T) {
+	root := t.TempDir()
+
+	userDir := filepath.Join(root, "user")
+	projDir := filepath.Join(root, "project")
+
+	// Tier 1: user-global skills
+	userSkills := filepath.Join(userDir, "skills")
+	if err := os.MkdirAll(userSkills, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	// Tier 2: user-global plugin skills
+	userPluginSkills := filepath.Join(userDir, "plugins", "myplugin", "skills")
+	if err := os.MkdirAll(userPluginSkills, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	// Tier 3: per-project skills
+	projSkills := filepath.Join(projDir, ".skaffen", "skills")
+	if err := os.MkdirAll(projSkills, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	// Tier 4: per-project plugin skills
+	projPluginSkills := filepath.Join(projDir, ".skaffen", "plugins", "projplugin", "skills")
+	if err := os.MkdirAll(projPluginSkills, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := &Config{
+		userDir:    userDir,
+		projectDir: projDir,
+		workDir:    projDir,
+	}
+
+	dirs := cfg.SkillDirs()
+	if len(dirs) != 4 {
+		t.Fatalf("SkillDirs = %v, want 4 dirs", dirs)
+	}
+	if dirs[0] != userSkills {
+		t.Errorf("dirs[0] = %q, want user skills %q", dirs[0], userSkills)
+	}
+	if dirs[1] != userPluginSkills {
+		t.Errorf("dirs[1] = %q, want user plugin skills %q", dirs[1], userPluginSkills)
+	}
+	if dirs[2] != projSkills {
+		t.Errorf("dirs[2] = %q, want project skills %q", dirs[2], projSkills)
+	}
+	if dirs[3] != projPluginSkills {
+		t.Errorf("dirs[3] = %q, want project plugin skills %q", dirs[3], projPluginSkills)
+	}
+}
+
+func TestSkillDirs_MissingDirs(t *testing.T) {
+	cfg := &Config{
+		userDir:    "/nonexistent/user",
+		projectDir: "/nonexistent/project",
+		workDir:    "/tmp",
+	}
+	dirs := cfg.SkillDirs()
+	if len(dirs) != 0 {
+		t.Fatalf("SkillDirs = %v, want 0 dirs", dirs)
+	}
+}
+
+func TestSkillDirs_NoProjectDir(t *testing.T) {
+	root := t.TempDir()
+
+	userDir := filepath.Join(root, "user")
+	userSkills := filepath.Join(userDir, "skills")
+	if err := os.MkdirAll(userSkills, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	userPluginSkills := filepath.Join(userDir, "plugins", "alpha", "skills")
+	if err := os.MkdirAll(userPluginSkills, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := &Config{
+		userDir:    userDir,
+		projectDir: "", // no project
+		workDir:    root,
+	}
+
+	dirs := cfg.SkillDirs()
+	if len(dirs) != 2 {
+		t.Fatalf("SkillDirs = %v, want 2 dirs (user-global only)", dirs)
+	}
+	if dirs[0] != userSkills {
+		t.Errorf("dirs[0] = %q, want user skills %q", dirs[0], userSkills)
+	}
+	if dirs[1] != userPluginSkills {
+		t.Errorf("dirs[1] = %q, want user plugin skills %q", dirs[1], userPluginSkills)
+	}
+}
+
+func TestSkillDirs_Precedence(t *testing.T) {
+	root := t.TempDir()
+
+	userDir := filepath.Join(root, "user")
+	projDir := filepath.Join(root, "project")
+
+	// Create user-global skills and project skills
+	userSkills := filepath.Join(userDir, "skills")
+	if err := os.MkdirAll(userSkills, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	projSkills := filepath.Join(projDir, ".skaffen", "skills")
+	if err := os.MkdirAll(projSkills, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := &Config{
+		userDir:    userDir,
+		projectDir: projDir,
+		workDir:    projDir,
+	}
+
+	dirs := cfg.SkillDirs()
+	if len(dirs) != 2 {
+		t.Fatalf("SkillDirs = %v, want 2 dirs", dirs)
+	}
+
+	// User-global must come before project (lower index = lower precedence)
+	// so LoadAll can let later entries override earlier ones.
+	if dirs[0] != userSkills {
+		t.Errorf("dirs[0] = %q, want user-global (lowest precedence) %q", dirs[0], userSkills)
+	}
+	if dirs[1] != projSkills {
+		t.Errorf("dirs[1] = %q, want per-project (highest precedence) %q", dirs[1], projSkills)
+	}
+}
+
 func TestFileExists(t *testing.T) {
 	dir := t.TempDir()
 	f := filepath.Join(dir, "test.txt")
