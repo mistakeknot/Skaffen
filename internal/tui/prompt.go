@@ -181,7 +181,7 @@ func (p promptModel) Update(msg tea.Msg) (promptModel, tea.Cmd) {
 	return p, cmd
 }
 
-func (p promptModel) View(width int, running bool) string {
+func (p promptModel) View(width int, running bool, spinnerView string) string {
 	c := theme.Current().Semantic()
 	border := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
@@ -190,8 +190,7 @@ func (p promptModel) View(width int, running bool) string {
 		Padding(0, 1)
 
 	if running {
-		spinStyle := lipgloss.NewStyle().Foreground(c.Primary.Color())
-		return border.Render(spinStyle.Render("Thinking..."))
+		return border.Render(spinnerView)
 	}
 
 	// Show accumulated lines + current input

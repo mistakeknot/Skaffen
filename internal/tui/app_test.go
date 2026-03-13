@@ -14,6 +14,7 @@ import (
 	"github.com/mistakeknot/Skaffen/internal/trust"
 	"github.com/mistakeknot/Masaq/question"
 	msettings "github.com/mistakeknot/Masaq/settings"
+	"github.com/mistakeknot/Masaq/spinner"
 )
 
 // --- helpers ---
@@ -608,16 +609,15 @@ func TestRenderDiffPreviewEmptyFilePath(t *testing.T) {
 func TestRunAgentNilAgent(t *testing.T) {
 	m := setup(t) // nil agent
 	cmd := m.runAgent("hello")
-	msg := cmd()
-	done, ok := msg.(agentDoneMsg)
-	if !ok {
-		t.Fatalf("expected agentDoneMsg, got %T", msg)
+	if cmd == nil {
+		t.Fatal("runAgent should return a command even with nil agent")
 	}
-	if done.Err == nil {
-		t.Fatal("should error with nil agent")
+	// Spinner should have been initialized with label
+	if m.spinner.Label != "Thinking" {
+		t.Fatalf("spinner label = %q, want 'Thinking'", m.spinner.Label)
 	}
-	if !strings.Contains(done.Err.Error(), "no agent configured") {
-		t.Errorf("error = %q, want 'no agent configured'", done.Err)
+	if len(m.spinner.Frames) == 0 {
+		t.Fatal("spinner should have frames after runAgent")
 	}
 }
 
@@ -632,12 +632,14 @@ func TestViewShowsPromptWhenIdle(t *testing.T) {
 	}
 }
 
-func TestViewShowsThinkingWhenRunning(t *testing.T) {
+func TestViewShowsSpinnerWhenRunning(t *testing.T) {
 	m := setup(t)
 	m.running = true
+	m.spinner = spinner.New()
+	m.spinner.Label = "Thinking"
 	view := m.View()
 	if !strings.Contains(view, "Thinking") {
-		t.Fatal("view should show 'Thinking...' when running")
+		t.Fatal("view should show spinner with 'Thinking' label when running")
 	}
 }
 

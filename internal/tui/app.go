@@ -29,6 +29,7 @@ import (
 	"github.com/mistakeknot/Masaq/question"
 	msettings "github.com/mistakeknot/Masaq/settings"
 	"github.com/mistakeknot/Masaq/sparkline"
+	"github.com/mistakeknot/Masaq/spinner"
 	"github.com/mistakeknot/Masaq/statusbar"
 	"github.com/mistakeknot/Masaq/theme"
 	"github.com/mistakeknot/Masaq/viewport"
@@ -180,6 +181,9 @@ type appModel struct {
 	pinner        *skill.Pinner
 	pendingSkills []string // queued skill injections for next agent call
 
+	// Animated spinner shown in prompt while agent is running
+	spinner spinner.Model
+
 	// Context meter and token sparkline
 	contextMeter  meter.Model
 	tokenSpark    sparkline.Model
@@ -296,6 +300,13 @@ func (m *appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.logo.frame++
 			m.logo.step()
 			cmds = append(cmds, m.logo.tick())
+		}
+
+	case spinner.TickMsg:
+		if m.running {
+			var cmd tea.Cmd
+			m.spinner, cmd = m.spinner.Update(msg)
+			cmds = append(cmds, cmd)
 		}
 
 	case tea.KeyMsg:
@@ -593,7 +604,7 @@ func (m *appModel) View() string {
 		return lipgloss.JoinVertical(lipgloss.Left, logoView, vpView, m.settingsOverlay.View(), crumbView, meterView, statusView)
 	}
 
-	promptView := m.prompt.View(m.width, m.running)
+	promptView := m.prompt.View(m.width, m.running, m.spinner.View())
 	return lipgloss.JoinVertical(lipgloss.Left, logoView, vpView, promptView, crumbView, meterView, statusView)
 }
 
@@ -675,7 +686,9 @@ func (m *appModel) runAgent(prompt string) tea.Cmd {
 	a := m.agent
 	ctx, cancel := context.WithCancel(context.Background())
 	m.cancelRun = cancel
-	return func() tea.Msg {
+	m.spinner = spinner.New()
+	m.spinner.Label = "Thinking"
+	agentCmd := func() tea.Msg {
 		if a == nil {
 			cancel()
 			return agentDoneMsg{Err: fmt.Errorf("no agent configured")}
@@ -688,6 +701,7 @@ func (m *appModel) runAgent(prompt string) tea.Cmd {
 		}
 		return agentDoneMsg{Response: result.Response}
 	}
+	return tea.Batch(agentCmd, m.spinner.Tick())
 }
 
 // buildSkillPrompt prepends pending skill injections and pinned skill bodies

@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/mistakeknot/Masaq/spinner"
 )
 
 func TestPromptInit(t *testing.T) {
@@ -117,7 +118,7 @@ func TestPromptReset(t *testing.T) {
 
 func TestPromptViewIdle(t *testing.T) {
 	p := newPromptModel()
-	view := p.View(80, false)
+	view := p.View(80, false, "")
 	if view == "" {
 		t.Fatal("view should not be empty")
 	}
@@ -125,9 +126,11 @@ func TestPromptViewIdle(t *testing.T) {
 
 func TestPromptViewRunning(t *testing.T) {
 	p := newPromptModel()
-	view := p.View(80, true)
+	s := spinner.New()
+	s.Label = "Thinking"
+	view := p.View(80, true, s.View())
 	if !strings.Contains(view, "Thinking") {
-		t.Fatal("running view should show 'Thinking...'")
+		t.Fatal("running view should show spinner with 'Thinking' label")
 	}
 }
 
@@ -135,7 +138,7 @@ func TestPromptViewMultiline(t *testing.T) {
 	p := newPromptModel()
 	p.lines = []string{"first line"}
 	p.input.SetValue("second line")
-	view := p.View(80, false)
+	view := p.View(80, false, "")
 	if !strings.Contains(view, "first line") {
 		t.Fatal("multiline view should show accumulated lines")
 	}
