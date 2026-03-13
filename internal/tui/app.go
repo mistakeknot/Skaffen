@@ -282,8 +282,8 @@ func (m *appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
-		// Layout: breadcrumb=1, meter=1, status=1, prompt=3, rest=viewport
-		vpHeight := m.height - 6 // 1 breadcrumb + 1 meter + 1 status + 3 prompt
+		// Layout: breadcrumb=1, scroll-hint=1, meter=1, status=1, prompt=3, rest=viewport
+		vpHeight := m.height - 7 // 1 breadcrumb + 1 scroll-hint + 1 meter + 1 status + 3 prompt
 		if vpHeight < 1 {
 			vpHeight = 1
 		}
@@ -596,7 +596,7 @@ func (m *appModel) View() string {
 
 	// Logo sits above viewport, taking space from viewport height
 	logoHeight := strings.Count(logoView, "\n")
-	vpHeight := m.height - 6 - logoHeight // 1 breadcrumb + 1 meter + 1 status + 3 prompt + logo
+	vpHeight := m.height - 7 - logoHeight // 1 breadcrumb + 1 scroll-hint + 1 meter + 1 status + 3 prompt + logo
 	if vpHeight < 1 {
 		vpHeight = 1
 	}
@@ -605,16 +605,27 @@ func (m *appModel) View() string {
 		vpView = m.viewport.View()
 	}
 
+	// Scroll-to-bottom indicator: shown when user has scrolled up and content extends below
+	scrollHint := ""
+	if !m.viewport.AtBottom() && m.viewport.TotalLines() > m.viewport.Height() {
+		c := theme.Current().Semantic()
+		hintStyle := lipgloss.NewStyle().
+			Foreground(c.Info.Color()).
+			Align(lipgloss.Right).
+			Width(m.width)
+		scrollHint = hintStyle.Render("↓ new content — End to jump")
+	}
+
 	if m.approving {
-		return lipgloss.JoinVertical(lipgloss.Left, logoView, vpView, m.approvalQ.View(), crumbView, meterView, statusView)
+		return lipgloss.JoinVertical(lipgloss.Left, logoView, vpView, scrollHint, m.approvalQ.View(), crumbView, meterView, statusView)
 	}
 
 	if m.settingsOpen {
-		return lipgloss.JoinVertical(lipgloss.Left, logoView, vpView, m.settingsOverlay.View(), crumbView, meterView, statusView)
+		return lipgloss.JoinVertical(lipgloss.Left, logoView, vpView, scrollHint, m.settingsOverlay.View(), crumbView, meterView, statusView)
 	}
 
 	promptView := m.prompt.View(m.width, m.running, m.spinner.View())
-	return lipgloss.JoinVertical(lipgloss.Left, logoView, vpView, promptView, crumbView, meterView, statusView)
+	return lipgloss.JoinVertical(lipgloss.Left, logoView, vpView, scrollHint, promptView, crumbView, meterView, statusView)
 }
 
 // drainApproval sends false to a pending approval channel so the agent

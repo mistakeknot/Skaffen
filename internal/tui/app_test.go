@@ -929,6 +929,52 @@ func TestRetryInKnownCommands(t *testing.T) {
 	}
 }
 
+// --- Scroll indicator ---
+
+func TestScrollIndicatorHiddenAtBottom(t *testing.T) {
+	m := setup(t)
+	// Content fits on screen — no indicator
+	m.viewport.AppendContent("short content\n")
+	view := m.View()
+	if strings.Contains(view, "new content") {
+		t.Fatal("scroll indicator should not show when at bottom")
+	}
+}
+
+func TestScrollIndicatorShownWhenScrolledUp(t *testing.T) {
+	m := setup(t)
+	// Add enough content to exceed viewport height
+	for i := 0; i < 100; i++ {
+		m.viewport.AppendContent(fmt.Sprintf("line %d\n", i))
+	}
+	// Scroll up so we're no longer at bottom
+	m.viewport.ScrollUp(10)
+	view := m.View()
+	if !strings.Contains(view, "new content") {
+		t.Fatal("scroll indicator should show when scrolled up with overflow content")
+	}
+}
+
+func TestScrollIndicatorHiddenAfterScrollToBottom(t *testing.T) {
+	m := setup(t)
+	m.logo.stop() // stop animation so logo doesn't affect viewport height
+	for i := 0; i < 100; i++ {
+		m.viewport.AppendContent(fmt.Sprintf("line %d\n", i))
+	}
+	m.viewport.ScrollUp(10)
+	// Verify indicator appears
+	view := m.View()
+	if !strings.Contains(view, "new content") {
+		t.Fatal("scroll indicator should show before scrolling back")
+	}
+	// Now scroll back to bottom
+	m.viewport.ScrollToBottom()
+	view = m.View()
+	if strings.Contains(view, "new content") {
+		t.Fatal("scroll indicator should hide after scrolling to bottom")
+	}
+}
+
 // --- Esc to stop ---
 
 func TestEscStopsRunningAgent(t *testing.T) {
