@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"mime"
 	"net"
 	"net/http"
 	"net/url"
@@ -111,13 +112,13 @@ func (t *WebFetchTool) fetch(ctx context.Context, rawURL string, maxLength int) 
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		io.Copy(io.Discard, resp.Body)
+		io.Copy(io.Discard, io.LimitReader(resp.Body, 64<<10))
 		return "", fmt.Errorf("HTTP %d", resp.StatusCode)
 	}
 
 	ct := resp.Header.Get("Content-Type")
 	if !isTextContent(ct) {
-		io.Copy(io.Discard, resp.Body)
+		io.Copy(io.Discard, io.LimitReader(resp.Body, 64<<10))
 		return "", fmt.Errorf("unsupported content type: %s (only text/html and text/plain are supported)", ct)
 	}
 
@@ -133,9 +134,9 @@ func (t *WebFetchTool) fetch(ctx context.Context, rawURL string, maxLength int) 
 	var text string
 	if strings.Contains(ct, "text/html") {
 		text = extractHTML(string(bodyBytes))
-		// Encoding heuristic: if extracted text is <10% of input, likely encoding issue
-		if len(text) > 0 && len(text) < len(bodyBytes)/10 {
-			return "", fmt.Errorf("content extraction yielded very little text — the page may use an unsupported character encoding")
+		// Heuristic: if extracted text is <10% of input, page may be JS-rendered or use unsupported encoding
+		if len(text) > 0 && len(text) < len(bodyBytes)/10 && len(bodyBytes) > 1000 {
+			return "", fmt.Errorf("content extraction yielded very little text — the page may be JavaScript-rendered or use an unsupported character encoding")
 		}
 	} else {
 		text = string(bodyBytes)
@@ -159,7 +160,7 @@ func validateURL(u *url.URL) error {
 		return fmt.Errorf("empty hostname")
 	}
 
-	lower := strings.ToLower(host)
+	lower := strings.ToLower(strings.TrimSuffix(host, "."))
 	if lower == "localhost" {
 		return fmt.Errorf("localhost is not allowed")
 	}
@@ -224,15 +225,19 @@ func ssrfSafeDialer() func(ctx context.Context, network, addr string) (net.Conn,
 }
 
 func isTextContent(ct string) bool {
-	lower := strings.ToLower(ct)
-	return strings.Contains(lower, "text/html") || strings.Contains(lower, "text/plain")
+	mediaType, _, err := mime.ParseMediaType(ct)
+	if err != nil {
+		return false
+	}
+	return mediaType == "text/html" || mediaType == "text/plain"
 }
 
 // extractHTML extracts visible text from HTML, skipping script/style/nav/footer.
+// Uses a tag stack instead of a depth counter to handle mismatched nesting correctly.
 func extractHTML(htmlContent string) string {
 	tokenizer := html.NewTokenizer(strings.NewReader(htmlContent))
 	var b strings.Builder
-	skipDepth := 0
+	var skipStack []string // stack of active skip tags
 	skipTags := map[string]bool{
 		"script": true, "style": true, "nav": true, "footer": true,
 		"noscript": true, "svg": true, "header": true,
@@ -242,31 +247,33 @@ func extractHTML(htmlContent string) string {
 		tt := tokenizer.Next()
 		switch tt {
 		case html.ErrorToken:
-			if tokenizer.Err() == io.EOF {
-				return strings.TrimSpace(b.String())
-			}
 			return strings.TrimSpace(b.String())
 
 		case html.StartTagToken:
 			tn, _ := tokenizer.TagName()
 			tag := string(tn)
 			if skipTags[tag] {
-				skipDepth++
+				skipStack = append(skipStack, tag)
 			}
 
 		case html.EndTagToken:
 			tn, _ := tokenizer.TagName()
 			tag := string(tn)
-			if skipTags[tag] && skipDepth > 0 {
-				skipDepth--
+			if skipTags[tag] {
+				// Pop the matching tag from the stack (search from top)
+				for i := len(skipStack) - 1; i >= 0; i-- {
+					if skipStack[i] == tag {
+						skipStack = append(skipStack[:i], skipStack[i+1:]...)
+						break
+					}
+				}
 			}
-			// Add line break after block elements
 			if isBlockElement(tag) {
 				b.WriteString("\n")
 			}
 
 		case html.TextToken:
-			if skipDepth == 0 {
+			if len(skipStack) == 0 {
 				text := strings.TrimSpace(tokenizer.Token().Data)
 				if text != "" {
 					b.WriteString(text)

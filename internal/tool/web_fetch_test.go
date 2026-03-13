@@ -125,6 +125,18 @@ func TestExtractHTML(t *testing.T) {
 			contains: []string{"Outer", "inner", "nested", "text"},
 		},
 		{
+			name:     "mismatched nesting - nav with inline script",
+			html:     `<nav><script>var x=1;</script></nav><p>Visible after nav</p>`,
+			contains: []string{"Visible after nav"},
+			excludes: []string{"var x"},
+		},
+		{
+			name:     "nested skip tags recover correctly",
+			html:     `<nav><div>nav content</div></nav><script>hidden script</script><p>After both</p>`,
+			contains: []string{"After both"},
+			excludes: []string{"nav content", "hidden script"},
+		},
+		{
 			name:     "empty input",
 			html:     ``,
 			contains: []string{},
