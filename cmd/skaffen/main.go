@@ -2,12 +2,14 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
 	"log"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"runtime"
 	"runtime/debug"
 	"strings"
@@ -16,6 +18,7 @@ import (
 
 	"github.com/mistakeknot/Masaq/theme"
 	"github.com/mistakeknot/Skaffen/internal/agent"
+	"github.com/mistakeknot/Skaffen/internal/agentloop"
 	"github.com/mistakeknot/Skaffen/internal/command"
 	"github.com/mistakeknot/Skaffen/internal/config"
 	"github.com/mistakeknot/Skaffen/internal/hooks"
@@ -25,6 +28,7 @@ import (
 	"github.com/mistakeknot/Skaffen/internal/provider"
 	"github.com/mistakeknot/Skaffen/internal/router"
 	"github.com/mistakeknot/Skaffen/internal/session"
+	"github.com/mistakeknot/Skaffen/internal/subagent"
 	"github.com/mistakeknot/Skaffen/internal/tool"
 	"github.com/mistakeknot/Skaffen/internal/trust"
 	"github.com/mistakeknot/Skaffen/internal/tui"
@@ -386,10 +390,16 @@ func runTUI() error {
 	// Load custom slash commands from disk
 	customCmds := command.LoadAll(cfg.CommandDirs()...)
 
+	// Subagent system: registry + tool + runner (runner wired after TUI starts)
+	subReg := subagent.NewTypeRegistry(filepath.Join(cfg.WorkDir(), ".skaffen", "agents"))
+	agentTool := subagent.NewAgentTool(subReg, nil) // runner set lazily
+	reg.RegisterForPhases(&agentloopToolBridge{inner: agentTool}, []tool.Phase{tool.PhaseBuild})
+
 	// Create agent
 	a := agent.New(p, reg, opts...)
 
-	// Run TUI
+	// Run TUI — pass subagent wiring info so it can create the runner
+	// and connect StatusCB to program.Send.
 	return tui.Run(tui.Config{
 		Agent:          a,
 		Trust:          trustEval,
@@ -400,6 +410,12 @@ func runTUI() error {
 		SkaffenVer:     skaffenVersion(),
 		MasaqVer:       masaqVersion(),
 		CustomCommands: customCmds,
+		SubagentInit: &tui.SubagentInit{
+			AgentTool:   agentTool,
+			Registry:    subReg,
+			Provider:    p,
+			Reservation: subagent.NewReservationBridge(cfg.WorkDir()),
+		},
 	})
 }
 
@@ -535,4 +551,18 @@ func buildSystemPrompt(workDir, explicit string) string {
 
 func printVersion() {
 	fmt.Printf("skaffen %s (%s)\n", skaffenVersion(), runtime.Version())
+}
+
+// agentloopToolBridge adapts an agentloop.Tool to tool.Tool so it can be
+// registered in the phase-gated tool.Registry. The reverse of agent.toolBridge.
+type agentloopToolBridge struct {
+	inner agentloop.Tool
+}
+
+func (b *agentloopToolBridge) Name() string                    { return b.inner.Name() }
+func (b *agentloopToolBridge) Description() string             { return b.inner.Description() }
+func (b *agentloopToolBridge) Schema() json.RawMessage         { return b.inner.Schema() }
+func (b *agentloopToolBridge) Execute(ctx context.Context, params json.RawMessage) tool.ToolResult {
+	r := b.inner.Execute(ctx, params)
+	return tool.ToolResult{Content: r.Content, IsError: r.IsError}
 }

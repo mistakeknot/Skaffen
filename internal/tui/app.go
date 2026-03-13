@@ -14,7 +14,9 @@ import (
 	"github.com/mistakeknot/Skaffen/internal/agent"
 	"github.com/mistakeknot/Skaffen/internal/command"
 	"github.com/mistakeknot/Skaffen/internal/git"
+	"github.com/mistakeknot/Skaffen/internal/provider"
 	"github.com/mistakeknot/Skaffen/internal/session"
+	"github.com/mistakeknot/Skaffen/internal/subagent"
 	"github.com/mistakeknot/Skaffen/internal/trust"
 	"github.com/mistakeknot/Masaq/breadcrumb"
 	"github.com/mistakeknot/Masaq/compact"
@@ -39,13 +41,38 @@ type Config struct {
 	SkaffenVer     string
 	MasaqVer       string
 	CustomCommands map[string]command.Def
+	SubagentInit   *SubagentInit // nil = subagents disabled
 }
+
+// SubagentInit carries the components needed to wire the subagent runner
+// once the TUI program is running and can receive Bubble Tea messages.
+type SubagentInit struct {
+	AgentTool   *subagent.AgentTool
+	Registry    *subagent.TypeRegistry
+	Provider    provider.Provider
+	Reservation *subagent.ReservationBridge
+}
+
+// subagentStatusMsg wraps a subagent.StatusUpdate for the Bubble Tea message loop.
+type subagentStatusMsg subagent.StatusUpdate
 
 // Run starts the TUI REPL.
 func Run(cfg Config) error {
 	m := newAppModel(cfg)
 	p := tea.NewProgram(m, tea.WithAltScreen(), tea.WithMouseCellMotion())
 	m.program = p
+	// Wire subagent runner now that we have the tea.Program for sending messages
+	if cfg.SubagentInit != nil {
+		si := cfg.SubagentInit
+		runner := subagent.NewRunner(si.Registry, si.Provider, si.Reservation, subagent.RunnerConfig{
+			MaxConcurrent: 5,
+			StatusCB: func(u subagent.StatusUpdate) {
+				p.Send(subagentStatusMsg(u))
+			},
+		})
+		si.AgentTool.SetRunner(runner)
+		m.subagents = newSubagentTracker()
+	}
 	if m.agent != nil {
 		// Wire StreamCallback → tea.Program.Send so agent events reach the
 		// Bubble Tea message loop from the background goroutine.
@@ -141,6 +168,9 @@ type appModel struct {
 
 	// Custom slash commands loaded from disk
 	customCmds map[string]command.Def
+
+	// Subagent tracker for inline status rendering
+	subagents *subagentTracker
 }
 
 func newAppModel(cfg Config) *appModel {
@@ -430,6 +460,13 @@ func (m *appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 		m.prompt.Reset()
+
+	case subagentStatusMsg:
+		if m.subagents != nil {
+			m.subagents.update(subagent.StatusUpdate(msg))
+			// Re-render subagent tracker inline
+			m.viewport.AppendContent("\r" + m.subagents.View(m.width) + "\n")
+		}
 
 	case agentDoneMsg:
 		m.running = false
