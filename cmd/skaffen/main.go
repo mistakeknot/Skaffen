@@ -53,6 +53,7 @@ var (
 	flagPlugins   = flag.String("plugins", "", "Path to plugins.toml (overrides config hierarchy)")
 	flagColorMode = flag.String("color-mode", "", "Color mode: dark, light (default: auto-detect)")
 	flagTheme     = flag.String("theme", "", "Theme: tokyonight, catppuccin (default: Tokyo Night)")
+	flagPlanMode  = flag.Bool("plan-mode", false, "Start in read-only plan mode")
 )
 
 func main() {
@@ -284,6 +285,12 @@ func runPrint() error {
 
 	a := agent.New(p, reg, opts...)
 
+	// Plan mode
+	if *flagPlanMode {
+		a.SetPlanMode(true)
+		fmt.Fprintln(os.Stderr, "skaffen: plan mode (read-only)")
+	}
+
 	// Run agent loop
 	result, err := a.Run(ctx, prompt)
 	if err != nil {
@@ -397,6 +404,11 @@ func runTUI() error {
 
 	// Create agent
 	a := agent.New(p, reg, opts...)
+
+	// Plan mode
+	if *flagPlanMode {
+		a.SetPlanMode(true)
+	}
 
 	// Run TUI — pass subagent wiring info so it can create the runner
 	// and connect StatusCB to program.Send.

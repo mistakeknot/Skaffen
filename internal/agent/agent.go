@@ -93,6 +93,14 @@ func (a *Agent) SetToolApprover(fn ToolApprover) {
 	a.approver = fn
 }
 
+// SetPlanMode enables or disables plan mode on the tool registry.
+// When active, only read-only tools (read, glob, grep, ls) are available.
+// Must be called when the agent is not running (guarded by TUI's !m.running).
+func (a *Agent) SetPlanMode(on bool) { a.registry.SetPlanMode(on) }
+
+// PlanMode returns whether plan mode is active.
+func (a *Agent) PlanMode() bool { return a.registry.PlanMode() }
+
 // SetModelOverride sets a runtime model override if the router supports it.
 // Returns false if the router does not implement ModelOverrideSetter.
 func (a *Agent) SetModelOverride(model string) bool {

@@ -272,6 +272,17 @@ func (m *appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return m, tea.Quit
 		}
+		// Plan mode toggle: Shift+Tab toggles read-only mode (only when idle)
+		if msg.String() == "shift+tab" && !m.running && !m.approving && !m.settingsOpen {
+			on := !m.agent.PlanMode()
+			m.agent.SetPlanMode(on)
+			if on {
+				m.viewport.AppendContent("\n" + lipgloss.NewStyle().Foreground(theme.Current().Semantic().Info.Color()).Render("Plan mode enabled — read-only tools only (Shift+Tab to toggle)") + "\n")
+			} else {
+				m.viewport.AppendContent("\n" + lipgloss.NewStyle().Foreground(theme.Current().Semantic().Success.Color()).Render("Plan mode disabled — full tools available") + "\n")
+			}
+			break
+		}
 		// Stop logo animation on first real typed character.
 		// Ignore scroll keys, control sequences, and escape sequence
 		// fragments (like termenv OSC query responses).
@@ -485,7 +496,7 @@ func (m *appModel) View() string {
 	vpView := m.viewport.View()
 
 	// Update status slots with current state.
-	updateStatusSlots(&m.status, m.phase, m.modelName, m.totalCost, m.contextPct, m.turns)
+	updateStatusSlots(&m.status, m.phase, m.modelName, m.totalCost, m.contextPct, m.turns, m.agent.PlanMode())
 	statusView := m.status.View()
 	crumbView := m.crumbs.View()
 
