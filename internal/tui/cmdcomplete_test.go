@@ -266,3 +266,25 @@ func TestPromptCompleterCancel(t *testing.T) {
 		t.Errorf("input after cancel = %q, want empty", p.input.Value())
 	}
 }
+
+func TestCmdCompleterMultiRunePaste(t *testing.T) {
+	cc := newCmdCompleter(nil, nil)
+	// Simulate pasting "he" as a single KeyMsg with multiple runes
+	cc, _ = cc.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'h', 'e'}})
+	if cc.pattern != "he" {
+		t.Errorf("pattern = %q, want %q", cc.pattern, "he")
+	}
+	found := false
+	for _, e := range cc.filtered {
+		if e.name == "help" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("pasting 'he' should match 'help'")
+	}
+	if len(cc.filtered) >= len(cc.commands) {
+		t.Error("pasting should filter the list")
+	}
+}

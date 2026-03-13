@@ -114,7 +114,7 @@ func renderMeterRow(m meter.Model, s sparkline.Model, width int) string {
 		return ""
 	}
 
-	sep := lipgloss.NewStyle().Foreground(theme.Current().Semantic().Border.Color()).Render(" │ ")
+	sep := lipgloss.NewStyle().Foreground(theme.Current().Semantic().Border.Color()).Render("  │  ")
 	var parts []string
 	if meterView != "" {
 		parts = append(parts, meterView)
@@ -122,7 +122,7 @@ func renderMeterRow(m meter.Model, s sparkline.Model, width int) string {
 	if sparkView != "" {
 		parts = append(parts, sparkView)
 	}
-	row := strings.Join(parts, sep)
+	row := " " + strings.Join(parts, sep)
 
 	// Truncate to terminal width if needed
 	_ = width

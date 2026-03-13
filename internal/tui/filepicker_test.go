@@ -350,3 +350,23 @@ func TestItoa(t *testing.T) {
 		}
 	}
 }
+
+func TestFilePickerMultiRunePaste(t *testing.T) {
+	dir := t.TempDir()
+	os.WriteFile(filepath.Join(dir, "main.go"), []byte("package main"), 0o644)
+	os.WriteFile(filepath.Join(dir, "test.go"), []byte("package test"), 0o644)
+	os.WriteFile(filepath.Join(dir, "readme.md"), []byte("# readme"), 0o644)
+
+	fp := newFilePicker(dir)
+	// Simulate pasting "main" as a single KeyMsg with multiple runes
+	fp, _ = fp.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'m', 'a', 'i', 'n'}})
+	if fp.pattern != "main" {
+		t.Errorf("pattern = %q, want %q", fp.pattern, "main")
+	}
+	if len(fp.filtered) != 1 {
+		t.Errorf("filtered = %d, want 1 (main.go)", len(fp.filtered))
+	}
+	if len(fp.filtered) > 0 && fp.filtered[0] != "main.go" {
+		t.Errorf("filtered[0] = %q, want %q", fp.filtered[0], "main.go")
+	}
+}

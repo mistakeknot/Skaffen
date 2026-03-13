@@ -102,21 +102,22 @@ func (cc cmdCompleterModel) Update(msg tea.Msg) (cmdCompleterModel, tea.Cmd) {
 				return cc, func() tea.Msg { return cmdCompleterCancelMsg{} }
 			}
 		default:
-			if len(msg.Runes) == 1 {
-				r := msg.Runes[0]
-				// Space means done typing the command name — select current
-				if r == ' ' {
-					if len(cc.filtered) > 0 && cc.cursor < len(cc.filtered) {
-						cc.visible = false
-						return cc, func() tea.Msg {
-							return cmdCompleterSelectedMsg{Name: cc.filtered[cc.cursor].name}
+			if len(msg.Runes) > 0 {
+				for _, r := range msg.Runes {
+					// Space means done typing the command name — select current
+					if r == ' ' {
+						if len(cc.filtered) > 0 && cc.cursor < len(cc.filtered) {
+							cc.visible = false
+							return cc, func() tea.Msg {
+								return cmdCompleterSelectedMsg{Name: cc.filtered[cc.cursor].name}
+							}
 						}
+						return cc, nil
 					}
-				} else {
 					cc.pattern += string(r)
-					cc.filtered = filterCommands(cc.commands, cc.pattern)
-					cc.cursor = clampCursor(cc.cursor, cc.filtered)
 				}
+				cc.filtered = filterCommands(cc.commands, cc.pattern)
+				cc.cursor = clampCursor(cc.cursor, cc.filtered)
 			}
 		}
 	}

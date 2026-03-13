@@ -91,8 +91,10 @@ func (fp filePickerModel) Update(msg tea.Msg) (filePickerModel, tea.Cmd) {
 				return fp, func() tea.Msg { return filePickerCancelMsg{} }
 			}
 		default:
-			if len(msg.Runes) == 1 {
-				fp.pattern += string(msg.Runes)
+			if len(msg.Runes) > 0 {
+				for _, r := range msg.Runes {
+					fp.pattern += string(r)
+				}
 				fp.filtered = filterFiles(fp.allFiles, fp.pattern)
 				fp.cursor = 0
 			}
