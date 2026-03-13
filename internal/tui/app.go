@@ -186,6 +186,7 @@ func newAppModel(cfg Config) *appModel {
 	pm := newPromptModel()
 	pm.workDir = cfg.WorkDir
 	pm.customCmds = cfg.CustomCommands
+	pm.skills = cfg.Skills
 	// Initialize git helper if workDir is a git repo
 	var g *git.Git
 	if cfg.WorkDir != "" {

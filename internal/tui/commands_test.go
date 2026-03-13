@@ -571,7 +571,7 @@ func TestCompleterIncludesCustomCommands(t *testing.T) {
 			Source:      "project",
 		},
 	}
-	cc := newCmdCompleter(custom)
+	cc := newCmdCompleter(custom, nil)
 	found := false
 	for _, e := range cc.commands {
 		if e.name == "deploy" {

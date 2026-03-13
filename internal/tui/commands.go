@@ -63,6 +63,7 @@ func KnownCommands() map[string]string {
 		"sessions": "List saved sessions",
 		"settings": "Show or change settings",
 		"ship":     "Push changes to remote",
+		"skills":   "List, inspect, pin, and manage skills",
 		"status":   "Show session status summary",
 		"theme":    "Switch theme (e.g. /theme catppuccin)",
 		"undo":     "Undo the last git commit",
@@ -98,11 +99,50 @@ func formatHelpWithCustom(custom map[string]command.Def) string {
 	return b.String()
 }
 
+// formatHelp renders help text for built-in + custom commands + skills.
+func (m *appModel) formatHelp() string {
+	cmds := KnownCommands()
+	for name, def := range m.customCmds {
+		if _, exists := cmds[name]; !exists {
+			cmds[name] = def.Description
+		}
+	}
+	names := make([]string, 0, len(cmds))
+	for name := range cmds {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+
+	var b strings.Builder
+	b.WriteString("Available commands:\n")
+	for _, name := range names {
+		b.WriteString(fmt.Sprintf("  /%s — %s\n", name, cmds[name]))
+	}
+
+	// Skills section
+	var skillNames []string
+	for name, d := range m.skills {
+		if d.UserInvocable {
+			skillNames = append(skillNames, name)
+		}
+	}
+	if len(skillNames) > 0 {
+		sort.Strings(skillNames)
+		b.WriteString("\nSkills:\n")
+		for _, name := range skillNames {
+			d := m.skills[name]
+			b.WriteString(fmt.Sprintf("  /%s — %s [%s]\n", name, d.Description, d.Source))
+		}
+	}
+
+	return b.String()
+}
+
 // executeCommand runs a slash command and returns the result.
 func (m *appModel) executeCommand(cmd *Command) CommandResult {
 	switch cmd.Name {
 	case "help":
-		return CommandResult{Message: formatHelpWithCustom(m.customCmds)}
+		return CommandResult{Message: m.formatHelp()}
 
 	case "quit":
 		return CommandResult{Message: "Goodbye!", Quit: true}
@@ -185,6 +225,9 @@ func (m *appModel) executeCommand(cmd *Command) CommandResult {
 
 	case "sessions":
 		return m.execListSessions()
+
+	case "skills":
+		return m.execSkills(cmd.Args)
 
 	default:
 		// Check custom commands loaded from disk
@@ -299,6 +342,129 @@ func (m *appModel) execSkill(d skill.Def, args []string) CommandResult {
 		status += " (pinned)"
 	}
 	return CommandResult{Message: status}
+}
+
+// execSkills handles the /skills management command.
+func (m *appModel) execSkills(args []string) CommandResult {
+	if len(args) == 0 || args[0] == "list" {
+		return m.execSkillsList()
+	}
+	switch args[0] {
+	case "info":
+		if len(args) < 2 {
+			return CommandResult{Message: "Usage: /skills info <name>", IsError: true}
+		}
+		return m.execSkillsInfo(args[1])
+	case "pin":
+		if len(args) < 2 {
+			return CommandResult{Message: "Usage: /skills pin <name>", IsError: true}
+		}
+		return m.execSkillsPin(args[1])
+	case "unpin":
+		if len(args) < 2 {
+			return CommandResult{Message: "Usage: /skills unpin <name>", IsError: true}
+		}
+		m.pinner.Unpin(args[1])
+		return CommandResult{Message: fmt.Sprintf("Unpinned skill %q.", args[1])}
+	case "pinned":
+		pinned := m.pinner.Pinned()
+		if len(pinned) == 0 {
+			return CommandResult{Message: "No pinned skills."}
+		}
+		return CommandResult{Message: "Pinned skills:\n  " + strings.Join(pinned, "\n  ")}
+	default:
+		return CommandResult{
+			Message: "Usage: /skills [list|info <name>|pin <name>|unpin <name>|pinned]",
+			IsError: true,
+		}
+	}
+}
+
+func (m *appModel) execSkillsList() CommandResult {
+	if len(m.skills) == 0 {
+		return CommandResult{Message: "No skills discovered."}
+	}
+
+	// Group by source tier
+	groups := make(map[string][]skill.Def)
+	for _, d := range m.skills {
+		groups[d.Source] = append(groups[d.Source], d)
+	}
+
+	tierOrder := []struct{ key, label string }{
+		{"project", "Project (.skaffen/skills/)"},
+		{"project-plugin", "Project Plugins (.skaffen/plugins/*/skills/)"},
+		{"user", "User (~/.skaffen/skills/)"},
+		{"user-plugin", "User Plugins (~/.skaffen/plugins/*/skills/)"},
+	}
+
+	var b strings.Builder
+	b.WriteString("Skills:\n")
+	for _, tier := range tierOrder {
+		defs, ok := groups[tier.key]
+		if !ok || len(defs) == 0 {
+			continue
+		}
+		b.WriteString(fmt.Sprintf("\n  %s:\n", tier.label))
+		sort.Slice(defs, func(i, j int) bool { return defs[i].Name < defs[j].Name })
+		for _, d := range defs {
+			pinned := ""
+			if m.pinner.IsPinned(d.Name) {
+				pinned = " (pinned)"
+			}
+			b.WriteString(fmt.Sprintf("    /%s — %s%s\n", d.Name, d.Description, pinned))
+		}
+	}
+	return CommandResult{Message: b.String()}
+}
+
+func (m *appModel) execSkillsInfo(name string) CommandResult {
+	d, ok := m.skills[name]
+	if !ok {
+		return CommandResult{
+			Message: fmt.Sprintf("Skill %q not found.", name),
+			IsError: true,
+		}
+	}
+
+	var b strings.Builder
+	b.WriteString(fmt.Sprintf("Skill: %s\n", d.Name))
+	b.WriteString(fmt.Sprintf("  Description: %s\n", d.Description))
+	b.WriteString(fmt.Sprintf("  Source: %s\n", d.Source))
+	b.WriteString(fmt.Sprintf("  Invocable: %v\n", d.UserInvocable))
+	if len(d.Triggers) > 0 {
+		b.WriteString(fmt.Sprintf("  Triggers: %s\n", strings.Join(d.Triggers, ", ")))
+	}
+	if d.Args != "" {
+		b.WriteString(fmt.Sprintf("  Args: %s\n", d.Args))
+	}
+	if d.Model != "" {
+		b.WriteString(fmt.Sprintf("  Model: %s\n", d.Model))
+	}
+	b.WriteString(fmt.Sprintf("  Path: %s\n", d.Path))
+
+	// Body preview (first 3 lines)
+	body, err := skill.LoadBody(&d)
+	if err == nil && body != "" {
+		m.skills[name] = d // cache loaded body
+		lines := strings.SplitN(body, "\n", 4)
+		if len(lines) > 3 {
+			lines = lines[:3]
+		}
+		b.WriteString("  Preview:\n")
+		for _, line := range lines {
+			b.WriteString(fmt.Sprintf("    %s\n", line))
+		}
+	}
+
+	return CommandResult{Message: b.String()}
+}
+
+func (m *appModel) execSkillsPin(name string) CommandResult {
+	if err := m.pinner.Pin(name); err != nil {
+		return CommandResult{Message: err.Error(), IsError: true}
+	}
+	return CommandResult{Message: fmt.Sprintf("Pinned skill %q for this session.", name)}
 }
 
 func (m *appModel) execStatus() CommandResult {

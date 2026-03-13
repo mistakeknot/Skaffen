@@ -9,6 +9,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/mistakeknot/Skaffen/internal/command"
+	"github.com/mistakeknot/Skaffen/internal/skill"
 	"github.com/mistakeknot/Masaq/theme"
 )
 
@@ -21,6 +22,7 @@ type promptModel struct {
 	completing bool
 	workDir    string
 	customCmds map[string]command.Def
+	skills     map[string]skill.Def
 }
 
 func newPromptModel() promptModel {
@@ -106,7 +108,7 @@ func (p promptModel) Update(msg tea.Msg) (promptModel, tea.Cmd) {
 				// Let textinput handle the '/' character first
 				var cmd tea.Cmd
 				p.input, cmd = p.input.Update(msg)
-				p.completer = newCmdCompleter(p.customCmds)
+				p.completer = newCmdCompleter(p.customCmds, p.skills)
 				p.completing = true
 				return p, cmd
 			}

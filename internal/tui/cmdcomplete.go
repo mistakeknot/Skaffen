@@ -7,6 +7,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/mistakeknot/Skaffen/internal/command"
+	"github.com/mistakeknot/Skaffen/internal/skill"
 	"github.com/mistakeknot/Masaq/theme"
 )
 
@@ -33,11 +34,18 @@ type cmdCompleterSelectedMsg struct {
 // cmdCompleterCancelMsg is sent when the completer is dismissed.
 type cmdCompleterCancelMsg struct{}
 
-func newCmdCompleter(custom map[string]command.Def) cmdCompleterModel {
+func newCmdCompleter(custom map[string]command.Def, skills map[string]skill.Def) cmdCompleterModel {
 	known := KnownCommands()
 	for name, def := range custom {
 		if _, exists := known[name]; !exists {
 			known[name] = def.Description
+		}
+	}
+	for name, def := range skills {
+		if def.UserInvocable {
+			if _, exists := known[name]; !exists {
+				known[name] = def.Description + " [skill]"
+			}
 		}
 	}
 	entries := make([]cmdEntry, 0, len(known))

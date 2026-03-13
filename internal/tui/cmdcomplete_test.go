@@ -8,7 +8,7 @@ import (
 )
 
 func TestNewCmdCompleter(t *testing.T) {
-	cc := newCmdCompleter(nil)
+	cc := newCmdCompleter(nil, nil)
 	if !cc.visible {
 		t.Fatal("completer should start visible")
 	}
@@ -27,7 +27,7 @@ func TestNewCmdCompleter(t *testing.T) {
 }
 
 func TestCmdCompleterFilter(t *testing.T) {
-	cc := newCmdCompleter(nil)
+	cc := newCmdCompleter(nil, nil)
 	// Type "he" — should match "help"
 	cc, _ = cc.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'h'}})
 	cc, _ = cc.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'e'}})
@@ -47,7 +47,7 @@ func TestCmdCompleterFilter(t *testing.T) {
 }
 
 func TestCmdCompleterFilterNoMatch(t *testing.T) {
-	cc := newCmdCompleter(nil)
+	cc := newCmdCompleter(nil, nil)
 	cc, _ = cc.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'z'}})
 	cc, _ = cc.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'z'}})
 	cc, _ = cc.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'z'}})
@@ -57,7 +57,7 @@ func TestCmdCompleterFilterNoMatch(t *testing.T) {
 }
 
 func TestCmdCompleterArrowKeys(t *testing.T) {
-	cc := newCmdCompleter(nil)
+	cc := newCmdCompleter(nil, nil)
 	if cc.cursor != 0 {
 		t.Fatal("cursor should start at 0")
 	}
@@ -77,7 +77,7 @@ func TestCmdCompleterArrowKeys(t *testing.T) {
 }
 
 func TestCmdCompleterSelectEnter(t *testing.T) {
-	cc := newCmdCompleter(nil)
+	cc := newCmdCompleter(nil, nil)
 	cc, cmd := cc.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	if cmd == nil {
 		t.Fatal("enter should produce a command")
@@ -96,7 +96,7 @@ func TestCmdCompleterSelectEnter(t *testing.T) {
 }
 
 func TestCmdCompleterSelectTab(t *testing.T) {
-	cc := newCmdCompleter(nil)
+	cc := newCmdCompleter(nil, nil)
 	cc, cmd := cc.Update(tea.KeyMsg{Type: tea.KeyTab})
 	if cmd == nil {
 		t.Fatal("tab should produce a command")
@@ -108,7 +108,7 @@ func TestCmdCompleterSelectTab(t *testing.T) {
 }
 
 func TestCmdCompleterSelectSpace(t *testing.T) {
-	cc := newCmdCompleter(nil)
+	cc := newCmdCompleter(nil, nil)
 	cc, cmd := cc.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{' '}})
 	if cmd == nil {
 		t.Fatal("space should select current command")
@@ -120,7 +120,7 @@ func TestCmdCompleterSelectSpace(t *testing.T) {
 }
 
 func TestCmdCompleterEscCancels(t *testing.T) {
-	cc := newCmdCompleter(nil)
+	cc := newCmdCompleter(nil, nil)
 	cc, cmd := cc.Update(tea.KeyMsg{Type: tea.KeyEsc})
 	if cmd == nil {
 		t.Fatal("esc should produce a command")
@@ -135,7 +135,7 @@ func TestCmdCompleterEscCancels(t *testing.T) {
 }
 
 func TestCmdCompleterBackspacePastSlashCancels(t *testing.T) {
-	cc := newCmdCompleter(nil)
+	cc := newCmdCompleter(nil, nil)
 	// pattern is empty, backspace should cancel
 	_, cmd := cc.Update(tea.KeyMsg{Type: tea.KeyBackspace})
 	if cmd == nil {
@@ -148,7 +148,7 @@ func TestCmdCompleterBackspacePastSlashCancels(t *testing.T) {
 }
 
 func TestCmdCompleterBackspaceNarrowing(t *testing.T) {
-	cc := newCmdCompleter(nil)
+	cc := newCmdCompleter(nil, nil)
 	// Type "he"
 	cc, _ = cc.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'h'}})
 	cc, _ = cc.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'e'}})
@@ -164,7 +164,7 @@ func TestCmdCompleterBackspaceNarrowing(t *testing.T) {
 }
 
 func TestCmdCompleterView(t *testing.T) {
-	cc := newCmdCompleter(nil)
+	cc := newCmdCompleter(nil, nil)
 	view := cc.View(80)
 	if view == "" {
 		t.Fatal("view should not be empty")
@@ -179,7 +179,7 @@ func TestCmdCompleterView(t *testing.T) {
 }
 
 func TestCmdCompleterViewHidden(t *testing.T) {
-	cc := newCmdCompleter(nil)
+	cc := newCmdCompleter(nil, nil)
 	cc.visible = false
 	if cc.View(80) != "" {
 		t.Fatal("hidden completer should return empty view")
