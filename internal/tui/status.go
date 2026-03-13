@@ -52,12 +52,25 @@ func contextMeterWidth(termWidth int) int {
 }
 
 // newTokenSparkline creates a sparkline for tracking input tokens per turn.
+// Uses brand colors (Primary→Secondary gradient) instead of traffic-light colors.
 func newTokenSparkline(width int) sparkline.Model {
 	sparkWidth := tokenSparklineWidth(width)
 	s := sparkline.New(sparkWidth)
-	s.WarnThreshold = 0.75
-	s.CritThreshold = 0.90
+	s.ColorOverride = brandSparklineColor
 	return s
+}
+
+// brandSparklineColor maps sparkline values to the theme's brand palette:
+// low values use Muted, mid values use Primary, high values use Secondary.
+func brandSparklineColor(t float64, sem theme.SemanticColors) lipgloss.Color {
+	switch {
+	case t >= 0.8:
+		return sem.Secondary.Color() // purple — stands out for peaks
+	case t >= 0.4:
+		return sem.Primary.Color() // blue — the dominant brand color
+	default:
+		return sem.Info.Color() // cyan — subtle for low values
+	}
 }
 
 // tokenSparklineWidth returns the sparkline width. Uses 15 columns or
@@ -116,28 +129,17 @@ func renderMeterRow(m meter.Model, s sparkline.Model, width int) string {
 	return row
 }
 
-// costColor returns a semantic color based on accumulated cost.
+// costColor returns a brand color based on accumulated cost.
+// Uses a muted→primary→secondary gradient instead of traffic-light colors.
 func costColor(cost float64) lipgloss.Color {
 	c := theme.Current().Semantic()
 	switch {
 	case cost >= 2.0:
-		return c.Error.Color()
+		return c.Secondary.Color() // purple — high spend, stands out
 	case cost >= 0.5:
-		return c.Warning.Color()
+		return c.Primary.Color() // blue — moderate spend
 	default:
-		return c.Success.Color()
+		return c.FgDim.Color() // muted — low spend, unobtrusive
 	}
 }
 
-// contextColor returns a semantic color based on context window usage.
-func contextColor(pct float64) lipgloss.Color {
-	c := theme.Current().Semantic()
-	switch {
-	case pct >= 80:
-		return c.Error.Color()
-	case pct >= 50:
-		return c.Warning.Color()
-	default:
-		return c.Success.Color()
-	}
-}

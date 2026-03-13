@@ -11,19 +11,20 @@ import (
 var phaseOrder = []string{"brainstorm", "plan", "build", "review", "ship"}
 
 // phaseColor returns the lipgloss color for a given phase.
+// Uses brand palette colors to convey phase identity, not severity.
 func phaseColor(phase string) lipgloss.Color {
 	c := theme.Current().Semantic()
 	switch phase {
 	case "brainstorm":
-		return c.Secondary.Color()
+		return c.Secondary.Color() // purple — creative/exploratory
 	case "plan":
-		return c.Primary.Color()
+		return c.Info.Color() // cyan — analytical/structural
 	case "build":
-		return c.Success.Color()
+		return c.Primary.Color() // blue — the dominant work phase
 	case "review":
-		return c.Warning.Color()
+		return c.Active.Color() // green — verification/validation
 	case "ship":
-		return c.Error.Color()
+		return c.Secondary.Color() // purple — celebratory, matches brainstorm bookend
 	default:
 		return c.FgDim.Color()
 	}
