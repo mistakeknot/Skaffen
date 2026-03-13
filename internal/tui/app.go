@@ -194,6 +194,9 @@ type appModel struct {
 	// Cancellation for the current agent run
 	cancelRun context.CancelFunc
 
+	// Last submitted prompt (for /retry)
+	lastPrompt string
+
 	// Subagent tracker for inline status rendering
 	subagents *subagentTracker
 }
@@ -409,6 +412,7 @@ func (m *appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			break
 		}
 		m.running = true
+		m.lastPrompt = msg.Text
 		// Render user message (original text with @mentions)
 		userStyle := lipgloss.NewStyle().Foreground(theme.Current().Semantic().Primary.Color()).Bold(true)
 		m.viewport.AppendContent("\n" + userStyle.Render("You") + "\n" + msg.Text + "\n")
@@ -522,6 +526,11 @@ func (m *appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.Quit {
 			m.drainApproval()
 			return m, tea.Quit
+		}
+		// /retry — re-submit the stored prompt
+		if msg.Retry != "" && !m.running {
+			retryCmd := func() tea.Msg { return submitMsg{Text: msg.Retry} }
+			cmds = append(cmds, retryCmd)
 		}
 		// Auto-submit pending skills to the agent
 		if len(m.pendingSkills) > 0 && !m.running {

@@ -882,6 +882,55 @@ func TestSyncBreadcrumbUnknownPhase(t *testing.T) {
 
 // --- Esc to stop ---
 
+// --- /retry ---
+
+func TestRetryStoresLastPrompt(t *testing.T) {
+	m := setup(t)
+	m.Update(submitMsg{Text: "explain the code"})
+	if m.lastPrompt != "explain the code" {
+		t.Fatalf("lastPrompt = %q, want 'explain the code'", m.lastPrompt)
+	}
+}
+
+func TestRetryCommandResultTriggersResubmit(t *testing.T) {
+	m := setup(t)
+	// Simulate a completed agent run, then retry
+	m.running = false
+	m.lastPrompt = "test prompt"
+	_, cmd := m.Update(commandResultMsg{Message: "Retrying: test prompt", Retry: "test prompt"})
+	if cmd == nil {
+		t.Fatal("retry commandResultMsg should produce a command")
+	}
+	// The cmd should produce a submitMsg
+	msg := cmd()
+	sub, ok := msg.(submitMsg)
+	if !ok {
+		t.Fatalf("expected submitMsg, got %T", msg)
+	}
+	if sub.Text != "test prompt" {
+		t.Fatalf("retry submit text = %q, want 'test prompt'", sub.Text)
+	}
+}
+
+func TestRetryIgnoredWhileRunning(t *testing.T) {
+	m := setup(t)
+	m.running = true
+	_, cmd := m.Update(commandResultMsg{Retry: "test"})
+	// Should not produce a submitMsg since we're already running
+	if cmd != nil {
+		t.Fatal("retry should not produce commands while running")
+	}
+}
+
+func TestRetryInKnownCommands(t *testing.T) {
+	cmds := KnownCommands()
+	if _, ok := cmds["retry"]; !ok {
+		t.Fatal("/retry should be in KnownCommands")
+	}
+}
+
+// --- Esc to stop ---
+
 func TestEscStopsRunningAgent(t *testing.T) {
 	m := setup(t)
 	cancelled := false

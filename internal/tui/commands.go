@@ -27,7 +27,8 @@ type Command struct {
 type CommandResult struct {
 	Message string
 	IsError bool
-	Quit    bool // true for /quit — signals tea.Quit
+	Quit    bool   // true for /quit — signals tea.Quit
+	Retry   string // non-empty = re-submit this text as a prompt
 }
 
 // ParseCommand parses a slash command from input text.
@@ -61,6 +62,7 @@ func KnownCommands() map[string]string {
 		"phase":    "Show current OODARC phase",
 		"plan":     "Toggle plan mode (read-only tools only)",
 		"quit":     "Exit Skaffen",
+		"retry":    "Re-submit the last prompt",
 		"sessions": "List saved sessions",
 		"settings": "Show or change settings",
 		"ship":     "Push changes to remote",
@@ -226,6 +228,15 @@ func (m *appModel) executeCommand(cmd *Command) CommandResult {
 
 	case "history":
 		return m.execHistory(cmd.Args)
+
+	case "retry":
+		if m.lastPrompt == "" {
+			return CommandResult{Message: "No previous prompt to retry.", IsError: true}
+		}
+		return CommandResult{
+			Message: fmt.Sprintf("Retrying: %s", truncate(m.lastPrompt, 60)),
+			Retry:   m.lastPrompt,
+		}
 
 	case "sessions":
 		return m.execListSessions()

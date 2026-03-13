@@ -561,6 +561,57 @@ func TestCustomCommandDoesNotOverrideBuiltin(t *testing.T) {
 	}
 }
 
+func TestExecuteCommand_RetryNoHistory(t *testing.T) {
+	m := newTestModel()
+	result := m.executeCommand(&Command{Name: "retry"})
+	if !result.IsError {
+		t.Fatal("retry with no previous prompt should be an error")
+	}
+	if !strings.Contains(result.Message, "No previous prompt") {
+		t.Fatalf("should mention no previous prompt, got: %s", result.Message)
+	}
+}
+
+func TestExecuteCommand_RetryWithHistory(t *testing.T) {
+	m := newTestModel()
+	m.lastPrompt = "explain the code"
+	result := m.executeCommand(&Command{Name: "retry"})
+	if result.IsError {
+		t.Fatalf("retry with history should not error: %s", result.Message)
+	}
+	if result.Retry != "explain the code" {
+		t.Fatalf("Retry = %q, want 'explain the code'", result.Retry)
+	}
+	if !strings.Contains(result.Message, "Retrying") {
+		t.Fatalf("should mention retrying, got: %s", result.Message)
+	}
+}
+
+func TestExecuteCommand_RetryTruncatesLongPrompt(t *testing.T) {
+	m := newTestModel()
+	m.lastPrompt = strings.Repeat("a", 100)
+	result := m.executeCommand(&Command{Name: "retry"})
+	if result.IsError {
+		t.Fatal("retry should not error")
+	}
+	// Message should be truncated for display but Retry should have full text
+	if result.Retry != m.lastPrompt {
+		t.Fatal("Retry field should contain the full prompt")
+	}
+	if len(result.Message) > 80 {
+		t.Fatal("displayed message should be truncated")
+	}
+}
+
+func TestTruncate(t *testing.T) {
+	if truncate("short", 10) != "short" {
+		t.Fatal("short string should not be truncated")
+	}
+	if truncate("hello world", 8) != "hello..." {
+		t.Fatalf("truncate = %q, want 'hello...'", truncate("hello world", 8))
+	}
+}
+
 func TestCompleterIncludesCustomCommands(t *testing.T) {
 	custom := map[string]command.Def{
 		"deploy": {
