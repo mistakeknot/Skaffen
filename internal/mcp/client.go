@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"strings"
 
+	"github.com/mistakeknot/Skaffen/internal/sandbox"
 	gomcp "github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -31,10 +32,15 @@ type Client struct {
 }
 
 // NewClient spawns an MCP server subprocess and performs the initialize handshake.
-// args and env are optional (may be nil).
+// args and env are optional (may be nil). sb is optional (nil = no sandbox wrapping).
 // The command is spawned with exec.Command (not exec.CommandContext) so the
 // subprocess lifetime is managed by session.Close(), not the context.
-func NewClient(ctx context.Context, command string, args []string, env map[string]string) (*Client, error) {
+func NewClient(ctx context.Context, command string, args []string, env map[string]string, sb *sandbox.Sandbox) (*Client, error) {
+	// Apply sandbox wrapping to the MCP server command
+	if sb != nil {
+		command, args = sb.WrapArgs(command, args...)
+	}
+
 	cmd := exec.Command(command, args...)
 
 	// Merge env vars into subprocess environment

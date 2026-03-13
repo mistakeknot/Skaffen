@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+
+	"github.com/mistakeknot/Skaffen/internal/sandbox"
 )
 
 // defaultGates defines which tools are available per phase.
@@ -32,7 +34,11 @@ type Registry struct {
 	tools    map[string]Tool
 	gates    map[Phase]map[string]bool
 	planMode bool
+	sandbox  *sandbox.Sandbox
 }
+
+// SetSandbox configures the sandbox used for in-process tool path validation.
+func (r *Registry) SetSandbox(s *sandbox.Sandbox) { r.sandbox = s }
 
 // NewRegistry creates a registry with the default phase gate matrix.
 func NewRegistry() *Registry {
@@ -133,6 +139,19 @@ func (r *Registry) Execute(ctx context.Context, phase Phase, name string, params
 		}
 	}
 
+	// Sandbox path validation for file-accessing tools.
+	// Bash tool handles its own sandboxing via WrapArgs.
+	if r.sandbox != nil && !r.sandbox.Disabled() && name != "bash" {
+		if filePath := extractFilePath(name, params); filePath != "" {
+			if err := r.sandbox.CheckPath(filePath, isWriteTool(name)); err != nil {
+				return ToolResult{
+					Content: fmt.Sprintf("sandbox: %v", err),
+					IsError: true,
+				}
+			}
+		}
+	}
+
 	// If the tool implements PhasedTool, pass the phase for phase-aware behavior.
 	if pt, ok := t.(PhasedTool); ok {
 		return pt.ExecuteWithPhase(ctx, phase, params)
@@ -144,4 +163,30 @@ func (r *Registry) Execute(ctx context.Context, phase Phase, name string, params
 func (r *Registry) Get(name string) (Tool, bool) {
 	t, ok := r.tools[name]
 	return t, ok
+}
+
+// writeTools are tools that modify files.
+var writeTools = map[string]bool{"write": true, "edit": true}
+
+func isWriteTool(name string) bool { return writeTools[name] }
+
+// extractFilePath pulls the file_path or path param from tool input JSON.
+// Returns empty string if not a file-accessing tool or no path found.
+func extractFilePath(toolName string, params json.RawMessage) string {
+	switch toolName {
+	case "read", "write", "edit":
+		var p struct {
+			FilePath string `json:"file_path"`
+		}
+		json.Unmarshal(params, &p)
+		return p.FilePath
+	case "grep", "glob":
+		var p struct {
+			Path string `json:"path"`
+		}
+		json.Unmarshal(params, &p)
+		return p.Path
+	default:
+		return ""
+	}
 }

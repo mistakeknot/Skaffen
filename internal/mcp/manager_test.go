@@ -37,7 +37,7 @@ phases = ["brainstorm", "build"]
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
-	mgr := NewManager(cfg, reg)
+	mgr := NewManager(cfg, reg, nil)
 	defer mgr.Shutdown()
 
 	if err := mgr.LoadAll(ctx); err != nil {
@@ -89,7 +89,7 @@ func TestManager_ExecuteThroughRegistry(t *testing.T) {
 	}
 
 	reg := tool.NewRegistry()
-	mgr := NewManager(cfg, reg)
+	mgr := NewManager(cfg, reg, nil)
 	defer mgr.Shutdown()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
@@ -122,7 +122,7 @@ func TestManager_Shutdown(t *testing.T) {
 	}
 
 	reg := tool.NewRegistry()
-	mgr := NewManager(cfg, reg)
+	mgr := NewManager(cfg, reg, nil)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
@@ -149,7 +149,7 @@ func TestManager_MissingServer_GracefulDegradation(t *testing.T) {
 	}
 
 	reg := tool.NewRegistry()
-	mgr := NewManager(cfg, reg)
+	mgr := NewManager(cfg, reg, nil)
 	defer mgr.Shutdown()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -197,7 +197,7 @@ phases = ["build"]
 	// Step 2: Create registry and manager
 	reg := tool.NewRegistry()
 	tool.RegisterBuiltins(reg)
-	mgr := NewManager(cfg, reg)
+	mgr := NewManager(cfg, reg, nil)
 	defer mgr.Shutdown()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)

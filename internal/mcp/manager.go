@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/mistakeknot/Skaffen/internal/sandbox"
 	"github.com/mistakeknot/Skaffen/internal/tool"
 )
 
@@ -30,14 +31,17 @@ type Manager struct {
 	handles  map[string]*serverHandle // key: "plugin_server"
 	mu       sync.RWMutex
 	shutdown bool
+	sandbox  *sandbox.Sandbox
 }
 
 // NewManager creates a Manager from resolved plugin configs.
-func NewManager(config map[string]PluginConfig, registry *tool.Registry) *Manager {
+// The sandbox parameter is optional (nil = no sandbox wrapping for MCP subprocesses).
+func NewManager(config map[string]PluginConfig, registry *tool.Registry, sb *sandbox.Sandbox) *Manager {
 	return &Manager{
 		config:   config,
 		registry: registry,
 		handles:  make(map[string]*serverHandle),
+		sandbox:  sb,
 	}
 }
 
@@ -56,7 +60,7 @@ func (m *Manager) LoadAll(ctx context.Context) error {
 }
 
 func (m *Manager) connectAndRegister(ctx context.Context, pluginName, serverName string, sc ServerConfig, phases []string) error {
-	client, err := NewClient(ctx, sc.Command, sc.Args, sc.Env)
+	client, err := NewClient(ctx, sc.Command, sc.Args, sc.Env, m.sandbox)
 	if err != nil {
 		return fmt.Errorf("connect: %w", err)
 	}
@@ -216,7 +220,7 @@ func (m *Manager) tryRespawn(key string) bool {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	client, err := NewClient(ctx, sc.Command, sc.Args, sc.Env)
+	client, err := NewClient(ctx, sc.Command, sc.Args, sc.Env, m.sandbox)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "skaffen: warning: respawn %q: %v\n", key, err)
 		h.mu.Lock()

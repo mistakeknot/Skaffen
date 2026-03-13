@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"os/exec"
 	"time"
+
+	"github.com/mistakeknot/Skaffen/internal/sandbox"
 )
 
 const (
@@ -14,7 +16,9 @@ const (
 )
 
 // BashTool executes shell commands.
-type BashTool struct{}
+type BashTool struct {
+	Sandbox *sandbox.Sandbox
+}
 
 type bashParams struct {
 	Command string `json:"command"`
@@ -51,7 +55,13 @@ func (t *BashTool) Execute(ctx context.Context, params json.RawMessage) ToolResu
 	ctx, cancel := context.WithTimeout(ctx, time.Duration(timeout)*time.Second)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, "bash", "-c", p.Command)
+	// Apply sandbox wrapping if configured
+	cmdName, cmdArgs := "bash", []string{"-c", p.Command}
+	if t.Sandbox != nil {
+		cmdName, cmdArgs = t.Sandbox.WrapArgs(cmdName, cmdArgs...)
+	}
+
+	cmd := exec.CommandContext(ctx, cmdName, cmdArgs...)
 	out, err := cmd.CombinedOutput()
 
 	output := string(out)

@@ -31,7 +31,7 @@ func TestClient_ConnectAndListTools(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	c, err := NewClient(ctx, binary, nil, nil)
+	c, err := NewClient(ctx, binary, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("NewClient: %v", err)
 	}
@@ -55,7 +55,7 @@ func TestClient_CallTool(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	c, err := NewClient(ctx, binary, nil, nil)
+	c, err := NewClient(ctx, binary, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("NewClient: %v", err)
 	}
@@ -79,7 +79,7 @@ func TestClient_CallTool_UnknownTool(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	c, err := NewClient(ctx, binary, nil, nil)
+	c, err := NewClient(ctx, binary, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("NewClient: %v", err)
 	}

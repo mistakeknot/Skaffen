@@ -27,6 +27,7 @@ import (
 	"github.com/mistakeknot/Skaffen/internal/mcp"
 	"github.com/mistakeknot/Skaffen/internal/provider"
 	"github.com/mistakeknot/Skaffen/internal/router"
+	"github.com/mistakeknot/Skaffen/internal/sandbox"
 	"github.com/mistakeknot/Skaffen/internal/session"
 	"github.com/mistakeknot/Skaffen/internal/skill"
 	"github.com/mistakeknot/Skaffen/internal/subagent"
@@ -55,6 +56,9 @@ var (
 	flagColorMode = flag.String("color-mode", "", "Color mode: dark, light (default: auto-detect)")
 	flagTheme     = flag.String("theme", "", "Theme: tokyonight, catppuccin (default: Tokyo Night)")
 	flagPlanMode  = flag.Bool("plan-mode", false, "Start in read-only plan mode")
+	flagYolo      = flag.Bool("yolo", false, "Disable all sandbox enforcement (alias for --dangerously-disable-sandbox)")
+	flagNoSandbox = flag.Bool("dangerously-disable-sandbox", false, "Disable all sandbox enforcement")
+	flagSandboxMode = flag.String("sandbox", "default", "Sandbox mode: default, strict")
 )
 
 func main() {
@@ -240,8 +244,19 @@ func runPrint() error {
 		return fmt.Errorf("config: %w", err)
 	}
 
+	// Initialize sandbox
+	sb := initSandbox(cfg.WorkDir())
+	reg.SetSandbox(sb)
+
+	// Inject sandbox into BashTool
+	if bt, ok := reg.Get("bash"); ok {
+		if bashTool, ok := bt.(*tool.BashTool); ok {
+			bashTool.Sandbox = sb
+		}
+	}
+
 	// Load MCP plugins
-	mcpMgr := loadMCPPluginsFromConfig(ctx, reg, pluginsCfg)
+	mcpMgr := loadMCPPluginsFromConfig(ctx, reg, pluginsCfg, sb)
 	if mcpMgr != nil {
 		defer mcpMgr.Shutdown()
 	}
@@ -345,9 +360,18 @@ func runTUI() error {
 		return fmt.Errorf("config: %w", err)
 	}
 
+	// Initialize sandbox (print mode)
+	sb := initSandbox(cfg.WorkDir())
+	reg.SetSandbox(sb)
+	if bt, ok := reg.Get("bash"); ok {
+		if bashTool, ok := bt.(*tool.BashTool); ok {
+			bashTool.Sandbox = sb
+		}
+	}
+
 	// Load MCP plugins (use timeout context since TUI manages its own context)
 	mcpCtx, mcpCancel := context.WithTimeout(context.Background(), 30*time.Second)
-	mcpMgr := loadMCPPluginsFromConfig(mcpCtx, reg, pluginsCfg)
+	mcpMgr := loadMCPPluginsFromConfig(mcpCtx, reg, pluginsCfg, sb)
 	mcpCancel()
 	if mcpMgr != nil {
 		defer mcpMgr.Shutdown()
@@ -455,11 +479,11 @@ func checkIntercore() *router.ICClient {
 
 // loadMCPPluginsFromConfig loads pre-resolved plugin configs into the registry.
 // Returns the manager (may be nil if no plugins configured) — caller must defer Shutdown().
-func loadMCPPluginsFromConfig(ctx context.Context, reg *tool.Registry, pluginsCfg map[string]mcp.PluginConfig) *mcp.Manager {
+func loadMCPPluginsFromConfig(ctx context.Context, reg *tool.Registry, pluginsCfg map[string]mcp.PluginConfig, sb *sandbox.Sandbox) *mcp.Manager {
 	if len(pluginsCfg) == 0 {
 		return nil
 	}
-	mgr := mcp.NewManager(pluginsCfg, reg)
+	mgr := mcp.NewManager(pluginsCfg, reg, sb)
 	if err := mgr.LoadAll(ctx); err != nil {
 		fmt.Fprintf(os.Stderr, "skaffen: warning: MCP plugins: %v\n", err)
 	}
@@ -566,6 +590,24 @@ func buildSystemPrompt(workDir, explicit string) string {
 	default:
 		return explicit
 	}
+}
+
+// initSandbox creates the sandbox based on CLI flags and config.
+func initSandbox(workDir string) *sandbox.Sandbox {
+	if *flagYolo || *flagNoSandbox {
+		fmt.Fprintln(os.Stderr, "skaffen: WARNING: sandbox disabled (--yolo)")
+		return sandbox.New(sandbox.DisabledPolicy(), sandbox.ModeDisabled)
+	}
+	if *flagSandboxMode == "strict" {
+		return sandbox.New(sandbox.StrictPolicy(workDir), sandbox.ModeStrict)
+	}
+
+	policy, err := sandbox.Load(workDir)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "skaffen: warning: sandbox config error: %v (using defaults)\n", err)
+		policy = sandbox.DefaultPolicy(workDir)
+	}
+	return sandbox.New(policy, sandbox.ModeDefault)
 }
 
 func printVersion() {
