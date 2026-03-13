@@ -496,7 +496,8 @@ func (m *appModel) View() string {
 	vpView := m.viewport.View()
 
 	// Update status slots with current state.
-	updateStatusSlots(&m.status, m.phase, m.modelName, m.totalCost, m.contextPct, m.turns, m.agent.PlanMode())
+	planMode := m.agent != nil && m.agent.PlanMode()
+	updateStatusSlots(&m.status, m.phase, m.modelName, m.totalCost, m.contextPct, m.turns, planMode)
 	statusView := m.status.View()
 	crumbView := m.crumbs.View()
 

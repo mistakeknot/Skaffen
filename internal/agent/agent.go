@@ -156,7 +156,8 @@ func (a *Agent) Run(ctx context.Context, task string) (*RunResult, error) {
 	}
 
 	config := agentloop.LoopConfig{
-		Hints: agentloop.SelectionHints{Phase: string(phase)},
+		Hints:    agentloop.SelectionHints{Phase: string(phase)},
+		PlanMode: a.PlanMode(),
 	}
 
 	result, err := loop.Run(ctx, task, config)
@@ -227,7 +228,11 @@ type sessionAdapter struct {
 }
 
 func (sa *sessionAdapter) SystemPrompt(hints agentloop.PromptHints) string {
-	return sa.inner.SystemPrompt(sa.phase(), hints.Budget)
+	prompt := sa.inner.SystemPrompt(sa.phase(), hints.Budget)
+	if hints.PlanMode {
+		prompt += "\n\nYou are in plan mode (read-only). You can explore the codebase, analyze code, explain patterns, and answer questions. You cannot modify files or run commands. The user will exit plan mode when ready to make changes."
+	}
+	return prompt
 }
 
 func (sa *sessionAdapter) Save(turn agentloop.Turn) error {

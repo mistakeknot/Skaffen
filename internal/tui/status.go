@@ -23,12 +23,19 @@ func newStatusBar(width int) statusbar.Model {
 }
 
 // updateStatusSlots refreshes status bar slots with current agent state.
-func updateStatusSlots(sb *statusbar.Model, phase, model string, cost, contextPct float64, turns int) {
+// When planMode is true, prepends "PLAN " to the phase with an accent color.
+func updateStatusSlots(sb *statusbar.Model, phase, model string, cost, contextPct float64, turns int, planMode bool) {
 	c := theme.Current().Semantic()
 
-	// Phase slot: colored by OODARC phase.
+	phaseVal := phase
+	phaseCol := phaseColor(phase)
+	if planMode {
+		phaseVal = "PLAN " + phase
+		phaseCol = c.Info.Color()
+	}
+
 	sb.SetSlots([]statusbar.Slot{
-		{Label: "", Value: phase, Color: phaseColor(phase)},
+		{Label: "", Value: phaseVal, Color: phaseCol},
 		{Label: "", Value: model, Color: c.FgDim.Color()},
 		{Label: "", Value: fmt.Sprintf("$%.2f", cost), Color: costColor(cost)},
 		{Label: "", Value: fmt.Sprintf("%.0f%%", contextPct), Color: contextColor(contextPct)},

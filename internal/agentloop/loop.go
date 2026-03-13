@@ -26,7 +26,8 @@ type Loop struct {
 
 // LoopConfig configures a single Run invocation.
 type LoopConfig struct {
-	Hints SelectionHints
+	Hints    SelectionHints
+	PlanMode bool // when true, system prompt includes plan mode context
 }
 
 // Option configures the Loop.
@@ -112,9 +113,10 @@ func (l *Loop) Run(ctx context.Context, task string, config LoopConfig) (*RunRes
 			promptBudget = 0
 		}
 		systemPrompt := l.session.SystemPrompt(PromptHints{
-			Phase:  config.Hints.Phase,
-			Budget: promptBudget,
-			Model:  model,
+			Phase:    config.Hints.Phase,
+			Budget:   promptBudget,
+			Model:    model,
+			PlanMode: config.PlanMode,
 		})
 
 		cfg := provider.Config{
