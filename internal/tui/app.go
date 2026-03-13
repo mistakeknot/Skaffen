@@ -45,6 +45,7 @@ type Config struct {
 	MasaqVer       string
 	CustomCommands map[string]command.Def
 	Skills         map[string]skill.Def
+	HistoryPath    string
 	SubagentInit   *SubagentInit // nil = subagents disabled
 }
 
@@ -182,6 +183,9 @@ type appModel struct {
 	contextMeter  meter.Model
 	tokenSpark    sparkline.Model
 
+	// Prompt history persistence
+	historyStore *historyStore
+
 	// Subagent tracker for inline status rendering
 	subagents *subagentTracker
 }
@@ -193,6 +197,13 @@ func newAppModel(cfg Config) *appModel {
 	pm.workDir = cfg.WorkDir
 	pm.customCmds = cfg.CustomCommands
 	pm.skills = cfg.Skills
+	// Load prompt history
+	var hs *historyStore
+	if cfg.HistoryPath != "" {
+		hs = newHistoryStore(cfg.HistoryPath)
+		hs.Load()
+	}
+	pm.historyStore = hs
 	// Initialize git helper if workDir is a git repo
 	var g *git.Git
 	if cfg.WorkDir != "" {
@@ -242,6 +253,7 @@ func newAppModel(cfg Config) *appModel {
 		logo:         newLogoModel(skVer, mqVer),
 		customCmds:   cfg.CustomCommands,
 		skills:       cfg.Skills,
+		historyStore: hs,
 		pinner:       skill.NewPinner(cfg.Skills),
 		contextMeter: newContextMeter(80),
 		tokenSpark:   newTokenSparkline(80),
@@ -344,6 +356,10 @@ func (m *appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case submitMsg:
 		if m.running {
 			break
+		}
+		// Record in prompt history
+		if m.historyStore != nil {
+			m.historyStore.Append(msg.Text)
 		}
 		// Check for shell escape (! prefix) before slash commands
 		if shellCmd, isShell := ParseShellEscape(msg.Text); isShell {
@@ -465,7 +481,9 @@ func (m *appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 	case filePickerSelectedMsg, filePickerCancelMsg,
-		cmdCompleterSelectedMsg, cmdCompleterCancelMsg:
+		cmdCompleterSelectedMsg, cmdCompleterCancelMsg,
+		historySelectedMsg, historyCancelMsg,
+		keyHelpDismissMsg:
 		var cmd tea.Cmd
 		m.prompt, cmd = m.prompt.Update(msg)
 		cmds = append(cmds, cmd)

@@ -427,6 +427,7 @@ func runTUI() error {
 		MasaqVer:       masaqVersion(),
 		CustomCommands: customCmds,
 		Skills:         skills,
+		HistoryPath:    cfg.HistoryPath(),
 		SubagentInit: &tui.SubagentInit{
 			AgentTool:   agentTool,
 			Registry:    subReg,

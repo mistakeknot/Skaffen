@@ -240,9 +240,9 @@ func TestEditorResultMsgEmpty(t *testing.T) {
 	}
 }
 
-func TestPromptPlaceholderMentionsCtrlG(t *testing.T) {
+func TestPromptPlaceholderMentionsHelp(t *testing.T) {
 	p := newPromptModel()
-	if !strings.Contains(p.input.Placeholder, "Ctrl+G") {
-		t.Fatal("placeholder should mention Ctrl+G for editor")
+	if !strings.Contains(p.input.Placeholder, "?") {
+		t.Fatal("placeholder should mention ? for help")
 	}
 }

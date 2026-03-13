@@ -14,20 +14,25 @@ import (
 )
 
 type promptModel struct {
-	input      textinput.Model
-	lines      []string
-	picker     filePickerModel
-	picking    bool
-	completer  cmdCompleterModel
-	completing bool
-	workDir    string
-	customCmds map[string]command.Def
-	skills     map[string]skill.Def
+	input        textinput.Model
+	lines        []string
+	picker       filePickerModel
+	picking      bool
+	completer    cmdCompleterModel
+	completing   bool
+	history      historyModel
+	searching    bool
+	historyStore *historyStore
+	keyHelp      keyHelpModel
+	helping      bool
+	workDir      string
+	customCmds   map[string]command.Def
+	skills       map[string]skill.Def
 }
 
 func newPromptModel() promptModel {
 	ti := textinput.New()
-	ti.Placeholder = "Ask anything... (Enter to send, Shift+Enter for newline, @ for files, Ctrl+G for editor)"
+	ti.Placeholder = "Ask anything... (Enter to send, Shift+Enter for newline, ? for help)"
 	ti.Focus()
 	ti.CharLimit = 4096
 	return promptModel{input: ti}
@@ -67,6 +72,18 @@ func (p promptModel) Update(msg tea.Msg) (promptModel, tea.Cmd) {
 		// Clear the "/" that triggered the completer
 		p.input.SetValue("")
 		return p, nil
+	case historySelectedMsg:
+		sel := msg.(historySelectedMsg)
+		p.searching = false
+		p.input.SetValue(sel.Text)
+		p.input.CursorEnd()
+		return p, nil
+	case historyCancelMsg:
+		p.searching = false
+		return p, nil
+	case keyHelpDismissMsg:
+		p.helping = false
+		return p, nil
 	}
 
 	// Delegate to picker when active
@@ -80,6 +97,20 @@ func (p promptModel) Update(msg tea.Msg) (promptModel, tea.Cmd) {
 	if p.completing {
 		var cmd tea.Cmd
 		p.completer, cmd = p.completer.Update(msg)
+		return p, cmd
+	}
+
+	// Delegate to history search when active
+	if p.searching {
+		var cmd tea.Cmd
+		p.history, cmd = p.history.Update(msg)
+		return p, cmd
+	}
+
+	// Delegate to key help when active
+	if p.helping {
+		var cmd tea.Cmd
+		p.keyHelp, cmd = p.keyHelp.Update(msg)
 		return p, cmd
 	}
 
@@ -101,7 +132,20 @@ func (p promptModel) Update(msg tea.Msg) (promptModel, tea.Cmd) {
 			return p, nil
 		case "ctrl+g":
 			return p, openEditor(p.fullText())
+		case "ctrl+r":
+			if p.historyStore != nil {
+				p.history = newHistoryModel(p.historyStore, p.input.Value())
+				p.searching = true
+				return p, nil
+			}
 		default:
+			// Check for ? trigger on empty prompt (no accumulated lines)
+			if len(msg.Runes) == 1 && msg.Runes[0] == '?' &&
+				len(p.lines) == 0 && p.input.Value() == "" {
+				p.keyHelp = newKeyHelpModel()
+				p.helping = true
+				return p, nil
+			}
 			// Check for / trigger at start of empty input (no accumulated lines)
 			if len(msg.Runes) == 1 && msg.Runes[0] == '/' &&
 				len(p.lines) == 0 && p.input.Value() == "" {
@@ -175,6 +219,22 @@ func (p promptModel) View(width int, running bool) string {
 		}
 	}
 
+	// Show history search below prompt input
+	if p.searching {
+		historyView := p.history.View(width)
+		if historyView != "" {
+			result = result + "\n" + historyView
+		}
+	}
+
+	// Show key help overlay below prompt
+	if p.helping {
+		helpView := p.keyHelp.View(width)
+		if helpView != "" {
+			result = result + "\n" + helpView
+		}
+	}
+
 	return result
 }
 
@@ -193,6 +253,8 @@ func (p *promptModel) Reset() {
 	p.lines = nil
 	p.picking = false
 	p.completing = false
+	p.searching = false
+	p.helping = false
 }
 
 // editorResultMsg carries the result of an external editor session.

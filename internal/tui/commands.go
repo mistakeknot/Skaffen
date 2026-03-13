@@ -55,7 +55,8 @@ func KnownCommands() map[string]string {
 		"commit":   "Auto-commit current changes",
 		"compact":  "Compact context (free tokens by summarizing old turns)",
 		"diff":     "Show git diff",
-		"help":     "Show available commands",
+		"help":     "Show available commands (? for keyboard shortcuts)",
+		"history":  "Show recent prompt history",
 		"model":    "Show or switch model (opus, sonnet, haiku)",
 		"phase":    "Show current OODARC phase",
 		"plan":     "Toggle plan mode (read-only tools only)",
@@ -222,6 +223,9 @@ func (m *appModel) executeCommand(cmd *Command) CommandResult {
 
 	case "ship":
 		return m.execGitShip()
+
+	case "history":
+		return m.execHistory(cmd.Args)
 
 	case "sessions":
 		return m.execListSessions()
@@ -622,6 +626,33 @@ func (m *appModel) execGitShip() CommandResult {
 		return CommandResult{Message: fmt.Sprintf("Pushed %s to origin.", branch)}
 	}
 	return CommandResult{Message: "Pushed to origin."}
+}
+
+func (m *appModel) execHistory(args []string) CommandResult {
+	if m.historyStore == nil {
+		return CommandResult{Message: "History not available.", IsError: true}
+	}
+	entries := m.historyStore.Search("")
+	if len(entries) == 0 {
+		return CommandResult{Message: "No history entries."}
+	}
+	limit := 20
+	if len(entries) < limit {
+		limit = len(entries)
+	}
+	var b strings.Builder
+	b.WriteString("Recent prompts:\n")
+	for i, e := range entries[:limit] {
+		display := e
+		if len(display) > 80 {
+			display = display[:77] + "..."
+		}
+		b.WriteString(fmt.Sprintf("  %d. %s\n", i+1, display))
+	}
+	if len(entries) > limit {
+		b.WriteString(fmt.Sprintf("  ... %d more (Ctrl+R to search)\n", len(entries)-limit))
+	}
+	return CommandResult{Message: b.String()}
 }
 
 func (m *appModel) execListSessions() CommandResult {

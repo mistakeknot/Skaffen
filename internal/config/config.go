@@ -162,6 +162,9 @@ func (c *Config) SessionDir() string { return filepath.Join(c.userDir, "sessions
 // EvidenceDir returns the user-global evidence directory (always ~/.skaffen/evidence).
 func (c *Config) EvidenceDir() string { return filepath.Join(c.userDir, "evidence") }
 
+// HistoryPath returns the path to the prompt history file (always ~/.skaffen/history).
+func (c *Config) HistoryPath() string { return filepath.Join(c.userDir, "history") }
+
 // ProjectDir returns the project root (parent of .skaffen/), empty if none found.
 func (c *Config) ProjectDir() string { return c.projectDir }
 
