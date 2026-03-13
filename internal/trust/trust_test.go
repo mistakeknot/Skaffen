@@ -147,6 +147,22 @@ func TestLearnedOverrideCountIncrements(t *testing.T) {
 	}
 }
 
+func TestWebSearchRequiresPrompt(t *testing.T) {
+	e := trust.NewEvaluator(nil)
+	got := e.Evaluate("web_search", `{"query": "go context patterns"}`)
+	if got != trust.Prompt {
+		t.Errorf("web_search should be Prompt (external API), got %v", got)
+	}
+}
+
+func TestWebFetchRequiresPrompt(t *testing.T) {
+	e := trust.NewEvaluator(nil)
+	got := e.Evaluate("web_fetch", `{"url": "https://example.com"}`)
+	if got != trust.Prompt {
+		t.Errorf("web_fetch should be Prompt (SSRF risk), got %v", got)
+	}
+}
+
 func TestDecisionString(t *testing.T) {
 	if trust.Allow.String() != "allow" {
 		t.Errorf("Allow.String() = %q", trust.Allow.String())

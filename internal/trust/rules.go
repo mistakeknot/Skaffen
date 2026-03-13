@@ -5,7 +5,10 @@ import (
 	"strings"
 )
 
-// Safe tools that are always allowed
+// Safe tools that are always allowed (local filesystem only).
+// web_search and web_fetch are deliberately NOT here — web_search costs money
+// per call and sends queries to Exa; web_fetch has SSRF risk. The user gate
+// on web_fetch is load-bearing for prompt injection defense.
 var safeTools = map[string]bool{
 	"read":  true,
 	"write": true,
