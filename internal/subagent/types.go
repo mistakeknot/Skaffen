@@ -101,6 +101,7 @@ type StatusUpdate struct {
 	MaxTurns    int
 	TokensUsed  int
 	Error       error
+	Response    string // populated on StatusDone for TUI display
 }
 
 // StatusCallback receives real-time status updates from running subagents.

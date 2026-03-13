@@ -95,6 +95,7 @@ func (r *Runner) runOne(ctx context.Context, task SubagentTask) SubagentResult {
 			ttl = 120
 		}
 		if err := r.reservation.Reserve(task.ID, task.FilePatterns, ttl); err != nil {
+			r.reservation.Release(task.ID) // release any partially acquired reservations
 			result.Error = fmt.Errorf("reservation: %w", err)
 			result.Status = StatusFailed
 			r.emitStatus(StatusUpdate{ID: task.ID, Description: task.Description, Status: StatusFailed, Error: result.Error})
@@ -112,6 +113,7 @@ func (r *Runner) runOne(ctx context.Context, task SubagentTask) SubagentResult {
 
 	sess := NewScopedSession(st.SystemPrompt, task.Prompt, task.InjectedContext)
 	emitter := NewAggregatingEmitter(task.ID, task.Type, r.config.ParentEmitter)
+	defer emitter.Flush() // flush evidence to parent on all paths (success and failure)
 	reg := agentloop.NewRegistry()
 
 	router := &agentloop.NoOpRouter{}
@@ -166,8 +168,6 @@ func (r *Runner) runOne(ctx context.Context, task SubagentTask) SubagentResult {
 	result.Evidence = emitter.Events()
 	result.Status = StatusDone
 
-	emitter.Flush()
-
 	r.emitStatus(StatusUpdate{
 		ID:          task.ID,
 		Description: task.Description,
@@ -175,6 +175,7 @@ func (r *Runner) runOne(ctx context.Context, task SubagentTask) SubagentResult {
 		Turn:        result.Turns,
 		MaxTurns:    st.MaxTurns,
 		TokensUsed:  result.Usage.InputTokens + result.Usage.OutputTokens,
+		Response:    result.Response,
 	})
 
 	return result

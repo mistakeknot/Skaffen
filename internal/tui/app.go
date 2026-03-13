@@ -263,13 +263,7 @@ func (m *appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case tea.KeyMsg:
 		if msg.String() == "ctrl+c" {
-			// Drain approval channel so the agent goroutine doesn't block
-			// forever on <-reply after p.Run() exits.
-			if m.approving && m.approvalReply != nil {
-				m.approvalReply <- false
-				m.approvalReply = nil
-				m.approving = false
-			}
+			m.drainApproval()
 			return m, tea.Quit
 		}
 		// Plan mode toggle: Shift+Tab toggles read-only mode (only when idle)
@@ -448,6 +442,7 @@ func (m *appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.viewport.AppendContent(msg.Message + "\n")
 		}
 		if msg.Quit {
+			m.drainApproval()
 			return m, tea.Quit
 		}
 
@@ -522,6 +517,16 @@ func (m *appModel) View() string {
 
 	promptView := m.prompt.View(m.width, m.running)
 	return lipgloss.JoinVertical(lipgloss.Left, logoView, vpView, promptView, crumbView, statusView)
+}
+
+// drainApproval sends false to a pending approval channel so the agent
+// goroutine doesn't block forever on <-reply after p.Run() exits.
+func (m *appModel) drainApproval() {
+	if m.approving && m.approvalReply != nil {
+		m.approvalReply <- false
+		m.approvalReply = nil
+		m.approving = false
+	}
 }
 
 func (m *appModel) handleStreamEvent(ev agent.StreamEvent) {

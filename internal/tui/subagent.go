@@ -37,6 +37,9 @@ func (b *subagentBlock) update(u subagent.StatusUpdate) {
 	if u.Error != nil {
 		b.errMsg = u.Error.Error()
 	}
+	if u.Response != "" {
+		b.response = u.Response
+	}
 }
 
 func (b *subagentBlock) View(width int, expanded bool) string {
