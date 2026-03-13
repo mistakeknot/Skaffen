@@ -3,6 +3,7 @@ package skill
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -253,5 +254,240 @@ It spans multiple lines.
 	}
 	if body2 != expected {
 		t.Errorf("cached body = %q, want %q", body2, expected)
+	}
+}
+
+// --- Injection tests ---
+
+func TestFormatInjection_Basic(t *testing.T) {
+	d := &Def{
+		Name:        "test-skill",
+		Description: "A test skill",
+		Path:        "/fake/path/SKILL.md",
+		Body:        "Do the thing.\nSecond line.\n",
+	}
+
+	msg := FormatInjection(d, "")
+	if !strings.Contains(msg, "test-skill") {
+		t.Error("injection should contain skill name")
+	}
+	if !strings.Contains(msg, "Do the thing.") {
+		t.Error("injection should contain skill body")
+	}
+}
+
+func TestFormatInjection_WithArgs(t *testing.T) {
+	d := &Def{
+		Name: "review",
+		Body: "Review the code.\n",
+	}
+
+	msg := FormatInjection(d, "src/main.go")
+	if !strings.Contains(msg, "src/main.go") {
+		t.Error("injection should contain user arguments")
+	}
+	if !strings.Contains(msg, "Review the code.") {
+		t.Error("injection should contain body")
+	}
+}
+
+func TestFormatInjection_SizeLimit(t *testing.T) {
+	d := &Def{
+		Name: "huge",
+		Body: strings.Repeat("x", MaxBodyChars+1),
+	}
+
+	_, err := FormatInjectionSafe(d, "")
+	if err == nil {
+		t.Error("expected error for oversized body")
+	}
+}
+
+func TestFormatInjection_EmptyBody(t *testing.T) {
+	d := &Def{
+		Name:        "empty",
+		Description: "Empty skill",
+	}
+
+	msg := FormatInjection(d, "")
+	// Should still produce a message (metadata tags, just no body)
+	if msg == "" {
+		t.Error("injection should produce output even with empty body")
+	}
+}
+
+// --- Trigger matching tests ---
+
+func TestMatchTriggers_SingleMatch(t *testing.T) {
+	skills := map[string]Def{
+		"review": {
+			Name:          "review",
+			UserInvocable: true,
+			Triggers:      []string{"review my code", "check changes"},
+		},
+		"deploy": {
+			Name:          "deploy",
+			UserInvocable: true,
+			Triggers:      []string{"deploy to prod"},
+		},
+	}
+
+	matched := MatchTriggers(skills, "can you review my code please?")
+	if len(matched) != 1 {
+		t.Fatalf("got %d matches, want 1", len(matched))
+	}
+	if matched[0].Name != "review" {
+		t.Errorf("matched %q, want review", matched[0].Name)
+	}
+}
+
+func TestMatchTriggers_MultiMatch(t *testing.T) {
+	skills := map[string]Def{
+		"review": {
+			Name:          "review",
+			UserInvocable: true,
+			Triggers:      []string{"review"},
+		},
+		"test": {
+			Name:          "test",
+			UserInvocable: true,
+			Triggers:      []string{"review"},
+		},
+	}
+
+	matched := MatchTriggers(skills, "please review this")
+	if len(matched) != 2 {
+		t.Fatalf("got %d matches, want 2", len(matched))
+	}
+}
+
+func TestMatchTriggers_CaseInsensitive(t *testing.T) {
+	skills := map[string]Def{
+		"review": {
+			Name:          "review",
+			UserInvocable: true,
+			Triggers:      []string{"Review My Code"},
+		},
+	}
+
+	matched := MatchTriggers(skills, "review my code")
+	if len(matched) != 1 {
+		t.Fatalf("got %d matches, want 1 (case insensitive)", len(matched))
+	}
+}
+
+func TestMatchTriggers_NoMatch(t *testing.T) {
+	skills := map[string]Def{
+		"review": {
+			Name:          "review",
+			UserInvocable: true,
+			Triggers:      []string{"review my code"},
+		},
+	}
+
+	matched := MatchTriggers(skills, "deploy to production")
+	if len(matched) != 0 {
+		t.Errorf("got %d matches, want 0", len(matched))
+	}
+}
+
+func TestMatchTriggers_SkipsNonInvocable(t *testing.T) {
+	skills := map[string]Def{
+		"internal": {
+			Name:          "internal",
+			UserInvocable: false,
+			Triggers:      []string{"do something"},
+		},
+	}
+
+	matched := MatchTriggers(skills, "do something")
+	if len(matched) != 0 {
+		t.Errorf("got %d matches, want 0 (user_invocable=false should be skipped)", len(matched))
+	}
+}
+
+func TestMatchTriggers_NoTriggers(t *testing.T) {
+	skills := map[string]Def{
+		"manual": {
+			Name:          "manual",
+			UserInvocable: true,
+			Triggers:      nil,
+		},
+	}
+
+	matched := MatchTriggers(skills, "anything at all")
+	if len(matched) != 0 {
+		t.Errorf("got %d matches, want 0 (no triggers defined)", len(matched))
+	}
+}
+
+// --- Pinner tests ---
+
+func TestPinner_PinUnpin(t *testing.T) {
+	skills := map[string]Def{
+		"review": {Name: "review"},
+		"deploy": {Name: "deploy"},
+	}
+	p := NewPinner(skills)
+
+	// Pin
+	if err := p.Pin("review"); err != nil {
+		t.Fatalf("Pin error: %v", err)
+	}
+	pinned := p.Pinned()
+	if len(pinned) != 1 || pinned[0] != "review" {
+		t.Errorf("Pinned = %v, want [review]", pinned)
+	}
+
+	// Unpin
+	p.Unpin("review")
+	if len(p.Pinned()) != 0 {
+		t.Error("Pinned should be empty after unpin")
+	}
+}
+
+func TestPinner_DuplicatePin(t *testing.T) {
+	skills := map[string]Def{"review": {Name: "review"}}
+	p := NewPinner(skills)
+
+	p.Pin("review")
+	p.Pin("review") // duplicate — should be a no-op
+	if len(p.Pinned()) != 1 {
+		t.Error("duplicate pin should not add twice")
+	}
+}
+
+func TestPinner_PinNonExistent(t *testing.T) {
+	skills := map[string]Def{"review": {Name: "review"}}
+	p := NewPinner(skills)
+
+	err := p.Pin("nonexistent")
+	if err == nil {
+		t.Error("expected error for non-existent skill")
+	}
+}
+
+func TestPinner_UnpinNonExistent(t *testing.T) {
+	skills := map[string]Def{"review": {Name: "review"}}
+	p := NewPinner(skills)
+
+	// Should not panic
+	p.Unpin("nonexistent")
+}
+
+func TestPinner_MultiplePins(t *testing.T) {
+	skills := map[string]Def{
+		"review": {Name: "review"},
+		"deploy": {Name: "deploy"},
+		"test":   {Name: "test"},
+	}
+	p := NewPinner(skills)
+
+	p.Pin("review")
+	p.Pin("deploy")
+
+	pinned := p.Pinned()
+	if len(pinned) != 2 {
+		t.Fatalf("got %d pinned, want 2", len(pinned))
 	}
 }
