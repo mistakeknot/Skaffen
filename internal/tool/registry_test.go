@@ -226,8 +226,8 @@ func TestPlanMode_ToolsFiltered(t *testing.T) {
 	r := newRegistryWithStubs()
 	r.SetPlanMode(true)
 
-	// All phases should return only read-only tools
-	for _, phase := range []Phase{PhaseBrainstorm, PhasePlan, PhaseBuild, PhaseReview, PhaseShip} {
+	// Phases that include all four read-only tools in their gates
+	for _, phase := range []Phase{PhaseBrainstorm, PhasePlan, PhaseBuild, PhaseReview} {
 		names := toolNames(r.Tools(phase))
 		for _, want := range []string{"read", "glob", "grep", "ls"} {
 			if !names[want] {
@@ -238,6 +238,29 @@ func TestPlanMode_ToolsFiltered(t *testing.T) {
 			if names[block] {
 				t.Errorf("plan mode %s: should not have %q", phase, block)
 			}
+		}
+	}
+}
+
+func TestPlanMode_RespectsPhaseGates(t *testing.T) {
+	r := newRegistryWithStubs()
+	r.SetPlanMode(true)
+
+	// PhaseShip excludes "grep" — plan mode must not re-enable it
+	names := toolNames(r.Tools(PhaseShip))
+	if names["grep"] {
+		t.Error("plan mode in ship phase should not include grep (excluded by phase gate)")
+	}
+	// But "read", "glob", "ls" are both read-only AND phase-allowed
+	for _, want := range []string{"read", "glob", "ls"} {
+		if !names[want] {
+			t.Errorf("plan mode ship: missing %q", want)
+		}
+	}
+	// Write tools still blocked
+	for _, block := range []string{"write", "edit", "bash"} {
+		if names[block] {
+			t.Errorf("plan mode ship: should not have %q", block)
 		}
 	}
 }

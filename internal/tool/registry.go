@@ -85,13 +85,13 @@ func (r *Registry) SetPlanMode(on bool) { r.planMode = on }
 func (r *Registry) PlanMode() bool { return r.planMode }
 
 // Tools returns tool definitions available for the given phase.
-// In plan mode, returns only read-only tools regardless of phase gates.
+// In plan mode, returns only tools that are both read-only AND phase-allowed.
 func (r *Registry) Tools(phase Phase) []ToolDef {
 	allowed := r.gates[phase]
 	var defs []ToolDef
 	for name, t := range r.tools {
 		if r.planMode {
-			if !readOnlyTools[name] {
+			if !readOnlyTools[name] || !allowed[name] {
 				continue
 			}
 		} else if !allowed[name] {
@@ -107,7 +107,9 @@ func (r *Registry) Tools(phase Phase) []ToolDef {
 }
 
 // Execute runs a tool by name if it's allowed in the given phase.
-// In plan mode, only read-only tools may execute.
+// In plan mode, the tool must be both read-only AND phase-allowed.
+// The plan mode check is defence-in-depth: Tools() already filters,
+// but Execute() enforces independently for direct callers.
 func (r *Registry) Execute(ctx context.Context, phase Phase, name string, params json.RawMessage) ToolResult {
 	if r.planMode && !readOnlyTools[name] {
 		return ToolResult{

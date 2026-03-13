@@ -57,6 +57,7 @@ func KnownCommands() map[string]string {
 		"help":     "Show available commands",
 		"model":    "Show or switch model (opus, sonnet, haiku)",
 		"phase":    "Show current OODARC phase",
+		"plan":     "Toggle plan mode (read-only tools only)",
 		"quit":     "Exit Skaffen",
 		"sessions": "List saved sessions",
 		"settings": "Show or change settings",
@@ -131,6 +132,17 @@ func (m *appModel) executeCommand(cmd *Command) CommandResult {
 			return CommandResult{Message: fmt.Sprintf("Phase: %s (no agent)", m.phase)}
 		}
 		return CommandResult{Message: fmt.Sprintf("Phase: %s", m.agent.CurrentPhase())}
+
+	case "plan":
+		if m.agent == nil {
+			return CommandResult{Message: "No agent configured.", IsError: true}
+		}
+		on := !m.agent.PlanMode()
+		m.agent.SetPlanMode(on)
+		if on {
+			return CommandResult{Message: "Plan mode enabled — read-only tools only. Use /plan to toggle off."}
+		}
+		return CommandResult{Message: "Plan mode disabled — full tools available."}
 
 	case "advance":
 		if m.agent == nil {
