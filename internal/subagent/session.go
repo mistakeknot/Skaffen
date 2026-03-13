@@ -3,6 +3,7 @@ package subagent
 import (
 	"fmt"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/mistakeknot/Skaffen/internal/agentloop"
 	"github.com/mistakeknot/Skaffen/internal/provider"
@@ -39,12 +40,16 @@ func NewScopedSession(cfg ScopedSessionConfig) *ScopedSession {
 
 	injected := truncateToTokenCap(cfg.InjectedContext, cap)
 
-	expanded := cfg.PromptTemplate
-	expanded = strings.ReplaceAll(expanded, "{{.TaskPrompt}}", cfg.TaskPrompt)
-	expanded = strings.ReplaceAll(expanded, "{{.InjectedContext}}", injected)
-	expanded = strings.ReplaceAll(expanded, "{{.BeadDescription}}", cfg.BeadDescription)
+	// Single-pass replacement prevents cross-field injection: if TaskPrompt
+	// contains "{{.InjectedContext}}" literally (e.g., from a Go template file),
+	// it won't be expanded on a subsequent pass.
+	r := strings.NewReplacer(
+		"{{.TaskPrompt}}", cfg.TaskPrompt,
+		"{{.InjectedContext}}", injected,
+		"{{.BeadDescription}}", cfg.BeadDescription,
+	)
 	return &ScopedSession{
-		systemPrompt: expanded,
+		systemPrompt: r.Replace(cfg.PromptTemplate),
 	}
 }
 
@@ -89,13 +94,18 @@ func BuildInjectedContext(sources []ContextSource) string {
 }
 
 // truncateToTokenCap truncates s to approximately cap tokens, keeping the tail
-// (most recent content). Uses a 4-chars-per-token heuristic.
+// (most recent content). Uses a 4-bytes-per-token heuristic. The cut point is
+// aligned to a UTF-8 rune boundary to avoid splitting multi-byte sequences.
 func truncateToTokenCap(s string, cap int) string {
-	maxChars := cap * 4
-	if len(s) <= maxChars {
+	maxBytes := cap * 4
+	if len(s) <= maxBytes {
 		return s
 	}
-	truncatedChars := len(s) - maxChars
-	truncatedTokens := truncatedChars / 4
-	return fmt.Sprintf("[...truncated ~%d tokens...]\n%s", truncatedTokens, s[truncatedChars:])
+	cut := len(s) - maxBytes
+	// Advance past any UTF-8 continuation bytes to land on a rune boundary.
+	for cut < len(s) && !utf8.RuneStart(s[cut]) {
+		cut++
+	}
+	approxTokens := cut / 4
+	return fmt.Sprintf("[...truncated ~%d tokens...]\n%s", approxTokens, s[cut:])
 }

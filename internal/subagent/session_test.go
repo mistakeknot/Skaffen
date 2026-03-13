@@ -183,3 +183,59 @@ func TestBuildInjectedContext_Empty(t *testing.T) {
 		t.Errorf("empty sources should return empty string, got %q", result)
 	}
 }
+
+func TestScopedSession_CrossFieldInjection(t *testing.T) {
+	// TaskPrompt contains a literal placeholder string — must NOT be expanded.
+	s := NewScopedSession(ScopedSessionConfig{
+		PromptTemplate:  "{{.TaskPrompt}}\n{{.InjectedContext}}",
+		TaskPrompt:      "Analyze this template: {{.InjectedContext}}",
+		InjectedContext: "INJECTED_VALUE",
+	})
+	prompt := s.SystemPrompt(agentloop.PromptHints{})
+
+	// The literal "{{.InjectedContext}}" inside TaskPrompt must survive as-is.
+	if !strings.Contains(prompt, "{{.InjectedContext}}") {
+		t.Error("placeholder inside TaskPrompt was expanded — cross-field injection bug")
+	}
+	// The real InjectedContext should appear once (from the template placeholder).
+	if strings.Count(prompt, "INJECTED_VALUE") != 1 {
+		t.Errorf("InjectedContext appeared %d times, want 1", strings.Count(prompt, "INJECTED_VALUE"))
+	}
+}
+
+func TestScopedSession_UTF8Truncation(t *testing.T) {
+	// Build context with multi-byte characters (Japanese: each char is 3 bytes)
+	// 概 = U+6982 = 3 bytes in UTF-8
+	jp := strings.Repeat("概", 6000) // 18000 bytes, ~4500 tokens at 4 bytes/token
+	s := NewScopedSession(ScopedSessionConfig{
+		PromptTemplate:  "{{.InjectedContext}}",
+		TaskPrompt:      "test",
+		InjectedContext: jp,
+		ContextTokenCap: 1000, // 4000 bytes max
+	})
+	prompt := s.SystemPrompt(agentloop.PromptHints{})
+
+	if !strings.Contains(prompt, "[...truncated") {
+		t.Error("should truncate")
+	}
+	// Every character in the tail should be valid UTF-8
+	for i, r := range prompt {
+		if r == '\uFFFD' {
+			t.Errorf("invalid UTF-8 at byte %d — truncation split a multi-byte sequence", i)
+			break
+		}
+	}
+}
+
+func TestScopedSession_EmptyInjectedContext_WithCap(t *testing.T) {
+	s := NewScopedSession(ScopedSessionConfig{
+		PromptTemplate:  "pre|{{.InjectedContext}}|post",
+		TaskPrompt:      "test",
+		InjectedContext: "",
+		ContextTokenCap: 100,
+	})
+	prompt := s.SystemPrompt(agentloop.PromptHints{})
+	if prompt != "pre||post" {
+		t.Errorf("empty context with cap: got %q, want %q", prompt, "pre||post")
+	}
+}
