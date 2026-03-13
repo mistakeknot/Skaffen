@@ -28,6 +28,7 @@ import (
 	"github.com/mistakeknot/Skaffen/internal/provider"
 	"github.com/mistakeknot/Skaffen/internal/router"
 	"github.com/mistakeknot/Skaffen/internal/session"
+	"github.com/mistakeknot/Skaffen/internal/skill"
 	"github.com/mistakeknot/Skaffen/internal/subagent"
 	"github.com/mistakeknot/Skaffen/internal/tool"
 	"github.com/mistakeknot/Skaffen/internal/trust"
@@ -397,6 +398,9 @@ func runTUI() error {
 	// Load custom slash commands from disk
 	customCmds := command.LoadAll(cfg.CommandDirs()...)
 
+	// Load skills from SKILL.md files
+	skills := skill.LoadAll(cfg.SkillDirs()...)
+
 	// Subagent system: registry + tool + runner (runner wired after TUI starts)
 	subReg := subagent.NewTypeRegistry(filepath.Join(cfg.WorkDir(), ".skaffen", "agents"))
 	agentTool := subagent.NewAgentTool(subReg, nil) // runner set lazily
@@ -422,6 +426,7 @@ func runTUI() error {
 		SkaffenVer:     skaffenVersion(),
 		MasaqVer:       masaqVersion(),
 		CustomCommands: customCmds,
+		Skills:         skills,
 		SubagentInit: &tui.SubagentInit{
 			AgentTool:   agentTool,
 			Registry:    subReg,

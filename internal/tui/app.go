@@ -14,6 +14,7 @@ import (
 	"github.com/mistakeknot/Skaffen/internal/agent"
 	"github.com/mistakeknot/Skaffen/internal/command"
 	"github.com/mistakeknot/Skaffen/internal/git"
+	"github.com/mistakeknot/Skaffen/internal/skill"
 	"github.com/mistakeknot/Skaffen/internal/provider"
 	"github.com/mistakeknot/Skaffen/internal/session"
 	"github.com/mistakeknot/Skaffen/internal/subagent"
@@ -41,6 +42,7 @@ type Config struct {
 	SkaffenVer     string
 	MasaqVer       string
 	CustomCommands map[string]command.Def
+	Skills         map[string]skill.Def
 	SubagentInit   *SubagentInit // nil = subagents disabled
 }
 
@@ -169,6 +171,10 @@ type appModel struct {
 	// Custom slash commands loaded from disk
 	customCmds map[string]command.Def
 
+	// Skills loaded from SKILL.md files
+	skills map[string]skill.Def
+	pinner *skill.Pinner
+
 	// Subagent tracker for inline status rendering
 	subagents *subagentTracker
 }
@@ -227,6 +233,8 @@ func newAppModel(cfg Config) *appModel {
 		modelName:  "opus",
 		logo:       newLogoModel(skVer, mqVer),
 		customCmds: cfg.CustomCommands,
+		skills:     cfg.Skills,
+		pinner:     skill.NewPinner(cfg.Skills),
 	}
 }
 
