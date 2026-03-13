@@ -17,11 +17,12 @@ type AgentTool struct {
 
 // agentToolInput defines the JSON input schema for the Agent tool.
 type agentToolInput struct {
-	SubagentType string   `json:"subagent_type"`
-	Prompt       string   `json:"prompt"`
-	Description  string   `json:"description"`
-	Context      []string `json:"context,omitempty"`
-	FilePatterns []string `json:"file_patterns,omitempty"`
+	SubagentType    string   `json:"subagent_type"`
+	Prompt          string   `json:"prompt"`
+	Description     string   `json:"description"`
+	Context         []string `json:"context,omitempty"`
+	FilePatterns    []string `json:"file_patterns,omitempty"`
+	BeadDescription string   `json:"bead_description,omitempty"`
 }
 
 // NewAgentTool creates an Agent tool. Runner can be nil during schema-only
@@ -82,6 +83,10 @@ func (t *AgentTool) Schema() json.RawMessage {
 				"type": "array",
 				"items": {"type": "string"},
 				"description": "Glob patterns for files this subagent will modify. Required for write-capable types."
+			},
+			"bead_description": {
+				"type": "string",
+				"description": "Optional bead/issue description for domain awareness."
 			}
 		}
 	}`, typeEnum, typeDescJSON)
@@ -112,6 +117,7 @@ func (t *AgentTool) Execute(ctx context.Context, params json.RawMessage) agentlo
 		Prompt:          input.Prompt,
 		Description:     input.Description,
 		InjectedContext: injected,
+		BeadDescription: input.BeadDescription,
 		FilePatterns:    input.FilePatterns,
 	}
 

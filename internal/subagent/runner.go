@@ -111,7 +111,13 @@ func (r *Runner) runOne(ctx context.Context, task SubagentTask) SubagentResult {
 	subCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	sess := NewScopedSession(st.SystemPrompt, task.Prompt, task.InjectedContext)
+	sess := NewScopedSession(ScopedSessionConfig{
+		PromptTemplate:  st.SystemPrompt,
+		TaskPrompt:      task.Prompt,
+		InjectedContext: task.InjectedContext,
+		BeadDescription: task.BeadDescription,
+		ContextTokenCap: st.ContextTokenCap,
+	})
 	emitter := NewAggregatingEmitter(task.ID, task.Type, r.config.ParentEmitter)
 	defer emitter.Flush() // flush evidence to parent on all paths (success and failure)
 	reg := agentloop.NewRegistry()

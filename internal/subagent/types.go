@@ -17,8 +17,9 @@ type SubagentType struct {
 	MaxTurns     int      `toml:"max_turns"`     // 0 = default (25)
 	TokenBudget  int      `toml:"token_budget"`  // 0 = inherit from parent
 	ReadOnly     bool     `toml:"read_only"`     // skip Intercore reservation
-	Model        string   `toml:"model"`         // empty = inherit from parent
-	Timeout      Duration `toml:"timeout"`       // 0 = default (120s)
+	Model           string   `toml:"model"`            // empty = inherit from parent
+	Timeout         Duration `toml:"timeout"`          // 0 = default (120s)
+	ContextTokenCap int      `toml:"context_token_cap"` // 0 = DefaultContextTokenCap
 }
 
 // Duration wraps time.Duration for TOML unmarshaling.
@@ -76,6 +77,7 @@ type SubagentTask struct {
 	Prompt          string   // task-specific prompt
 	Description     string   // short label (3-5 words) for TUI display
 	InjectedContext string   // optional context from parent
+	BeadDescription string   // optional bead description for domain awareness
 	FilePatterns    []string // glob patterns for Intercore reservation (write-capable only)
 }
 
