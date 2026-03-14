@@ -126,6 +126,23 @@ func (a *Agent) ModelOverride() string {
 	return ""
 }
 
+// SetThinkingBudget sets the extended thinking token budget if the router supports it.
+func (a *Agent) SetThinkingBudget(tokens int) bool {
+	if setter, ok := a.router.(ThinkingBudgetSetter); ok {
+		setter.SetThinkingBudget(tokens)
+		return true
+	}
+	return false
+}
+
+// ThinkingBudget returns the current extended thinking token budget, or 0.
+func (a *Agent) ThinkingBudget() int {
+	if getter, ok := a.router.(ThinkingBudgetSetter); ok {
+		return getter.ThinkingBudget()
+	}
+	return 0
+}
+
 // Run executes the OODARC loop for a given task by delegating to agentloop.Loop.
 // It translates the current phase into SelectionHints and bridges the
 // phase-typed agent interfaces to the phase-agnostic agentloop interfaces.
@@ -155,6 +172,9 @@ func (a *Agent) Run(ctx context.Context, task string) (*RunResult, error) {
 	}
 	if a.hookExec != nil {
 		loopOpts = append(loopOpts, agentloop.WithHooks(&hookAdapter{exec: a.hookExec}))
+	}
+	if tb := a.ThinkingBudget(); tb > 0 {
+		loopOpts = append(loopOpts, agentloop.WithThinkingBudget(tb))
 	}
 
 	loop := agentloop.New(a.provider, loopReg, loopOpts...)

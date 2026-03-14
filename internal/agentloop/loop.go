@@ -19,9 +19,10 @@ type Loop struct {
 	emitter   Emitter
 	streamCB  StreamCallback
 	approver  ToolApprover
-	hooks     HookRunner // lifecycle hooks (nil = no hooks)
-	maxTurns  int
-	sessionID string
+	hooks          HookRunner // lifecycle hooks (nil = no hooks)
+	maxTurns       int
+	sessionID      string
+	thinkingBudget int // extended thinking token budget; 0 = disabled
 }
 
 // LoopConfig configures a single Run invocation.
@@ -53,6 +54,9 @@ func WithStreamCallback(cb StreamCallback) Option { return func(l *Loop) { l.str
 
 // WithHooks sets the lifecycle hook runner.
 func WithHooks(h HookRunner) Option { return func(l *Loop) { l.hooks = h } }
+
+// WithThinkingBudget sets the extended thinking token budget.
+func WithThinkingBudget(tokens int) Option { return func(l *Loop) { l.thinkingBudget = tokens } }
 
 // New creates a Loop with the given provider, tool registry, and options.
 func New(p provider.Provider, reg *Registry, opts ...Option) *Loop {
@@ -120,9 +124,10 @@ func (l *Loop) Run(ctx context.Context, task string, config LoopConfig) (*RunRes
 		})
 
 		cfg := provider.Config{
-			Model:     model,
-			MaxTokens: 8192,
-			System:    systemPrompt,
+			Model:          model,
+			MaxTokens:      8192,
+			System:         systemPrompt,
+			ThinkingBudget: l.thinkingBudget,
 		}
 
 		// Decide: call LLM

@@ -18,16 +18,26 @@ type Message struct {
 
 // ContentBlock is a polymorphic content element.
 type ContentBlock struct {
-	Type  string          `json:"type"`            // "text", "tool_use", "tool_result"
+	Type  string          `json:"type"`            // "text", "tool_use", "tool_result", "image"
 	Text  string          `json:"text,omitempty"`  // text content
 	ID    string          `json:"id,omitempty"`    // tool_use ID
 	Name  string          `json:"name,omitempty"`  // tool name
 	Input json.RawMessage `json:"input,omitempty"` // tool_use input (raw JSON)
 
+	// image fields
+	Source *ImageSource `json:"source,omitempty"`
+
 	// tool_result fields
 	ToolUseID      string `json:"tool_use_id,omitempty"`
 	ResultContent  string `json:"content,omitempty"` // tool result text
 	IsError        bool   `json:"is_error,omitempty"`
+}
+
+// ImageSource represents a base64-encoded image for multimodal messages.
+type ImageSource struct {
+	Type      string `json:"type"`       // "base64"
+	MediaType string `json:"media_type"` // "image/png", "image/jpeg", "image/gif", "image/webp"
+	Data      string `json:"data"`       // base64-encoded binary
 }
 
 // ToolDef describes a tool available to the model.
@@ -39,10 +49,11 @@ type ToolDef struct {
 
 // Config holds per-request settings.
 type Config struct {
-	Model       string
-	MaxTokens   int
-	Temperature float64 // -1 means use provider default
-	System      string  // system prompt
+	Model          string
+	MaxTokens      int
+	Temperature    float64 // -1 means use provider default
+	System         string  // system prompt
+	ThinkingBudget int     // extended thinking token budget; 0 = disabled
 }
 
 // Usage tracks token consumption for a single response.

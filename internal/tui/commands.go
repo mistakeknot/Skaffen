@@ -659,7 +659,62 @@ func (m *appModel) buildModelEntries() []msettings.Entry {
 		})
 	}
 
+	// Effort level (extended thinking)
+	effortVal := "off"
+	if m.agent != nil {
+		if tb := m.agent.ThinkingBudget(); tb > 0 {
+			effortVal = effortLabelForBudget(tb)
+		}
+	}
+	entries = append(entries, msettings.Entry{
+		Key:         "effort",
+		Description: "Extended thinking depth (token budget)",
+		Type:        msettings.TypeEnum,
+		Value:       effortVal,
+		Options:     effortOptions(),
+	})
+
 	return entries
+}
+
+// effortLevels maps effort labels to thinking token budgets.
+var effortLevels = []struct {
+	Label  string
+	Budget int
+}{
+	{"off", 0},
+	{"low (1k)", 1024},
+	{"medium (4k)", 4096},
+	{"high (10k)", 10240},
+	{"max (32k)", 32768},
+}
+
+func effortOptions() []string {
+	opts := make([]string, len(effortLevels))
+	for i, l := range effortLevels {
+		opts[i] = l.Label
+	}
+	return opts
+}
+
+func effortBudgetForLabel(label string) int {
+	for _, l := range effortLevels {
+		if l.Label == label {
+			return l.Budget
+		}
+	}
+	return 0
+}
+
+func effortLabelForBudget(budget int) string {
+	// Find closest match
+	for _, l := range effortLevels {
+		if l.Budget == budget {
+			return l.Label
+		}
+	}
+	// Custom budget — show as-is
+	return fmt.Sprintf("%dk", budget/1024)
 }
 
 func (m *appModel) execSettings(args []string) CommandResult {

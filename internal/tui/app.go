@@ -508,6 +508,13 @@ func (m *appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			break
 		}
+		if msg.Key == "effort" {
+			if m.agent != nil {
+				budget := effortBudgetForLabel(msg.NewValue)
+				m.agent.SetThinkingBudget(budget)
+			}
+			break
+		}
 		if _, err := ApplySetting(&m.settings, msg.Key, msg.NewValue); err != nil {
 			// Revert entry in overlay to old value
 			entries := m.settingsOverlay.Entries()

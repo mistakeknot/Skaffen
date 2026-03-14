@@ -100,6 +100,13 @@ type ModelOverrideSetter interface {
 	ModelOverride() string
 }
 
+// ThinkingBudgetSetter is an optional interface for routers that support
+// extended thinking (effort level). Checked via type assertion.
+type ThinkingBudgetSetter interface {
+	SetThinkingBudget(tokens int)
+	ThinkingBudget() int
+}
+
 // NoOpRouter always returns the default model.
 type NoOpRouter struct{ Model string }
 

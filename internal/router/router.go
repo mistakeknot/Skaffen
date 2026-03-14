@@ -37,6 +37,7 @@ type DefaultRouter struct {
 	ic             *ICClient
 	sessionID      string
 	runtimeModel   string // runtime override from /model command (empty = use defaults)
+	thinkingBudget int    // extended thinking token budget; 0 = disabled
 }
 
 // New creates a DefaultRouter. Pass nil config to use hardcoded defaults.
@@ -172,6 +173,17 @@ func (r *DefaultRouter) SetModelOverride(model string) {
 // ModelOverride returns the current runtime model override, or empty string if none.
 func (r *DefaultRouter) ModelOverride() string {
 	return r.runtimeModel
+}
+
+// SetThinkingBudget sets the extended thinking token budget.
+// Pass 0 to disable extended thinking.
+func (r *DefaultRouter) SetThinkingBudget(tokens int) {
+	r.thinkingBudget = tokens
+}
+
+// ThinkingBudget returns the current extended thinking token budget.
+func (r *DefaultRouter) ThinkingBudget() int {
+	return r.thinkingBudget
 }
 
 // Default context window sizes per model (tokens).

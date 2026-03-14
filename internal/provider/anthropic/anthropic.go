@@ -77,6 +77,13 @@ type apiRequest struct {
 	Messages  []provider.Message    `json:"messages"`
 	System    string                `json:"system,omitempty"`
 	Tools     []provider.ToolDef    `json:"tools,omitempty"`
+	Thinking  *thinkingConfig       `json:"thinking,omitempty"`
+}
+
+// thinkingConfig enables extended thinking (reasoning) for supported models.
+type thinkingConfig struct {
+	Type         string `json:"type"`          // "enabled"
+	BudgetTokens int    `json:"budget_tokens"` // max tokens for thinking
 }
 
 // Stream sends a streaming request to the Anthropic Messages API.
@@ -97,6 +104,20 @@ func (p *AnthropicProvider) Stream(ctx context.Context, messages []provider.Mess
 		Messages:  messages,
 		System:    config.System,
 		Tools:     tools,
+	}
+
+	// Enable extended thinking when budget is set.
+	// Extended thinking requires MaxTokens to include the thinking budget.
+	if config.ThinkingBudget > 0 {
+		reqBody.Thinking = &thinkingConfig{
+			Type:         "enabled",
+			BudgetTokens: config.ThinkingBudget,
+		}
+		// MaxTokens must be >= ThinkingBudget + output; bump if needed.
+		minTokens := config.ThinkingBudget + maxTokens
+		if reqBody.MaxTokens < minTokens {
+			reqBody.MaxTokens = minTokens
+		}
 	}
 
 	bodyBytes, err := json.Marshal(reqBody)
