@@ -665,8 +665,10 @@ func (m *appModel) View() string {
 	// Uses the viewport's themed indicator which shows "↓ N more lines".
 	scrollHint := m.viewport.ScrollIndicator(m.width)
 
-	// Status area with breathing room between sections.
-	statusArea := lipgloss.JoinVertical(lipgloss.Left, "", crumbView, "", meterView, statusView)
+	// Thin rules between status sections — lighter than blank lines.
+	ruleStyle := lipgloss.NewStyle().Foreground(theme.Current().Semantic().Border.Color())
+	rule := ruleStyle.Render(strings.Repeat("─", m.width))
+	statusArea := lipgloss.JoinVertical(lipgloss.Left, rule, crumbView, rule, meterView, statusView)
 
 	if m.approving {
 		return lipgloss.JoinVertical(lipgloss.Left, logoView, vpView, scrollHint, m.approvalQ.View(), statusArea)
