@@ -75,8 +75,9 @@ func TestRegistry_ReviewPhase(t *testing.T) {
 	r := newRegistryWithStubs()
 	names := toolNames(r.Tools(PhaseReview))
 
-	want := []string{"read", "glob", "grep", "ls", "bash"}
-	notWant := []string{"write", "edit"}
+	// Phase softening: Review includes edit (rate-limited to 3 calls)
+	want := []string{"read", "glob", "grep", "ls", "bash", "edit"}
+	notWant := []string{"write"}
 
 	for _, name := range want {
 		if !names[name] {
@@ -88,14 +89,30 @@ func TestRegistry_ReviewPhase(t *testing.T) {
 			t.Errorf("review: should not have %q", name)
 		}
 	}
+
+	// Verify constraint properties
+	gc, ok := r.Constraint(PhaseReview, "edit")
+	if !ok {
+		t.Fatal("review: edit should be gated")
+	}
+	if gc == nil {
+		t.Fatal("review: edit should have constraints")
+	}
+	if gc.RateLimit != 3 {
+		t.Errorf("review edit rate limit = %d, want 3", gc.RateLimit)
+	}
+	if !gc.RequirePrompt {
+		t.Error("review edit should require prompt")
+	}
 }
 
 func TestRegistry_ShipPhase(t *testing.T) {
 	r := newRegistryWithStubs()
 	names := toolNames(r.Tools(PhaseShip))
 
-	want := []string{"read", "glob", "ls", "bash"}
-	notWant := []string{"write", "edit", "grep"}
+	// Phase softening: Ship includes edit/write (manifest globs only)
+	want := []string{"read", "glob", "ls", "bash", "edit", "write"}
+	notWant := []string{"grep"}
 
 	for _, name := range want {
 		if !names[name] {
@@ -105,6 +122,18 @@ func TestRegistry_ShipPhase(t *testing.T) {
 	for _, name := range notWant {
 		if names[name] {
 			t.Errorf("ship: should not have %q", name)
+		}
+	}
+
+	// Verify constraints
+	for _, tool := range []string{"edit", "write"} {
+		gc, ok := r.Constraint(PhaseShip, tool)
+		if !ok {
+			t.Errorf("ship: %s should be gated", tool)
+			continue
+		}
+		if gc == nil || len(gc.AllowedGlobs) == 0 {
+			t.Errorf("ship: %s should have file glob constraints", tool)
 		}
 	}
 }
@@ -417,5 +446,133 @@ func TestPlanMode_ErrorMessage(t *testing.T) {
 	want := `tool "write" not available in plan mode (read-only)`
 	if result.Content != want {
 		t.Errorf("error message = %q, want %q", result.Content, want)
+	}
+}
+
+// --- Phase softening tests ---
+
+func TestSoftening_ReviewEditRateLimit(t *testing.T) {
+	r := newRegistryWithStubs()
+
+	// First 3 calls should succeed
+	for i := 0; i < 3; i++ {
+		result := r.Execute(context.Background(), PhaseReview, "edit", json.RawMessage(`{"file_path":"/tmp/test.go","old_string":"a","new_string":"b"}`))
+		if result.IsError {
+			t.Errorf("call %d: unexpected error: %s", i+1, result.Content)
+		}
+	}
+
+	// 4th call should be rate-limited
+	result := r.Execute(context.Background(), PhaseReview, "edit", json.RawMessage(`{"file_path":"/tmp/test.go","old_string":"a","new_string":"b"}`))
+	if !result.IsError {
+		t.Error("4th edit call should be rate-limited")
+	}
+	if result.Content == "" || result.Content == "executed edit" {
+		t.Error("expected rate limit error message")
+	}
+}
+
+func TestSoftening_ReviewEditRateLimitReset(t *testing.T) {
+	r := newRegistryWithStubs()
+
+	// Use 3 calls
+	for i := 0; i < 3; i++ {
+		r.Execute(context.Background(), PhaseReview, "edit", json.RawMessage(`{"file_path":"/tmp/test.go","old_string":"a","new_string":"b"}`))
+	}
+
+	// Reset counters (simulates phase transition)
+	r.ResetRateCounts()
+
+	// Should work again
+	result := r.Execute(context.Background(), PhaseReview, "edit", json.RawMessage(`{"file_path":"/tmp/test.go","old_string":"a","new_string":"b"}`))
+	if result.IsError {
+		t.Errorf("after reset, edit should work: %s", result.Content)
+	}
+}
+
+func TestSoftening_ShipEditManifestAllowed(t *testing.T) {
+	r := newRegistryWithStubs()
+
+	// Editing a markdown file should work in Ship phase
+	result := r.Execute(context.Background(), PhaseShip, "edit", json.RawMessage(`{"file_path":"/project/README.md","old_string":"old","new_string":"new"}`))
+	if result.IsError {
+		t.Errorf("ship edit *.md should be allowed: %s", result.Content)
+	}
+
+	// Editing a CHANGELOG should work
+	result = r.Execute(context.Background(), PhaseShip, "write", json.RawMessage(`{"file_path":"/project/CHANGELOG.md","content":"new"}`))
+	if result.IsError {
+		t.Errorf("ship write CHANGELOG should be allowed: %s", result.Content)
+	}
+
+	// Editing a JSON file should work
+	result = r.Execute(context.Background(), PhaseShip, "edit", json.RawMessage(`{"file_path":"/project/package.json","old_string":"1.0","new_string":"1.1"}`))
+	if result.IsError {
+		t.Errorf("ship edit *.json should be allowed: %s", result.Content)
+	}
+}
+
+func TestSoftening_ShipEditCodeBlocked(t *testing.T) {
+	r := newRegistryWithStubs()
+
+	// Editing a Go file should be blocked in Ship phase
+	result := r.Execute(context.Background(), PhaseShip, "edit", json.RawMessage(`{"file_path":"/project/main.go","old_string":"old","new_string":"new"}`))
+	if !result.IsError {
+		t.Error("ship edit *.go should be blocked")
+	}
+
+	// Editing a Python file should be blocked
+	result = r.Execute(context.Background(), PhaseShip, "write", json.RawMessage(`{"file_path":"/project/app.py","content":"code"}`))
+	if !result.IsError {
+		t.Error("ship write *.py should be blocked")
+	}
+
+	// Editing a TypeScript file should be blocked
+	result = r.Execute(context.Background(), PhaseShip, "edit", json.RawMessage(`{"file_path":"/project/index.ts","old_string":"a","new_string":"b"}`))
+	if !result.IsError {
+		t.Error("ship edit *.ts should be blocked")
+	}
+}
+
+func TestSoftening_BuildPhaseUnconstrained(t *testing.T) {
+	r := newRegistryWithStubs()
+
+	// Build phase should have no constraints on edit/write
+	result := r.Execute(context.Background(), PhaseBuild, "edit", json.RawMessage(`{"file_path":"/project/main.go","old_string":"a","new_string":"b"}`))
+	if result.IsError {
+		t.Errorf("build edit should be unconstrained: %s", result.Content)
+	}
+
+	result = r.Execute(context.Background(), PhaseBuild, "write", json.RawMessage(`{"file_path":"/project/main.go","content":"code"}`))
+	if result.IsError {
+		t.Errorf("build write should be unconstrained: %s", result.Content)
+	}
+}
+
+func TestGateConstraint_MatchesPath(t *testing.T) {
+	tests := []struct {
+		name  string
+		gc    *GateConstraint
+		path  string
+		match bool
+	}{
+		{"nil constraint", nil, "/any/path.go", true},
+		{"empty globs", &GateConstraint{}, "/any/path.go", true},
+		{"md match", &GateConstraint{AllowedGlobs: []string{"*.md"}}, "/project/README.md", true},
+		{"md no match", &GateConstraint{AllowedGlobs: []string{"*.md"}}, "/project/main.go", false},
+		{"json match", &GateConstraint{AllowedGlobs: []string{"*.json"}}, "/project/package.json", true},
+		{"changelog match", &GateConstraint{AllowedGlobs: []string{"CHANGELOG*"}}, "/project/CHANGELOG.md", true},
+		{"version match", &GateConstraint{AllowedGlobs: []string{"VERSION*"}}, "/project/VERSION", true},
+		{"multi glob", &GateConstraint{AllowedGlobs: []string{"*.md", "*.json"}}, "/project/config.json", true},
+		{"multi glob no match", &GateConstraint{AllowedGlobs: []string{"*.md", "*.json"}}, "/project/main.rs", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.gc.MatchesPath(tt.path)
+			if got != tt.match {
+				t.Errorf("MatchesPath(%q) = %v, want %v", tt.path, got, tt.match)
+			}
+		})
 	}
 }
