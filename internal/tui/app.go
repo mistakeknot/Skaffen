@@ -537,6 +537,9 @@ func (m *appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.Key == "verbose" {
 			m.compact.SetVerbose(m.settings.Verbose)
 		}
+		if msg.Key == "compact-phases" {
+			m.syncBreadcrumb()
+		}
 
 	case msettings.DismissedMsg:
 		m.settingsOpen = false
@@ -786,6 +789,11 @@ func (m *appModel) syncBreadcrumb() {
 		steps[i] = breadcrumb.Step{Label: p, Status: s}
 	}
 	m.crumbs.SetSteps(steps)
+	if m.settings.CompactPhases {
+		m.crumbs.SetCompact("OODARC")
+	} else {
+		m.crumbs.SetCompact("")
+	}
 }
 
 func (m *appModel) runAgent(prompt string) tea.Cmd {

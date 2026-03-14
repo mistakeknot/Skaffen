@@ -20,6 +20,7 @@ type settings struct {
 	Timestamps      bool   // show timestamps on messages
 	Theme           string // active theme name
 	ColorMode       string // "dark" or "light"
+	CompactPhases   bool   // show phases as "OODARC" instead of full names
 }
 
 func defaultSettings() settings {
@@ -32,6 +33,7 @@ func defaultSettings() settings {
 		Timestamps:      false,
 		Theme:           theme.Current().Name,
 		ColorMode:       theme.CurrentMode().String(),
+		CompactPhases:   false,
 	}
 }
 
@@ -165,6 +167,20 @@ var settingsRegistry = []settingEntry{
 			default:
 				return fmt.Errorf("unknown color mode %q (use dark or light)", val)
 			}
+			return nil
+		},
+	},
+	{
+		Key:         "compact-phases",
+		Description: "Show phases as OODARC instead of full names",
+		EntryType:   msettings.TypeBool,
+		Get:         func(s *settings) string { return fmtBool(s.CompactPhases) },
+		Set: func(s *settings, val string) error {
+			b, err := parseBool(val)
+			if err != nil {
+				return err
+			}
+			s.CompactPhases = b
 			return nil
 		},
 	},
