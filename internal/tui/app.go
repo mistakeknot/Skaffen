@@ -526,6 +526,8 @@ func (m *appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		cmds = append(cmds, cmd)
 
 	case commandResultMsg:
+		// Record position before append so we can scroll back to it.
+		topLine := m.viewport.TotalLines()
 		if msg.IsError {
 			errStyle := lipgloss.NewStyle().Foreground(theme.Current().Semantic().Error.Color())
 			m.viewport.AppendContent(errStyle.Render(msg.Message) + "\n")
@@ -533,6 +535,11 @@ func (m *appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if msg.Message != "" {
 				m.viewport.AppendContent(msg.Message + "\n")
 			}
+		}
+		// For pageable commands (e.g. /help), scroll to the top of the
+		// output so the user reads from the beginning and can scroll down.
+		if msg.ShowFromTop {
+			m.viewport.ScrollTo(topLine)
 		}
 		if msg.Quit {
 			m.drainApproval()
@@ -581,6 +588,7 @@ func (m *appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case agentDoneMsg:
 		m.running = false
 		m.cancelRun = nil
+		m.md.ResetStream()
 		if msg.Err != nil && !errors.Is(msg.Err, context.Canceled) {
 			errStyle := lipgloss.NewStyle().Foreground(theme.Current().Semantic().Error.Color())
 			m.viewport.AppendContent("\n" + errStyle.Render(fmt.Sprintf("Error: %v", msg.Err)) + "\n")
@@ -616,16 +624,9 @@ func (m *appModel) View() string {
 		vpView = m.viewport.View()
 	}
 
-	// Scroll-to-bottom indicator: shown when user has scrolled up and content extends below
-	scrollHint := ""
-	if !m.viewport.AtBottom() && m.viewport.TotalLines() > m.viewport.Height() {
-		c := theme.Current().Semantic()
-		hintStyle := lipgloss.NewStyle().
-			Foreground(c.Info.Color()).
-			Align(lipgloss.Right).
-			Width(m.width)
-		scrollHint = hintStyle.Render("↓ new content — End to jump")
-	}
+	// Scroll indicator: shown when content extends beyond the visible area.
+	// Uses the viewport's themed indicator which shows "↓ N more lines".
+	scrollHint := m.viewport.ScrollIndicator(m.width)
 
 	if m.approving {
 		return lipgloss.JoinVertical(lipgloss.Left, logoView, vpView, scrollHint, m.approvalQ.View(), crumbView, meterView, statusView)
@@ -653,9 +654,12 @@ func (m *appModel) handleStreamEvent(ev agent.StreamEvent) {
 	switch ev.Type {
 	case agent.StreamText:
 		m.md.Append(ev.Text)
-		m.viewport.AppendContent(m.md.View())
-		m.md.Reset()
+		delta := m.md.StreamDelta()
+		if delta != "" {
+			m.viewport.AppendContent(delta)
+		}
 	case agent.StreamToolStart:
+		m.md.ResetStream() // tool call interrupts text flow
 		summary := m.compact.FormatToolCall(ev.ToolName, ev.ToolParams, "", false)
 		m.viewport.AppendContent("\n" + summary)
 		// Start timer for this tool call
