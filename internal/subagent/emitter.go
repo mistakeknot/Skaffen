@@ -38,6 +38,8 @@ func (e *AggregatingEmitter) Emit(ev agentloop.Evidence) error {
 	e.events = append(e.events, ev)
 	e.usage.InputTokens += ev.TokensIn
 	e.usage.OutputTokens += ev.TokensOut
+	e.usage.CacheCreationInputTokens += ev.CacheCreationTokens
+	e.usage.CacheReadInputTokens += ev.CacheReadTokens
 	return nil
 }
 

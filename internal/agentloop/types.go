@@ -81,8 +81,10 @@ type Evidence struct {
 	TurnNumber         int            `json:"turn"`
 	ToolCalls          []string       `json:"tool_calls,omitempty"`
 	FileActivity       []FileActivity `json:"file_activity,omitempty"`
-	TokensIn           int            `json:"tokens_in"`
-	TokensOut          int            `json:"tokens_out"`
+	TokensIn               int            `json:"tokens_in"`
+	TokensOut              int            `json:"tokens_out"`
+	CacheCreationTokens    int            `json:"cache_creation_tokens,omitempty"`
+	CacheReadTokens        int            `json:"cache_read_tokens,omitempty"`
 	StopReason         string         `json:"stop_reason"`
 	DurationMs         int64          `json:"duration_ms,omitempty"`
 	Outcome            string         `json:"outcome,omitempty"`
