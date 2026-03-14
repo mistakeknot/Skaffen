@@ -186,6 +186,53 @@ func TestCustomPromoteThreshold(t *testing.T) {
 	}
 }
 
+func TestRevokeLearnedOverride(t *testing.T) {
+	e := trust.NewEvaluator(nil)
+	e.Learn("bash:npm install*", trust.Allow, trust.ScopeProject)
+	if len(e.Overrides()) != 1 {
+		t.Fatal("should have 1 override")
+	}
+
+	ok := e.Revoke("bash:npm install*")
+	if !ok {
+		t.Fatal("Revoke should return true for existing pattern")
+	}
+	if len(e.Overrides()) != 0 {
+		t.Fatal("override should be removed after revoke")
+	}
+
+	// Evaluate should now fall through to built-in (Prompt for npm install)
+	got := e.Evaluate("bash", `{"command": "npm install express"}`)
+	if got != trust.Prompt {
+		t.Errorf("after revoke, npm install should be Prompt, got %v", got)
+	}
+}
+
+func TestRevokeNonexistentPattern(t *testing.T) {
+	e := trust.NewEvaluator(nil)
+	ok := e.Revoke("bash:nonexistent")
+	if ok {
+		t.Fatal("Revoke should return false for nonexistent pattern")
+	}
+}
+
+func TestExpandedDangerousPatterns(t *testing.T) {
+	e := trust.NewEvaluator(nil)
+	dangerous := []string{
+		"git push --force origin main",
+		"git reset --hard HEAD~3",
+		"git clean -fd",
+		"find . -delete",
+		"truncate -s 0 /etc/passwd",
+	}
+	for _, cmd := range dangerous {
+		got := e.Evaluate("bash", `{"command": "`+cmd+`"}`)
+		if got != trust.Block {
+			t.Errorf("bash(%q) = %v, want Block", cmd, got)
+		}
+	}
+}
+
 func TestDecisionString(t *testing.T) {
 	if trust.Allow.String() != "allow" {
 		t.Errorf("Allow.String() = %q", trust.Allow.String())

@@ -164,6 +164,25 @@ func (e *Evaluator) Overrides() []Override {
 	return out
 }
 
+// Revoke removes a learned override by pattern. Returns true if found and removed.
+func (e *Evaluator) Revoke(pattern string) bool {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	for i, o := range e.overrides {
+		if o.Pattern == pattern {
+			e.overrides = append(e.overrides[:i], e.overrides[i+1:]...)
+			return true
+		}
+	}
+	// Also clear from session overrides
+	if _, ok := e.session[pattern]; ok {
+		delete(e.session, pattern)
+		delete(e.sessionCount, pattern)
+		return true
+	}
+	return false
+}
+
 func buildKey(toolName, paramsJSON string) string {
 	// For bash, extract command for the key
 	if toolName == "bash" {

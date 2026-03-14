@@ -26,11 +26,17 @@ var safeBashPrefixes = []string{
 	"tree", "find", "which", "command -v",
 }
 
-// Dangerous bash patterns
+// Dangerous bash patterns — deny-by-default for destructive commands.
+// These return Block regardless of learned overrides.
 var dangerousPatterns = []string{
-	"rm -rf", "sudo", "chmod 777",
+	"rm -rf", "rm -r ", "sudo", "chmod 777",
 	"curl", "wget", "nc ", "ncat",
 	".env",
+	"git push --force", "git push -f", "git reset --hard",
+	"git clean -f", "git checkout -- .",
+	"find . -delete", "find . -exec rm",
+	"truncate ", "> /", "dd if=",
+	"mkfs.", "fdisk",
 }
 
 func evaluateBuiltIn(toolName, paramsJSON string) Decision {
