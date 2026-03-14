@@ -70,6 +70,47 @@ func (c *ICClient) RecordDecision(rec DecisionRecord) {
 	}()
 }
 
+// TokenReport holds aggregate token usage for a completed session.
+type TokenReport struct {
+	SessionID           string
+	InputTokens         int
+	OutputTokens        int
+	CacheCreationTokens int
+	CacheReadTokens     int
+}
+
+// ReportTokens calls `ic session tokens` to persist token usage for a session.
+// Fire-and-forget with a 5-second timeout. Best-effort — errors are ignored.
+func (c *ICClient) ReportTokens(report TokenReport) {
+	if report.SessionID == "" {
+		return
+	}
+	// Only report if there are actual tokens
+	if report.InputTokens == 0 && report.OutputTokens == 0 {
+		return
+	}
+
+	args := []string{
+		"session", "tokens",
+		"--session=" + report.SessionID,
+		"--input=" + strconv.Itoa(report.InputTokens),
+		"--output=" + strconv.Itoa(report.OutputTokens),
+	}
+	if report.CacheCreationTokens > 0 {
+		args = append(args, "--cache-creation="+strconv.Itoa(report.CacheCreationTokens))
+	}
+	if report.CacheReadTokens > 0 {
+		args = append(args, "--cache-read="+strconv.Itoa(report.CacheReadTokens))
+	}
+
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		cmd := exec.CommandContext(ctx, c.icPath, args...)
+		cmd.Run() // best-effort
+	}()
+}
+
 func (c *ICClient) buildRecordArgs(rec DecisionRecord) []string {
 	args := []string{
 		"route", "record",

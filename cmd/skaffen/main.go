@@ -326,9 +326,26 @@ func runPrint() error {
 	// Print response to stdout
 	fmt.Print(result.Response)
 
-	// Print usage to stderr
-	fmt.Fprintf(os.Stderr, "\n[%d turns, %d in / %d out tokens]\n",
-		result.Turns, result.Usage.InputTokens, result.Usage.OutputTokens)
+	// Print usage to stderr (include cache tokens if nonzero)
+	if result.Usage.CacheReadInputTokens > 0 || result.Usage.CacheCreationInputTokens > 0 {
+		fmt.Fprintf(os.Stderr, "\n[%d turns, %d in / %d out tokens, %d cache_read / %d cache_create]\n",
+			result.Turns, result.Usage.InputTokens, result.Usage.OutputTokens,
+			result.Usage.CacheReadInputTokens, result.Usage.CacheCreationInputTokens)
+	} else {
+		fmt.Fprintf(os.Stderr, "\n[%d turns, %d in / %d out tokens]\n",
+			result.Turns, result.Usage.InputTokens, result.Usage.OutputTokens)
+	}
+
+	// Report tokens to intercore (best-effort, fire-and-forget)
+	if ic != nil {
+		ic.ReportTokens(router.TokenReport{
+			SessionID:           sessionID,
+			InputTokens:         result.Usage.InputTokens,
+			OutputTokens:        result.Usage.OutputTokens,
+			CacheCreationTokens: result.Usage.CacheCreationInputTokens,
+			CacheReadTokens:     result.Usage.CacheReadInputTokens,
+		})
+	}
 
 	return nil
 }

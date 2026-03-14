@@ -81,6 +81,18 @@ func TestICClient_BuildRecordArgsNoOptional(t *testing.T) {
 	}
 }
 
+func TestICClient_ReportTokensSkipsEmpty(t *testing.T) {
+	ic := &ICClient{icPath: "ic"}
+	// Should not panic with zero tokens
+	ic.ReportTokens(TokenReport{SessionID: "test", InputTokens: 0, OutputTokens: 0})
+}
+
+func TestICClient_ReportTokensSkipsNoSession(t *testing.T) {
+	ic := &ICClient{icPath: "ic"}
+	// Should not panic with empty session
+	ic.ReportTokens(TokenReport{InputTokens: 100, OutputTokens: 50})
+}
+
 func TestNewWithIC_NilICSelectModelWorks(t *testing.T) {
 	// Full flow: NewWithIC with nil IC should work exactly like New
 	r := NewWithIC(&Config{}, nil, "integration-test")
