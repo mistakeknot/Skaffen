@@ -87,24 +87,24 @@ func tokenSparklineWidth(termWidth int) int {
 }
 
 // updateStatusSlots refreshes status bar slots with current agent state.
-// When planMode is true, prepends "PLAN " to the phase with an accent color.
-// sandboxLabel is shown as a trailing slot when non-empty (e.g. "YOLO", "strict").
+// Phase is shown in the breadcrumb, not here — the status bar shows runtime state.
+// planMode adds a "PLAN" badge; sandboxLabel adds a trailing badge.
 func updateStatusSlots(sb *statusbar.Model, phase, model string, cost, contextPct float64, turns int, planMode bool, sandboxLabel string) {
 	c := theme.Current().Semantic()
 
-	phaseVal := phase
-	phaseCol := phaseColor(phase)
+	var slots []statusbar.Slot
+
+	// PLAN mode badge (modal state, not phase)
 	if planMode {
-		phaseVal = "PLAN " + phase
-		phaseCol = c.Info.Color()
+		slots = append(slots, statusbar.Slot{Label: "", Value: "PLAN", Color: c.Info.Color()})
 	}
 
-	slots := []statusbar.Slot{
-		{Label: "", Value: phaseVal, Color: phaseCol},
-		{Label: "", Value: model, Color: c.FgDim.Color()},
-		{Label: "", Value: fmt.Sprintf("$%.2f", cost), Color: costColor(cost)},
-		{Label: "", Value: fmt.Sprintf("%d turns", turns), Color: c.Fg.Color()},
-	}
+	slots = append(slots,
+		statusbar.Slot{Label: "", Value: model, Color: c.FgDim.Color()},
+		statusbar.Slot{Label: "", Value: fmt.Sprintf("$%.2f", cost), Color: costColor(cost)},
+		statusbar.Slot{Label: "", Value: fmt.Sprintf("%d turns", turns), Color: c.Fg.Color()},
+	)
+
 	if sandboxLabel != "" {
 		col := c.Success.Color()
 		if sandboxLabel == "YOLO" {

@@ -14,12 +14,13 @@ func TestStatusBarRenders(t *testing.T) {
 	}
 }
 
-func TestStatusBarContainsPhase(t *testing.T) {
+func TestStatusBarOmitsPhase(t *testing.T) {
 	sb := newStatusBar(120)
 	updateStatusSlots(&sb, "reflect", "claude", 0.0, 0, 0, false, "")
 	view := sb.View()
-	if !strings.Contains(view, "reflect") {
-		t.Fatal("status bar should contain phase name")
+	// Phase is shown in the breadcrumb, not the status bar
+	if strings.Contains(view, "reflect") {
+		t.Fatal("status bar should not contain phase name (shown in breadcrumb)")
 	}
 }
 
@@ -68,13 +69,15 @@ func TestStatusBarSeparators(t *testing.T) {
 	}
 }
 
-func TestStatusBarAllPhases(t *testing.T) {
+func TestStatusBarAllPhasesRender(t *testing.T) {
+	// Status bar should render without error for all phases,
+	// even though phase is no longer displayed (it's in breadcrumb).
 	for _, phase := range phaseOrder {
 		sb := newStatusBar(120)
 		updateStatusSlots(&sb, phase, "claude", 0, 0, 0, false, "")
 		view := sb.View()
-		if !strings.Contains(view, phase) {
-			t.Errorf("status bar should contain phase %q", phase)
+		if view == "" {
+			t.Errorf("status bar should render for phase %q", phase)
 		}
 	}
 }
@@ -114,9 +117,6 @@ func TestStatusBarPlanMode(t *testing.T) {
 	view := sb.View()
 	if !strings.Contains(view, "PLAN") {
 		t.Errorf("plan mode badge missing from status bar: %q", view)
-	}
-	if !strings.Contains(view, "act") {
-		t.Errorf("phase should still show after PLAN badge: %q", view)
 	}
 }
 
