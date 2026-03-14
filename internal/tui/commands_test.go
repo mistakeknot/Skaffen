@@ -218,9 +218,12 @@ func TestExecuteCommand_ModelOpensOverlay(t *testing.T) {
 	if entries[0].Key != "orchestrator" {
 		t.Fatalf("first entry should be 'orchestrator', got %q", entries[0].Key)
 	}
-	// Value should show current model
-	if entries[0].Value != "opus" {
-		t.Fatalf("orchestrator value should be 'opus', got %q", entries[0].Value)
+	// Value should show current model with canonical ID
+	if !strings.Contains(entries[0].Value, "opus") {
+		t.Fatalf("orchestrator value should contain 'opus', got %q", entries[0].Value)
+	}
+	if !strings.Contains(entries[0].Value, "claude-opus-4-6") {
+		t.Fatalf("orchestrator value should contain canonical ID, got %q", entries[0].Value)
 	}
 }
 

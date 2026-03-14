@@ -546,6 +546,33 @@ func modelAliases() []string {
 	return []string{"opus", "sonnet", "haiku"}
 }
 
+// modelDisplayOptions returns display strings for the model overlay.
+// Format: "alias (canonical-id)" e.g. "opus (claude-opus-4-6)".
+func modelDisplayOptions() []string {
+	aliases := modelAliases()
+	opts := make([]string, len(aliases))
+	for i, a := range aliases {
+		opts[i] = fmt.Sprintf("%s (%s)", a, validModels[a])
+	}
+	return opts
+}
+
+// modelDisplayValue formats a model alias for overlay display.
+func modelDisplayValue(alias string) string {
+	if canonical, ok := validModels[alias]; ok {
+		return fmt.Sprintf("%s (%s)", alias, canonical)
+	}
+	return alias
+}
+
+// modelAliasFromDisplay extracts the alias from a display string like "opus (claude-opus-4-6)".
+func modelAliasFromDisplay(display string) string {
+	if idx := strings.IndexByte(display, ' '); idx > 0 {
+		return display[:idx]
+	}
+	return display
+}
+
 // resolveModelAlias converts short aliases to canonical model IDs.
 func resolveModelAlias(alias string) string {
 	if canonical, ok := validModels[alias]; ok {
@@ -590,12 +617,11 @@ func (m *appModel) buildModelEntries() []msettings.Entry {
 	if m.agent != nil {
 		override = m.agent.ModelOverride()
 	}
-	orchestratorVal := current
+	orchestratorAlias := current
 	if override != "" {
-		// Show the alias if it's a canonical ID
 		for alias, canonical := range validModels {
 			if canonical == override {
-				orchestratorVal = alias
+				orchestratorAlias = alias
 				break
 			}
 		}
@@ -606,8 +632,8 @@ func (m *appModel) buildModelEntries() []msettings.Entry {
 			Key:         "orchestrator",
 			Description: "Primary model for your conversation",
 			Type:        msettings.TypeEnum,
-			Value:       orchestratorVal,
-			Options:     modelAliases(),
+			Value:       modelDisplayValue(orchestratorAlias),
+			Options:     modelDisplayOptions(),
 		},
 	}
 
@@ -617,17 +643,19 @@ func (m *appModel) buildModelEntries() []msettings.Entry {
 		if dm := m.subagentRegistry.DefaultModel(); dm != "" {
 			for alias, canonical := range validModels {
 				if canonical == dm || alias == dm {
-					subModel = alias
+					subModel = modelDisplayValue(alias)
 					break
 				}
 			}
 		}
+		subOpts := []string{"inherit"}
+		subOpts = append(subOpts, modelDisplayOptions()...)
 		entries = append(entries, msettings.Entry{
 			Key:         "subagents",
 			Description: "Default model for subagent tasks",
 			Type:        msettings.TypeEnum,
 			Value:       subModel,
-			Options:     []string{"inherit", "opus", "sonnet", "haiku"},
+			Options:     subOpts,
 		})
 	}
 

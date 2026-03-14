@@ -490,9 +490,10 @@ func (m *appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		// Handle model selector entries
 		if msg.Key == "orchestrator" {
+			alias := modelAliasFromDisplay(msg.NewValue)
 			if m.agent != nil {
-				m.agent.SetModelOverride(msg.NewValue)
-				m.modelName = msg.NewValue
+				m.agent.SetModelOverride(alias)
+				m.modelName = alias
 			}
 			break
 		}
@@ -501,7 +502,8 @@ func (m *appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if msg.NewValue == "inherit" {
 					m.subagentRegistry.SetDefaultModel("")
 				} else {
-					m.subagentRegistry.SetDefaultModel(resolveModelAlias(msg.NewValue))
+					alias := modelAliasFromDisplay(msg.NewValue)
+					m.subagentRegistry.SetDefaultModel(resolveModelAlias(alias))
 				}
 			}
 			break
