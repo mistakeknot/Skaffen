@@ -86,11 +86,18 @@ func (l *Loop) SetToolApprover(fn ToolApprover) {
 
 // Run executes the Decide->Act loop for a given task.
 func (l *Loop) Run(ctx context.Context, task string, config LoopConfig) (*RunResult, error) {
+	content := []provider.ContentBlock{{Type: "text", Text: task}}
+	return l.RunWithContent(ctx, content, config)
+}
+
+// RunWithContent executes the Decide->Act loop with pre-built content blocks.
+// This supports multimodal messages (e.g., images + text).
+func (l *Loop) RunWithContent(ctx context.Context, content []provider.ContentBlock, config LoopConfig) (*RunResult, error) {
 	// Initialize conversation — resume from session or start fresh
 	messages := l.session.Messages()
 	taskMsg := provider.Message{
 		Role:    provider.RoleUser,
-		Content: []provider.ContentBlock{{Type: "text", Text: task}},
+		Content: content,
 	}
 	if len(messages) == 0 {
 		messages = []provider.Message{taskMsg}
@@ -474,6 +481,8 @@ func estimateMessageTokens(msgs []provider.Message) int {
 				total += h.Count(string(b.Input))
 			case "tool_result":
 				total += h.Count(b.ResultContent)
+			case "image":
+				total += 1600 // approximate token cost per image
 			}
 		}
 	}

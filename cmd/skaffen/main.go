@@ -307,8 +307,18 @@ func runPrint() error {
 		fmt.Fprintln(os.Stderr, "skaffen: plan mode (read-only)")
 	}
 
+	// Expand @mentions: extract images first, then text files
+	workDir := cfg.WorkDir()
+	displayText, imageBlocks := tui.ExpandImageMentions(prompt, workDir)
+	expandedPrompt := tui.ExpandAtMentions(displayText, workDir)
+
 	// Run agent loop
-	result, err := a.Run(ctx, prompt)
+	var result *agent.RunResult
+	if len(imageBlocks) > 0 {
+		result, err = a.RunWithImages(ctx, expandedPrompt, imageBlocks)
+	} else {
+		result, err = a.Run(ctx, expandedPrompt)
+	}
 	if err != nil {
 		return err
 	}

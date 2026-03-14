@@ -143,10 +143,24 @@ func (a *Agent) ThinkingBudget() int {
 	return 0
 }
 
+// RunWithImages executes the OODARC loop with image content blocks prepended.
+func (a *Agent) RunWithImages(ctx context.Context, task string, images []provider.ContentBlock) (*RunResult, error) {
+	var content []provider.ContentBlock
+	content = append(content, images...)
+	content = append(content, provider.ContentBlock{Type: "text", Text: task})
+	return a.runWithContent(ctx, content)
+}
+
 // Run executes the OODARC loop for a given task by delegating to agentloop.Loop.
 // It translates the current phase into SelectionHints and bridges the
 // phase-typed agent interfaces to the phase-agnostic agentloop interfaces.
 func (a *Agent) Run(ctx context.Context, task string) (*RunResult, error) {
+	content := []provider.ContentBlock{{Type: "text", Text: task}}
+	return a.runWithContent(ctx, content)
+}
+
+// runWithContent is the shared implementation for Run and RunWithImages.
+func (a *Agent) runWithContent(ctx context.Context, content []provider.ContentBlock) (*RunResult, error) {
 	phase := a.fsm.Current()
 
 	// Build a flat registry containing only tools allowed for this phase
@@ -187,7 +201,7 @@ func (a *Agent) Run(ctx context.Context, task string) (*RunResult, error) {
 		PlanMode: a.PlanMode(),
 	}
 
-	result, err := loop.Run(ctx, task, config)
+	result, err := loop.RunWithContent(ctx, content, config)
 	if err != nil {
 		return nil, err
 	}

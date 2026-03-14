@@ -426,11 +426,13 @@ func (m *appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.running = true
 		m.lastPrompt = msg.Text
-		// Render user message (original text with @mentions)
+		// Extract image @mentions first (produces ContentBlocks + display text with badges)
+		displayText, imageBlocks := ExpandImageMentions(msg.Text, m.workDir)
+		// Render user message with badges for images
 		userStyle := lipgloss.NewStyle().Foreground(theme.Current().Semantic().Primary.Color()).Bold(true)
-		m.viewport.AppendContent("\n" + userStyle.Render("You") + "\n" + msg.Text + "\n")
-		// Expand @file mentions before sending to agent
-		expanded := expandAtMentions(msg.Text, m.workDir)
+		m.viewport.AppendContent("\n" + userStyle.Render("You") + "\n" + displayText + "\n")
+		// Expand remaining @file mentions (non-images) before sending to agent
+		expanded := expandAtMentions(displayText, m.workDir)
 		// Implicit trigger matching — auto-activate matching skills
 		matched := skill.MatchTriggers(m.skills, msg.Text)
 		for _, d := range matched {
@@ -446,7 +448,11 @@ func (m *appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		// Prepend any pending skill injections + pinned skill injections
 		prompt := m.buildSkillPrompt(expanded)
-		cmds = append(cmds, m.runAgent(prompt))
+		if len(imageBlocks) > 0 {
+			cmds = append(cmds, m.runAgentWithImages(prompt, imageBlocks))
+		} else {
+			cmds = append(cmds, m.runAgent(prompt))
+		}
 
 	case streamEventMsg:
 		m.handleStreamEvent(agent.StreamEvent(msg))
@@ -797,6 +803,26 @@ func (m *appModel) runAgent(prompt string) tea.Cmd {
 	return tea.Batch(agentCmd, m.spinner.Tick())
 }
 
+func (m *appModel) runAgentWithImages(prompt string, imageBlocks []provider.ContentBlock) tea.Cmd {
+	a := m.agent
+	ctx, cancel := context.WithCancel(context.Background())
+	m.cancelRun = cancel
+	m.spinner = spinner.New()
+	m.spinner.Label = "Thinking"
+	agentCmd := func() tea.Msg {
+		if a == nil {
+			cancel()
+			return agentDoneMsg{Err: fmt.Errorf("no agent configured")}
+		}
+		result, err := a.RunWithImages(ctx, prompt, imageBlocks)
+		if err != nil {
+			return agentDoneMsg{Err: err}
+		}
+		return agentDoneMsg{Response: result.Response}
+	}
+	return tea.Batch(agentCmd, m.spinner.Tick())
+}
+
 // buildSkillPrompt prepends pending skill injections and pinned skill bodies
 // to the user's message. Clears pendingSkills after consumption.
 func (m *appModel) buildSkillPrompt(userMessage string) string {
@@ -905,6 +931,12 @@ func expandAtMentions(text, workDir string) string {
 		}
 		return fmt.Sprintf("[File: %s]\n%s\n[/File]", path, string(content))
 	})
+}
+
+// ExpandAtMentions is the exported version of expandAtMentions for use by
+// print mode and other callers outside the TUI package.
+func ExpandAtMentions(text, workDir string) string {
+	return expandAtMentions(text, workDir)
 }
 
 // renderDiffPreview generates a diff preview for edit and write tool calls.
