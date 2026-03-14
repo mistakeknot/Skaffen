@@ -649,10 +649,10 @@ func (m *appModel) View() string {
 	meterView := renderMeterRow(m.contextMeter, m.tokenSpark, m.width)
 
 	// Logo sits above viewport, taking space from viewport height.
-	// Chrome height: 1 scroll-hint + 3 prompt + 1 blank + 1 breadcrumb
-	//              + 1 blank + 1 meter + 1 status = 9
+	// Chrome height: 1 scroll-hint + 3 prompt + 1 rule + 1 breadcrumb
+	//              + 1 rule + 1 meter + 1 rule + 1 status = 10
 	logoHeight := strings.Count(logoView, "\n")
-	vpHeight := m.height - 9 - logoHeight
+	vpHeight := m.height - 10 - logoHeight
 	if vpHeight < 1 {
 		vpHeight = 1
 	}
@@ -668,7 +668,7 @@ func (m *appModel) View() string {
 	// Thin rules between status sections — lighter than blank lines.
 	ruleStyle := lipgloss.NewStyle().Foreground(theme.Current().Semantic().Border.Color())
 	rule := ruleStyle.Render(strings.Repeat("─", m.width))
-	statusArea := lipgloss.JoinVertical(lipgloss.Left, rule, crumbView, rule, meterView, statusView)
+	statusArea := lipgloss.JoinVertical(lipgloss.Left, rule, crumbView, rule, meterView, rule, statusView)
 
 	if m.approving {
 		return lipgloss.JoinVertical(lipgloss.Left, logoView, vpView, scrollHint, m.approvalQ.View(), statusArea)
