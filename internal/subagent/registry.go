@@ -13,7 +13,19 @@ import (
 
 // TypeRegistry holds subagent type definitions.
 type TypeRegistry struct {
-	types map[string]SubagentType
+	types        map[string]SubagentType
+	defaultModel string // runtime override for subagents without explicit model
+}
+
+// SetDefaultModel sets a default model for all subagents that don't specify
+// their own. Pass empty string to clear and revert to provider default.
+func (r *TypeRegistry) SetDefaultModel(model string) {
+	r.defaultModel = model
+}
+
+// DefaultModel returns the current default model override, or empty string.
+func (r *TypeRegistry) DefaultModel() string {
+	return r.defaultModel
 }
 
 // NewTypeRegistry creates a registry with built-in types and loads custom

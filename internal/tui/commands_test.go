@@ -10,6 +10,7 @@ import (
 	"github.com/mistakeknot/Skaffen/internal/command"
 	"github.com/mistakeknot/Skaffen/internal/provider"
 	"github.com/mistakeknot/Skaffen/internal/session"
+	"github.com/mistakeknot/Skaffen/internal/subagent"
 )
 
 func TestParseSlashCommand(t *testing.T) {
@@ -200,14 +201,45 @@ func TestExecuteCommand_Verbose(t *testing.T) {
 	}
 }
 
-func TestExecuteCommand_ModelShow(t *testing.T) {
+func TestExecuteCommand_ModelOpensOverlay(t *testing.T) {
 	m := newTestModel()
 	result := m.executeCommand(&Command{Name: "model"})
 	if result.IsError {
 		t.Fatal("model should not error")
 	}
-	if !strings.Contains(result.Message, "opus") {
-		t.Fatalf("model should show model name, got: %s", result.Message)
+	if !m.settingsOpen {
+		t.Fatal("/model with no args should open the model selector overlay")
+	}
+	// Overlay should have at least an orchestrator entry
+	entries := m.settingsOverlay.Entries()
+	if len(entries) == 0 {
+		t.Fatal("model overlay should have entries")
+	}
+	if entries[0].Key != "orchestrator" {
+		t.Fatalf("first entry should be 'orchestrator', got %q", entries[0].Key)
+	}
+	// Value should show current model
+	if entries[0].Value != "opus" {
+		t.Fatalf("orchestrator value should be 'opus', got %q", entries[0].Value)
+	}
+}
+
+func TestExecuteCommand_ModelOverlayWithSubagents(t *testing.T) {
+	m := newTestModel()
+	m.subagentRegistry = subagent.NewTypeRegistry("")
+	result := m.executeCommand(&Command{Name: "model"})
+	if result.IsError {
+		t.Fatal("model should not error")
+	}
+	entries := m.settingsOverlay.Entries()
+	if len(entries) < 2 {
+		t.Fatalf("with subagents, model overlay should have >= 2 entries, got %d", len(entries))
+	}
+	if entries[1].Key != "subagents" {
+		t.Fatalf("second entry should be 'subagents', got %q", entries[1].Key)
+	}
+	if entries[1].Value != "inherit" {
+		t.Fatalf("subagent default should be 'inherit', got %q", entries[1].Value)
 	}
 }
 

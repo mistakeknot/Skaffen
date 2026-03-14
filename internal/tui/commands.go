@@ -25,10 +25,11 @@ type Command struct {
 
 // CommandResult is the output of executing a command.
 type CommandResult struct {
-	Message string
-	IsError bool
-	Quit    bool   // true for /quit — signals tea.Quit
-	Retry   string // non-empty = re-submit this text as a prompt
+	Message     string
+	IsError     bool
+	Quit        bool   // true for /quit — signals tea.Quit
+	Retry       string // non-empty = re-submit this text as a prompt
+	ShowFromTop bool   // scroll viewport to show this result from the top
 }
 
 // ParseCommand parses a slash command from input text.
@@ -61,7 +62,7 @@ func KnownCommands() map[string]string {
 		"map":      "Show repository structure with Go symbols",
 		"help":     "Show available commands (? for keyboard shortcuts)",
 		"history":  "Show recent prompt history",
-		"model":    "Show or switch model (opus, sonnet, haiku)",
+		"model":    "Model selector — orchestrator and subagent routing",
 		"phase":    "Show current OODARC phase",
 		"plan":     "Toggle plan mode (read-only tools only)",
 		"quit":     "Exit Skaffen",
@@ -149,7 +150,7 @@ func (m *appModel) formatHelp() string {
 func (m *appModel) executeCommand(cmd *Command) CommandResult {
 	switch cmd.Name {
 	case "help":
-		return CommandResult{Message: m.formatHelp()}
+		return CommandResult{Message: m.formatHelp(), ShowFromTop: true}
 
 	case "quit":
 		return CommandResult{Message: "Goodbye!", Quit: true}
@@ -455,7 +456,7 @@ func (m *appModel) execSkillsList() CommandResult {
 			b.WriteString(fmt.Sprintf("    /%s — %s%s\n", d.Name, d.Description, pinned))
 		}
 	}
-	return CommandResult{Message: b.String()}
+	return CommandResult{Message: b.String(), ShowFromTop: true}
 }
 
 func (m *appModel) execSkillsInfo(name string) CommandResult {
@@ -540,36 +541,97 @@ var validModels = map[string]string{
 	"haiku":  "claude-haiku-4-5-20251001",
 }
 
+// modelAliases returns sorted model alias names.
+func modelAliases() []string {
+	return []string{"opus", "sonnet", "haiku"}
+}
+
+// resolveModelAlias converts short aliases to canonical model IDs.
+func resolveModelAlias(alias string) string {
+	if canonical, ok := validModels[alias]; ok {
+		return canonical
+	}
+	return alias
+}
+
 func (m *appModel) execModel(args []string) CommandResult {
-	// /model — show current
-	if len(args) == 0 {
-		return CommandResult{Message: fmt.Sprintf("Model: %s", m.modelName)}
-	}
-
-	alias := strings.ToLower(args[0])
-	canonical, ok := validModels[alias]
-	if !ok {
-		names := make([]string, 0, len(validModels))
-		for k := range validModels {
-			names = append(names, k)
+	// /model <alias> — quick switch (keeps the fast path)
+	if len(args) > 0 {
+		alias := strings.ToLower(args[0])
+		canonical, ok := validModels[alias]
+		if !ok {
+			return CommandResult{
+				Message: fmt.Sprintf("Unknown model %q. Available: %s", args[0], strings.Join(modelAliases(), ", ")),
+				IsError: true,
+			}
 		}
-		sort.Strings(names)
-		return CommandResult{
-			Message: fmt.Sprintf("Unknown model %q. Available: %s", args[0], strings.Join(names, ", ")),
-			IsError: true,
+		if m.agent == nil {
+			return CommandResult{Message: "No agent configured.", IsError: true}
+		}
+		if !m.agent.SetModelOverride(alias) {
+			return CommandResult{Message: "Router does not support model switching.", IsError: true}
+		}
+		m.modelName = alias
+		return CommandResult{Message: fmt.Sprintf("Switched to %s (%s)", alias, canonical)}
+	}
+
+	// /model — open interactive overlay
+	entries := m.buildModelEntries()
+	m.settingsOverlay = msettings.New("Model Selector", entries).SetWidth(m.width)
+	m.settingsOpen = true
+	return CommandResult{} // overlay renders in View
+}
+
+// buildModelEntries creates settings entries for the model selector overlay.
+func (m *appModel) buildModelEntries() []msettings.Entry {
+	// Current orchestrator model
+	current := m.modelName
+	override := ""
+	if m.agent != nil {
+		override = m.agent.ModelOverride()
+	}
+	orchestratorVal := current
+	if override != "" {
+		// Show the alias if it's a canonical ID
+		for alias, canonical := range validModels {
+			if canonical == override {
+				orchestratorVal = alias
+				break
+			}
 		}
 	}
 
-	if m.agent == nil {
-		return CommandResult{Message: "No agent configured.", IsError: true}
+	entries := []msettings.Entry{
+		{
+			Key:         "orchestrator",
+			Description: "Primary model for your conversation",
+			Type:        msettings.TypeEnum,
+			Value:       orchestratorVal,
+			Options:     modelAliases(),
+		},
 	}
 
-	if !m.agent.SetModelOverride(alias) {
-		return CommandResult{Message: "Router does not support model switching.", IsError: true}
+	// Subagent default model (if subagents are configured)
+	if m.subagentRegistry != nil {
+		subModel := "inherit"
+		if dm := m.subagentRegistry.DefaultModel(); dm != "" {
+			for alias, canonical := range validModels {
+				if canonical == dm || alias == dm {
+					subModel = alias
+					break
+				}
+			}
+		}
+		entries = append(entries, msettings.Entry{
+			Key:         "subagents",
+			Description: "Default model for subagent tasks",
+			Type:        msettings.TypeEnum,
+			Value:       subModel,
+			Options:     []string{"inherit", "opus", "sonnet", "haiku"},
+		})
 	}
 
-	m.modelName = alias
-	return CommandResult{Message: fmt.Sprintf("Switched to %s (%s)", alias, canonical)}
+	return entries
 }
 
 func (m *appModel) execSettings(args []string) CommandResult {
@@ -612,7 +674,7 @@ func (m *appModel) execGitDiff() CommandResult {
 	if strings.TrimSpace(d) == "" {
 		return CommandResult{Message: "No changes."}
 	}
-	return CommandResult{Message: d}
+	return CommandResult{Message: d, ShowFromTop: true}
 }
 
 func (m *appModel) execGitUndo() CommandResult {
@@ -688,7 +750,7 @@ func (m *appModel) execHistory(args []string) CommandResult {
 	if len(entries) > limit {
 		b.WriteString(fmt.Sprintf("  ... %d more (Ctrl+R to search)\n", len(entries)-limit))
 	}
-	return CommandResult{Message: b.String()}
+	return CommandResult{Message: b.String(), ShowFromTop: true}
 }
 
 func (m *appModel) execListSessions() CommandResult {
@@ -713,7 +775,7 @@ func (m *appModel) execListSessions() CommandResult {
 		b.WriteString(fmt.Sprintf("  ... and %d more\n", len(sessions)-10))
 	}
 	b.WriteString("\nResume with: skaffen -r <session-id>")
-	return CommandResult{Message: b.String()}
+	return CommandResult{Message: b.String(), ShowFromTop: true}
 }
 
 const compactKeepRecent = 4 // keep last 4 messages (2 turns) after compaction
@@ -833,7 +895,7 @@ func (m *appModel) execMap(args []string) CommandResult {
 		return CommandResult{Message: "No Go source files found."}
 	}
 
-	return CommandResult{Message: output}
+	return CommandResult{Message: output, ShowFromTop: true}
 }
 
 // execFork creates a fork of the current session.

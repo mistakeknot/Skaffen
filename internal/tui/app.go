@@ -81,6 +81,7 @@ func Run(cfg Config) error {
 		})
 		si.AgentTool.SetRunner(runner)
 		m.subagents = newSubagentTracker()
+		m.subagentRegistry = si.Registry
 	}
 	if m.agent != nil {
 		// Wire StreamCallback → tea.Program.Send so agent events reach the
@@ -201,7 +202,8 @@ type appModel struct {
 	lastPrompt string
 
 	// Subagent tracker for inline status rendering
-	subagents *subagentTracker
+	subagents        *subagentTracker
+	subagentRegistry *subagent.TypeRegistry // for /model subagent settings
 
 	// Tool timers: track start time of in-flight tool calls by name
 	toolTimers map[string]time.Time
@@ -484,6 +486,24 @@ func (m *appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case msettings.ChangedMsg:
 		if !m.settingsOpen {
+			break
+		}
+		// Handle model selector entries
+		if msg.Key == "orchestrator" {
+			if m.agent != nil {
+				m.agent.SetModelOverride(msg.NewValue)
+				m.modelName = msg.NewValue
+			}
+			break
+		}
+		if msg.Key == "subagents" {
+			if m.subagentRegistry != nil {
+				if msg.NewValue == "inherit" {
+					m.subagentRegistry.SetDefaultModel("")
+				} else {
+					m.subagentRegistry.SetDefaultModel(resolveModelAlias(msg.NewValue))
+				}
+			}
 			break
 		}
 		if _, err := ApplySetting(&m.settings, msg.Key, msg.NewValue); err != nil {

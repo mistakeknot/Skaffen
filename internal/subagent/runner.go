@@ -125,6 +125,8 @@ func (r *Runner) runOne(ctx context.Context, task SubagentTask) SubagentResult {
 	router := &agentloop.NoOpRouter{}
 	if st.Model != "" {
 		router.Model = st.Model
+	} else if dm := r.registry.DefaultModel(); dm != "" {
+		router.Model = dm
 	}
 
 	r.emitStatus(StatusUpdate{ID: task.ID, Description: task.Description, Status: StatusRunning})
