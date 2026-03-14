@@ -44,15 +44,15 @@ func TestAppModelLifecycle(t *testing.T) {
 	if view == "" {
 		t.Fatal("view should not be empty after resize")
 	}
-	if !strings.Contains(view, "build") {
+	if !strings.Contains(view, "act") {
 		t.Fatal("status bar should show default phase")
 	}
 }
 
 func TestNewAppModelDefaults(t *testing.T) {
 	m := newAppModel(Config{})
-	if m.phase != "build" {
-		t.Errorf("default phase = %q, want build", m.phase)
+	if m.phase != "act" {
+		t.Errorf("default phase = %q, want act", m.phase)
 	}
 	if m.modelName != "opus" {
 		t.Errorf("default modelName = %q, want opus", m.modelName)
@@ -830,31 +830,31 @@ func TestShellEscapeBareExclamation(t *testing.T) {
 
 // --- Breadcrumb Sync ---
 
-func TestSyncBreadcrumbBuildPhase(t *testing.T) {
+func TestSyncBreadcrumbActPhase(t *testing.T) {
 	m := newAppModel(Config{})
-	m.phase = "build"
+	m.phase = "act"
 	m.syncBreadcrumb()
 
 	view := m.crumbs.View()
-	// brainstorm and plan should be done (✓), build should be active (●)
+	// orient and decide should be done (✓), act should be active (●)
 	if !strings.Contains(view, "✓") {
 		t.Fatal("completed phases should have ✓ marker")
 	}
 	if !strings.Contains(view, "●") {
 		t.Fatal("active phase should have ● marker")
 	}
-	if !strings.Contains(view, "build") {
+	if !strings.Contains(view, "act") {
 		t.Fatal("breadcrumb should contain current phase")
 	}
 }
 
 func TestSyncBreadcrumbFirstPhase(t *testing.T) {
 	m := newAppModel(Config{})
-	m.phase = "brainstorm"
+	m.phase = "orient"
 	m.syncBreadcrumb()
 
 	view := m.crumbs.View()
-	// brainstorm is first — no done markers expected
+	// orient is first — no done markers expected
 	if strings.Contains(view, "✓") {
 		t.Fatal("first phase should have no completed phases")
 	}
@@ -865,16 +865,16 @@ func TestSyncBreadcrumbFirstPhase(t *testing.T) {
 
 func TestSyncBreadcrumbLastPhase(t *testing.T) {
 	m := newAppModel(Config{})
-	m.phase = "ship"
+	m.phase = "compound"
 	m.syncBreadcrumb()
 
 	view := m.crumbs.View()
-	// All phases before ship should be done
+	// All phases before compound should be done
 	if !strings.Contains(view, "✓") {
 		t.Fatal("previous phases should be marked done")
 	}
-	if !strings.Contains(view, "ship") {
-		t.Fatal("breadcrumb should show ship phase")
+	if !strings.Contains(view, "compound") {
+		t.Fatal("breadcrumb should show compound phase")
 	}
 }
 

@@ -21,7 +21,7 @@ func TestLoadConfigDefaults(t *testing.T) {
 func TestLoadConfigFromJSON(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "routing.json")
-	data := `{"phases": {"brainstorm": "sonnet", "build": "haiku"}, "budget": {"max_tokens": 500000, "mode": "graceful", "degrade_at": 0.8}}`
+	data := `{"phases": {"orient": "sonnet", "act": "haiku"}, "budget": {"max_tokens": 500000, "mode": "graceful", "degrade_at": 0.8}}`
 	if err := os.WriteFile(path, []byte(data), 0644); err != nil {
 		t.Fatal(err)
 	}
@@ -29,11 +29,11 @@ func TestLoadConfigFromJSON(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if cfg.Phases[tool.PhaseBrainstorm] != "sonnet" {
-		t.Errorf("brainstorm = %q, want sonnet", cfg.Phases[tool.PhaseBrainstorm])
+	if cfg.Phases[tool.PhaseOrient] != "sonnet" {
+		t.Errorf("orient = %q, want sonnet", cfg.Phases[tool.PhaseOrient])
 	}
-	if cfg.Phases[tool.PhaseBuild] != "haiku" {
-		t.Errorf("build = %q, want haiku", cfg.Phases[tool.PhaseBuild])
+	if cfg.Phases[tool.PhaseAct] != "haiku" {
+		t.Errorf("act = %q, want haiku", cfg.Phases[tool.PhaseAct])
 	}
 	if cfg.Budget == nil || cfg.Budget.MaxTokens != 500000 {
 		t.Errorf("budget max_tokens = %v, want 500000", cfg.Budget)
@@ -45,33 +45,33 @@ func TestLoadConfigFromJSON(t *testing.T) {
 
 func TestEnvVarOverride(t *testing.T) {
 	cfg := &Config{}
-	t.Setenv("SKAFFEN_MODEL_BUILD", "haiku")
-	got := cfg.envOverride(tool.PhaseBuild)
+	t.Setenv("SKAFFEN_MODEL_ACT", "haiku")
+	got := cfg.envOverride(tool.PhaseAct)
 	if got != "haiku" {
-		t.Errorf("envOverride(build) = %q, want haiku", got)
+		t.Errorf("envOverride(act) = %q, want haiku", got)
 	}
 }
 
 func TestEnvVarOverrideMissing(t *testing.T) {
 	cfg := &Config{}
-	got := cfg.envOverride(tool.PhaseBuild)
+	got := cfg.envOverride(tool.PhaseAct)
 	if got != "" {
-		t.Errorf("envOverride(build) = %q, want empty", got)
+		t.Errorf("envOverride(act) = %q, want empty", got)
 	}
 }
 
 func TestResolutionOrder(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "routing.json")
-	data := `{"phases": {"brainstorm": "haiku"}}`
+	data := `{"phases": {"orient": "haiku"}}`
 	if err := os.WriteFile(path, []byte(data), 0644); err != nil {
 		t.Fatal(err)
 	}
 	cfg, _ := LoadConfig(path)
-	t.Setenv("SKAFFEN_MODEL_BRAINSTORM", "sonnet")
+	t.Setenv("SKAFFEN_MODEL_ORIENT", "sonnet")
 
 	r := New(cfg)
-	model, reason := r.SelectModel(tool.PhaseBrainstorm)
+	model, reason := r.SelectModel(tool.PhaseOrient)
 	if model != ModelSonnet {
 		t.Errorf("model = %q, want %q (env should override JSON)", model, ModelSonnet)
 	}
@@ -130,26 +130,26 @@ func TestLoadConfigBudgetDefaults(t *testing.T) {
 func TestMergeConfigPhases(t *testing.T) {
 	base := &Config{
 		Phases: map[tool.Phase]string{
-			tool.PhaseBuild:     "sonnet",
-			tool.PhaseBrainstorm: "haiku",
+			tool.PhaseAct:     "sonnet",
+			tool.PhaseOrient: "haiku",
 		},
 	}
 	project := &Config{
 		Phases: map[tool.Phase]string{
-			tool.PhaseBuild: "opus", // override
+			tool.PhaseAct: "opus", // override
 		},
 	}
 	merged := MergeConfig(base, project)
 
-	if merged.Phases[tool.PhaseBuild] != "opus" {
-		t.Errorf("build = %q, want opus (project override)", merged.Phases[tool.PhaseBuild])
+	if merged.Phases[tool.PhaseAct] != "opus" {
+		t.Errorf("act = %q, want opus (project override)", merged.Phases[tool.PhaseAct])
 	}
-	if merged.Phases[tool.PhaseBrainstorm] != "haiku" {
-		t.Errorf("brainstorm = %q, want haiku (base preserved)", merged.Phases[tool.PhaseBrainstorm])
+	if merged.Phases[tool.PhaseOrient] != "haiku" {
+		t.Errorf("orient = %q, want haiku (base preserved)", merged.Phases[tool.PhaseOrient])
 	}
 	// Verify base is NOT mutated
-	if base.Phases[tool.PhaseBuild] != "sonnet" {
-		t.Errorf("base.build mutated to %q, want sonnet", base.Phases[tool.PhaseBuild])
+	if base.Phases[tool.PhaseAct] != "sonnet" {
+		t.Errorf("base.act mutated to %q, want sonnet", base.Phases[tool.PhaseAct])
 	}
 }
 
@@ -173,15 +173,15 @@ func TestMergeConfigBudget(t *testing.T) {
 
 func TestMergeConfigEmpty(t *testing.T) {
 	base := &Config{
-		Phases: map[tool.Phase]string{tool.PhaseBuild: "sonnet"},
+		Phases: map[tool.Phase]string{tool.PhaseAct: "sonnet"},
 		Budget: &BudgetConfig{MaxTokens: 100000},
 	}
 	project := &Config{
 		Phases: map[tool.Phase]string{},
 	}
 	merged := MergeConfig(base, project)
-	if merged.Phases[tool.PhaseBuild] != "sonnet" {
-		t.Errorf("build = %q, want sonnet (base preserved)", merged.Phases[tool.PhaseBuild])
+	if merged.Phases[tool.PhaseAct] != "sonnet" {
+		t.Errorf("act = %q, want sonnet (base preserved)", merged.Phases[tool.PhaseAct])
 	}
 	if merged.Budget == nil || merged.Budget.MaxTokens != 100000 {
 		t.Error("budget should be preserved from base")
@@ -191,12 +191,12 @@ func TestMergeConfigEmpty(t *testing.T) {
 func TestMergeConfigNilMaps(t *testing.T) {
 	base := &Config{} // Phases and ContextWindows both nil
 	project := &Config{
-		Phases:         map[tool.Phase]string{tool.PhaseBuild: "opus"},
+		Phases:         map[tool.Phase]string{tool.PhaseAct: "opus"},
 		ContextWindows: map[string]int{"opus": 200000},
 	}
 	merged := MergeConfig(base, project)
-	if merged.Phases[tool.PhaseBuild] != "opus" {
-		t.Errorf("build = %q, want opus", merged.Phases[tool.PhaseBuild])
+	if merged.Phases[tool.PhaseAct] != "opus" {
+		t.Errorf("act = %q, want opus", merged.Phases[tool.PhaseAct])
 	}
 	if merged.ContextWindows["opus"] != 200000 {
 		t.Errorf("context_windows[opus] = %d, want 200000", merged.ContextWindows["opus"])
@@ -205,7 +205,7 @@ func TestMergeConfigNilMaps(t *testing.T) {
 
 func TestMergeConfigNoAlias(t *testing.T) {
 	base := &Config{
-		Phases: map[tool.Phase]string{tool.PhaseBuild: "sonnet"},
+		Phases: map[tool.Phase]string{tool.PhaseAct: "sonnet"},
 		ContextWindows: map[string]int{"sonnet": 200000},
 	}
 	project := &Config{
@@ -214,10 +214,10 @@ func TestMergeConfigNoAlias(t *testing.T) {
 	merged := MergeConfig(base, project)
 
 	// Mutate merged — should NOT affect base
-	merged.Phases[tool.PhaseReview] = "haiku"
+	merged.Phases[tool.PhaseReflect] = "haiku"
 	merged.ContextWindows["haiku"] = 100000
 
-	if _, ok := base.Phases[tool.PhaseReview]; ok {
+	if _, ok := base.Phases[tool.PhaseReflect]; ok {
 		t.Error("mutating merged.Phases affected base.Phases (aliased)")
 	}
 	if _, ok := base.ContextWindows["haiku"]; ok {

@@ -38,109 +38,109 @@ func toolNames(defs []ToolDef) map[string]bool {
 	return m
 }
 
-func TestRegistry_BrainstormPhase(t *testing.T) {
+func TestRegistry_OrientPhase(t *testing.T) {
 	r := newRegistryWithStubs()
-	names := toolNames(r.Tools(PhaseBrainstorm))
+	names := toolNames(r.Tools(PhaseOrient))
 
 	want := map[string]bool{"read": true, "glob": true, "grep": true, "ls": true}
 	notWant := []string{"write", "edit", "bash"}
 
 	for name := range want {
 		if !names[name] {
-			t.Errorf("brainstorm: missing %q", name)
+			t.Errorf("orient: missing %q", name)
 		}
 	}
 	for _, name := range notWant {
 		if names[name] {
-			t.Errorf("brainstorm: should not have %q", name)
+			t.Errorf("orient: should not have %q", name)
 		}
 	}
 }
 
-func TestRegistry_BuildPhase(t *testing.T) {
+func TestRegistry_ActPhase(t *testing.T) {
 	r := newRegistryWithStubs()
-	names := toolNames(r.Tools(PhaseBuild))
+	names := toolNames(r.Tools(PhaseAct))
 
 	for _, name := range allBuiltinNames() {
 		if !names[name] {
-			t.Errorf("build: missing %q", name)
+			t.Errorf("act: missing %q", name)
 		}
 	}
 	if len(names) != 7 {
-		t.Errorf("build: got %d tools, want 7", len(names))
+		t.Errorf("act: got %d tools, want 7", len(names))
 	}
 }
 
-func TestRegistry_ReviewPhase(t *testing.T) {
+func TestRegistry_ReflectPhase(t *testing.T) {
 	r := newRegistryWithStubs()
-	names := toolNames(r.Tools(PhaseReview))
+	names := toolNames(r.Tools(PhaseReflect))
 
-	// Phase softening: Review includes edit (rate-limited to 3 calls)
+	// Phase softening: Reflect includes edit (rate-limited to 3 calls)
 	want := []string{"read", "glob", "grep", "ls", "bash", "edit"}
 	notWant := []string{"write"}
 
 	for _, name := range want {
 		if !names[name] {
-			t.Errorf("review: missing %q", name)
+			t.Errorf("reflect: missing %q", name)
 		}
 	}
 	for _, name := range notWant {
 		if names[name] {
-			t.Errorf("review: should not have %q", name)
+			t.Errorf("reflect: should not have %q", name)
 		}
 	}
 
 	// Verify constraint properties
-	gc, ok := r.Constraint(PhaseReview, "edit")
+	gc, ok := r.Constraint(PhaseReflect, "edit")
 	if !ok {
-		t.Fatal("review: edit should be gated")
+		t.Fatal("reflect: edit should be gated")
 	}
 	if gc == nil {
-		t.Fatal("review: edit should have constraints")
+		t.Fatal("reflect: edit should have constraints")
 	}
 	if gc.RateLimit != 3 {
-		t.Errorf("review edit rate limit = %d, want 3", gc.RateLimit)
+		t.Errorf("reflect edit rate limit = %d, want 3", gc.RateLimit)
 	}
 	if !gc.RequirePrompt {
-		t.Error("review edit should require prompt")
+		t.Error("reflect edit should require prompt")
 	}
 }
 
-func TestRegistry_ShipPhase(t *testing.T) {
+func TestRegistry_CompoundPhase(t *testing.T) {
 	r := newRegistryWithStubs()
-	names := toolNames(r.Tools(PhaseShip))
+	names := toolNames(r.Tools(PhaseCompound))
 
-	// Phase softening: Ship includes edit/write (manifest globs only)
+	// Phase softening: Compound includes edit/write (manifest globs only)
 	want := []string{"read", "glob", "ls", "bash", "edit", "write"}
 	notWant := []string{"grep"}
 
 	for _, name := range want {
 		if !names[name] {
-			t.Errorf("ship: missing %q", name)
+			t.Errorf("compound: missing %q", name)
 		}
 	}
 	for _, name := range notWant {
 		if names[name] {
-			t.Errorf("ship: should not have %q", name)
+			t.Errorf("compound: should not have %q", name)
 		}
 	}
 
 	// Verify constraints
 	for _, tool := range []string{"edit", "write"} {
-		gc, ok := r.Constraint(PhaseShip, tool)
+		gc, ok := r.Constraint(PhaseCompound, tool)
 		if !ok {
-			t.Errorf("ship: %s should be gated", tool)
+			t.Errorf("compound: %s should be gated", tool)
 			continue
 		}
 		if gc == nil || len(gc.AllowedGlobs) == 0 {
-			t.Errorf("ship: %s should have file glob constraints", tool)
+			t.Errorf("compound: %s should have file glob constraints", tool)
 		}
 	}
 }
 
 func TestRegistry_ExecuteDisallowed(t *testing.T) {
 	r := newRegistryWithStubs()
-	result := r.Execute(context.Background(), PhaseBrainstorm, "write", nil)
+	result := r.Execute(context.Background(), PhaseOrient, "write", nil)
 	if !result.IsError {
 		t.Error("expected error for disallowed tool")
 	}
@@ -151,7 +151,7 @@ func TestRegistry_ExecuteDisallowed(t *testing.T) {
 
 func TestRegistry_ExecuteUnknown(t *testing.T) {
 	r := newRegistryWithStubs()
-	result := r.Execute(context.Background(), PhaseBuild, "nonexistent", nil)
+	result := r.Execute(context.Background(), PhaseAct, "nonexistent", nil)
 	if !result.IsError {
 		t.Error("expected error for unknown tool")
 	}
@@ -159,7 +159,7 @@ func TestRegistry_ExecuteUnknown(t *testing.T) {
 
 func TestRegistry_ExecuteAllowed(t *testing.T) {
 	r := newRegistryWithStubs()
-	result := r.Execute(context.Background(), PhaseBuild, "read", nil)
+	result := r.Execute(context.Background(), PhaseAct, "read", nil)
 	if result.IsError {
 		t.Errorf("unexpected error: %s", result.Content)
 	}
@@ -173,16 +173,16 @@ func TestRegistry_RuntimeRegistration(t *testing.T) {
 	custom := &stubTool{name: "custom_mcp"}
 	r.Register(custom)
 
-	// Custom tool should be available in build phase
-	names := toolNames(r.Tools(PhaseBuild))
+	// Custom tool should be available in act phase
+	names := toolNames(r.Tools(PhaseAct))
 	if !names["custom_mcp"] {
-		t.Error("custom tool not in build phase")
+		t.Error("custom tool not in act phase")
 	}
 
-	// But not in brainstorm
-	names = toolNames(r.Tools(PhaseBrainstorm))
+	// But not in orient
+	names = toolNames(r.Tools(PhaseOrient))
 	if names["custom_mcp"] {
-		t.Error("custom tool should not be in brainstorm phase")
+		t.Error("custom tool should not be in orient phase")
 	}
 }
 
@@ -205,30 +205,30 @@ func TestRegistry_Get(t *testing.T) {
 func TestRegistry_RegisterForPhases(t *testing.T) {
 	r := NewRegistry()
 	custom := &stubTool{name: "mcp_search"}
-	r.RegisterForPhases(custom, []Phase{PhaseBrainstorm, PhaseBuild})
+	r.RegisterForPhases(custom, []Phase{PhaseOrient, PhaseAct})
 
-	// Available in brainstorm
-	names := toolNames(r.Tools(PhaseBrainstorm))
+	// Available in orient
+	names := toolNames(r.Tools(PhaseOrient))
 	if !names["mcp_search"] {
-		t.Error("mcp_search should be in brainstorm")
+		t.Error("mcp_search should be in orient")
 	}
 
-	// Available in build
-	names = toolNames(r.Tools(PhaseBuild))
+	// Available in act
+	names = toolNames(r.Tools(PhaseAct))
 	if !names["mcp_search"] {
-		t.Error("mcp_search should be in build")
+		t.Error("mcp_search should be in act")
 	}
 
-	// NOT available in review
-	names = toolNames(r.Tools(PhaseReview))
+	// NOT available in reflect
+	names = toolNames(r.Tools(PhaseReflect))
 	if names["mcp_search"] {
-		t.Error("mcp_search should not be in review")
+		t.Error("mcp_search should not be in reflect")
 	}
 
-	// NOT available in ship
-	names = toolNames(r.Tools(PhaseShip))
+	// NOT available in compound
+	names = toolNames(r.Tools(PhaseCompound))
 	if names["mcp_search"] {
-		t.Error("mcp_search should not be in ship")
+		t.Error("mcp_search should not be in compound")
 	}
 }
 
@@ -237,15 +237,15 @@ func TestRegistry_RegisterForPhases_Empty(t *testing.T) {
 	custom := &stubTool{name: "mcp_nophase"}
 	r.RegisterForPhases(custom, nil)
 
-	// Default: build only
-	names := toolNames(r.Tools(PhaseBuild))
+	// Default: act only
+	names := toolNames(r.Tools(PhaseAct))
 	if !names["mcp_nophase"] {
-		t.Error("nil phases should default to build")
+		t.Error("nil phases should default to act")
 	}
 
-	names = toolNames(r.Tools(PhaseBrainstorm))
+	names = toolNames(r.Tools(PhaseOrient))
 	if names["mcp_nophase"] {
-		t.Error("should not be in brainstorm with nil phases")
+		t.Error("should not be in orient with nil phases")
 	}
 }
 
@@ -256,7 +256,7 @@ func TestPlanMode_ToolsFiltered(t *testing.T) {
 	r.SetPlanMode(true)
 
 	// Phases that include all four read-only tools in their gates
-	for _, phase := range []Phase{PhaseBrainstorm, PhasePlan, PhaseBuild, PhaseReview} {
+	for _, phase := range []Phase{PhaseOrient, PhaseDecide, PhaseAct, PhaseReflect} {
 		names := toolNames(r.Tools(phase))
 		for _, want := range []string{"read", "glob", "grep", "ls"} {
 			if !names[want] {
@@ -275,21 +275,21 @@ func TestPlanMode_RespectsPhaseGates(t *testing.T) {
 	r := newRegistryWithStubs()
 	r.SetPlanMode(true)
 
-	// PhaseShip excludes "grep" — plan mode must not re-enable it
-	names := toolNames(r.Tools(PhaseShip))
+	// PhaseCompound excludes "grep" — plan mode must not re-enable it
+	names := toolNames(r.Tools(PhaseCompound))
 	if names["grep"] {
-		t.Error("plan mode in ship phase should not include grep (excluded by phase gate)")
+		t.Error("plan mode in compound phase should not include grep (excluded by phase gate)")
 	}
 	// But "read", "glob", "ls" are both read-only AND phase-allowed
 	for _, want := range []string{"read", "glob", "ls"} {
 		if !names[want] {
-			t.Errorf("plan mode ship: missing %q", want)
+			t.Errorf("plan mode compound: missing %q", want)
 		}
 	}
 	// Write tools still blocked
 	for _, block := range []string{"write", "edit", "bash"} {
 		if names[block] {
-			t.Errorf("plan mode ship: should not have %q", block)
+			t.Errorf("plan mode compound: should not have %q", block)
 		}
 	}
 }
@@ -299,7 +299,7 @@ func TestPlanMode_ExecuteBlocked(t *testing.T) {
 	r.SetPlanMode(true)
 
 	for _, tool := range []string{"write", "edit", "bash"} {
-		result := r.Execute(context.Background(), PhaseBuild, tool, nil)
+		result := r.Execute(context.Background(), PhaseAct, tool, nil)
 		if !result.IsError {
 			t.Errorf("plan mode: %q should be blocked", tool)
 		}
@@ -314,7 +314,7 @@ func TestPlanMode_ExecuteAllowed(t *testing.T) {
 	r.SetPlanMode(true)
 
 	for _, tool := range []string{"read", "glob", "grep", "ls"} {
-		result := r.Execute(context.Background(), PhaseBuild, tool, nil)
+		result := r.Execute(context.Background(), PhaseAct, tool, nil)
 		if result.IsError {
 			t.Errorf("plan mode: %q should be allowed, got: %s", tool, result.Content)
 		}
@@ -328,7 +328,7 @@ func TestPlanMode_Toggle(t *testing.T) {
 	if r.PlanMode() {
 		t.Error("plan mode should be off by default")
 	}
-	names := toolNames(r.Tools(PhaseBuild))
+	names := toolNames(r.Tools(PhaseAct))
 	if !names["write"] {
 		t.Error("write should be available with plan mode off")
 	}
@@ -338,7 +338,7 @@ func TestPlanMode_Toggle(t *testing.T) {
 	if !r.PlanMode() {
 		t.Error("plan mode should be on")
 	}
-	names = toolNames(r.Tools(PhaseBuild))
+	names = toolNames(r.Tools(PhaseAct))
 	if names["write"] {
 		t.Error("write should not be available with plan mode on")
 	}
@@ -348,7 +348,7 @@ func TestPlanMode_Toggle(t *testing.T) {
 	if r.PlanMode() {
 		t.Error("plan mode should be off again")
 	}
-	names = toolNames(r.Tools(PhaseBuild))
+	names = toolNames(r.Tools(PhaseAct))
 	if !names["write"] {
 		t.Error("write should be available after disabling plan mode")
 	}
@@ -359,11 +359,11 @@ func TestPlanMode_MCPToolsBlocked(t *testing.T) {
 	// Register a read-only tool and a write-capable MCP tool
 	r.Register(&stubTool{name: "read"})
 	mcp := &stubTool{name: "mcp_deploy"}
-	r.RegisterForPhases(mcp, []Phase{PhaseBuild})
+	r.RegisterForPhases(mcp, []Phase{PhaseAct})
 
 	r.SetPlanMode(true)
 
-	names := toolNames(r.Tools(PhaseBuild))
+	names := toolNames(r.Tools(PhaseAct))
 	if names["mcp_deploy"] {
 		t.Error("MCP tool should be blocked in plan mode")
 	}
@@ -403,25 +403,25 @@ func (m *mockPlainTool) Execute(_ context.Context, _ json.RawMessage) ToolResult
 func TestRegistryCallsPhasedTool(t *testing.T) {
 	r := NewRegistry()
 	phased := &mockPhasedTool{}
-	r.RegisterForPhases(phased, []Phase{PhaseBrainstorm, PhaseBuild})
+	r.RegisterForPhases(phased, []Phase{PhaseOrient, PhaseAct})
 
-	result := r.Execute(context.Background(), PhaseBrainstorm, "mock_phased", json.RawMessage(`{}`))
-	if result.Content != "phased:brainstorm" {
-		t.Errorf("expected 'phased:brainstorm', got %q", result.Content)
+	result := r.Execute(context.Background(), PhaseOrient, "mock_phased", json.RawMessage(`{}`))
+	if result.Content != "phased:orient" {
+		t.Errorf("expected 'phased:orient', got %q", result.Content)
 	}
-	if phased.calledPhase != PhaseBrainstorm {
-		t.Errorf("expected phase brainstorm, got %q", phased.calledPhase)
+	if phased.calledPhase != PhaseOrient {
+		t.Errorf("expected phase orient, got %q", phased.calledPhase)
 	}
 }
 
 func TestRegistryCallsPhasedToolBuildPhase(t *testing.T) {
 	r := NewRegistry()
 	phased := &mockPhasedTool{}
-	r.RegisterForPhases(phased, []Phase{PhaseBrainstorm, PhaseBuild})
+	r.RegisterForPhases(phased, []Phase{PhaseOrient, PhaseAct})
 
-	result := r.Execute(context.Background(), PhaseBuild, "mock_phased", json.RawMessage(`{}`))
-	if result.Content != "phased:build" {
-		t.Errorf("expected 'phased:build', got %q", result.Content)
+	result := r.Execute(context.Background(), PhaseAct, "mock_phased", json.RawMessage(`{}`))
+	if result.Content != "phased:act" {
+		t.Errorf("expected 'phased:act', got %q", result.Content)
 	}
 }
 
@@ -429,7 +429,7 @@ func TestRegistryCallsPlainToolUnchanged(t *testing.T) {
 	r := NewRegistry()
 	r.Register(&mockPlainTool{})
 
-	result := r.Execute(context.Background(), PhaseBuild, "mock_plain", json.RawMessage(`{}`))
+	result := r.Execute(context.Background(), PhaseAct, "mock_plain", json.RawMessage(`{}`))
 	if result.Content != "plain" {
 		t.Errorf("expected 'plain', got %q", result.Content)
 	}
@@ -439,7 +439,7 @@ func TestPlanMode_ErrorMessage(t *testing.T) {
 	r := newRegistryWithStubs()
 	r.SetPlanMode(true)
 
-	result := r.Execute(context.Background(), PhaseBuild, "write", nil)
+	result := r.Execute(context.Background(), PhaseAct, "write", nil)
 	if !result.IsError {
 		t.Fatal("expected error")
 	}
@@ -456,14 +456,14 @@ func TestSoftening_ReviewEditRateLimit(t *testing.T) {
 
 	// First 3 calls should succeed
 	for i := 0; i < 3; i++ {
-		result := r.Execute(context.Background(), PhaseReview, "edit", json.RawMessage(`{"file_path":"/tmp/test.go","old_string":"a","new_string":"b"}`))
+		result := r.Execute(context.Background(), PhaseReflect, "edit", json.RawMessage(`{"file_path":"/tmp/test.go","old_string":"a","new_string":"b"}`))
 		if result.IsError {
 			t.Errorf("call %d: unexpected error: %s", i+1, result.Content)
 		}
 	}
 
 	// 4th call should be rate-limited
-	result := r.Execute(context.Background(), PhaseReview, "edit", json.RawMessage(`{"file_path":"/tmp/test.go","old_string":"a","new_string":"b"}`))
+	result := r.Execute(context.Background(), PhaseReflect, "edit", json.RawMessage(`{"file_path":"/tmp/test.go","old_string":"a","new_string":"b"}`))
 	if !result.IsError {
 		t.Error("4th edit call should be rate-limited")
 	}
@@ -477,14 +477,14 @@ func TestSoftening_ReviewEditRateLimitReset(t *testing.T) {
 
 	// Use 3 calls
 	for i := 0; i < 3; i++ {
-		r.Execute(context.Background(), PhaseReview, "edit", json.RawMessage(`{"file_path":"/tmp/test.go","old_string":"a","new_string":"b"}`))
+		r.Execute(context.Background(), PhaseReflect, "edit", json.RawMessage(`{"file_path":"/tmp/test.go","old_string":"a","new_string":"b"}`))
 	}
 
 	// Reset counters (simulates phase transition)
 	r.ResetRateCounts()
 
 	// Should work again
-	result := r.Execute(context.Background(), PhaseReview, "edit", json.RawMessage(`{"file_path":"/tmp/test.go","old_string":"a","new_string":"b"}`))
+	result := r.Execute(context.Background(), PhaseReflect, "edit", json.RawMessage(`{"file_path":"/tmp/test.go","old_string":"a","new_string":"b"}`))
 	if result.IsError {
 		t.Errorf("after reset, edit should work: %s", result.Content)
 	}
@@ -494,19 +494,19 @@ func TestSoftening_ShipEditManifestAllowed(t *testing.T) {
 	r := newRegistryWithStubs()
 
 	// Editing a markdown file should work in Ship phase
-	result := r.Execute(context.Background(), PhaseShip, "edit", json.RawMessage(`{"file_path":"/project/README.md","old_string":"old","new_string":"new"}`))
+	result := r.Execute(context.Background(), PhaseCompound, "edit", json.RawMessage(`{"file_path":"/project/README.md","old_string":"old","new_string":"new"}`))
 	if result.IsError {
 		t.Errorf("ship edit *.md should be allowed: %s", result.Content)
 	}
 
 	// Editing a CHANGELOG should work
-	result = r.Execute(context.Background(), PhaseShip, "write", json.RawMessage(`{"file_path":"/project/CHANGELOG.md","content":"new"}`))
+	result = r.Execute(context.Background(), PhaseCompound, "write", json.RawMessage(`{"file_path":"/project/CHANGELOG.md","content":"new"}`))
 	if result.IsError {
 		t.Errorf("ship write CHANGELOG should be allowed: %s", result.Content)
 	}
 
 	// Editing a JSON file should work
-	result = r.Execute(context.Background(), PhaseShip, "edit", json.RawMessage(`{"file_path":"/project/package.json","old_string":"1.0","new_string":"1.1"}`))
+	result = r.Execute(context.Background(), PhaseCompound, "edit", json.RawMessage(`{"file_path":"/project/package.json","old_string":"1.0","new_string":"1.1"}`))
 	if result.IsError {
 		t.Errorf("ship edit *.json should be allowed: %s", result.Content)
 	}
@@ -516,19 +516,19 @@ func TestSoftening_ShipEditCodeBlocked(t *testing.T) {
 	r := newRegistryWithStubs()
 
 	// Editing a Go file should be blocked in Ship phase
-	result := r.Execute(context.Background(), PhaseShip, "edit", json.RawMessage(`{"file_path":"/project/main.go","old_string":"old","new_string":"new"}`))
+	result := r.Execute(context.Background(), PhaseCompound, "edit", json.RawMessage(`{"file_path":"/project/main.go","old_string":"old","new_string":"new"}`))
 	if !result.IsError {
 		t.Error("ship edit *.go should be blocked")
 	}
 
 	// Editing a Python file should be blocked
-	result = r.Execute(context.Background(), PhaseShip, "write", json.RawMessage(`{"file_path":"/project/app.py","content":"code"}`))
+	result = r.Execute(context.Background(), PhaseCompound, "write", json.RawMessage(`{"file_path":"/project/app.py","content":"code"}`))
 	if !result.IsError {
 		t.Error("ship write *.py should be blocked")
 	}
 
 	// Editing a TypeScript file should be blocked
-	result = r.Execute(context.Background(), PhaseShip, "edit", json.RawMessage(`{"file_path":"/project/index.ts","old_string":"a","new_string":"b"}`))
+	result = r.Execute(context.Background(), PhaseCompound, "edit", json.RawMessage(`{"file_path":"/project/index.ts","old_string":"a","new_string":"b"}`))
 	if !result.IsError {
 		t.Error("ship edit *.ts should be blocked")
 	}
@@ -538,12 +538,12 @@ func TestSoftening_BuildPhaseUnconstrained(t *testing.T) {
 	r := newRegistryWithStubs()
 
 	// Build phase should have no constraints on edit/write
-	result := r.Execute(context.Background(), PhaseBuild, "edit", json.RawMessage(`{"file_path":"/project/main.go","old_string":"a","new_string":"b"}`))
+	result := r.Execute(context.Background(), PhaseAct, "edit", json.RawMessage(`{"file_path":"/project/main.go","old_string":"a","new_string":"b"}`))
 	if result.IsError {
 		t.Errorf("build edit should be unconstrained: %s", result.Content)
 	}
 
-	result = r.Execute(context.Background(), PhaseBuild, "write", json.RawMessage(`{"file_path":"/project/main.go","content":"code"}`))
+	result = r.Execute(context.Background(), PhaseAct, "write", json.RawMessage(`{"file_path":"/project/main.go","content":"code"}`))
 	if result.IsError {
 		t.Errorf("build write should be unconstrained: %s", result.Content)
 	}

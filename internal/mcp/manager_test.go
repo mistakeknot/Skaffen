@@ -22,7 +22,7 @@ func TestManager_LoadAll_RegistersTools(t *testing.T) {
 	tomlPath := filepath.Join(dir, "plugins.toml")
 	tomlContent := `[plugins.echo-plugin]
 path = "` + filepath.Join(pluginDir, "plugin.json") + `"
-phases = ["brainstorm", "build"]
+phases = ["orient", "act"]
 `
 	os.WriteFile(tomlPath, []byte(tomlContent), 0o644)
 
@@ -44,31 +44,31 @@ phases = ["brainstorm", "build"]
 		t.Fatalf("LoadAll: %v", err)
 	}
 
-	// Check that echo tool is registered in brainstorm phase
+	// Check that echo tool is registered in orient phase
 	names := make(map[string]bool)
-	for _, td := range reg.Tools(tool.PhaseBrainstorm) {
+	for _, td := range reg.Tools(tool.PhaseOrient) {
 		names[td.Name] = true
 	}
 	if !names["echo-plugin_echo-plugin_echo"] {
-		t.Errorf("echo tool not in brainstorm. Available: %v", names)
+		t.Errorf("echo tool not in orient. Available: %v", names)
 	}
 
-	// Check that echo tool is registered in build phase
+	// Check that echo tool is registered in act phase
 	names = make(map[string]bool)
-	for _, td := range reg.Tools(tool.PhaseBuild) {
+	for _, td := range reg.Tools(tool.PhaseAct) {
 		names[td.Name] = true
 	}
 	if !names["echo-plugin_echo-plugin_echo"] {
-		t.Errorf("echo tool not in build. Available: %v", names)
+		t.Errorf("echo tool not in act. Available: %v", names)
 	}
 
-	// Check that echo tool is NOT in review phase
+	// Check that echo tool is NOT in reflect phase
 	names = make(map[string]bool)
-	for _, td := range reg.Tools(tool.PhaseReview) {
+	for _, td := range reg.Tools(tool.PhaseReflect) {
 		names[td.Name] = true
 	}
 	if names["echo-plugin_echo-plugin_echo"] {
-		t.Error("echo tool should not be in review phase")
+		t.Error("echo tool should not be in reflect phase")
 	}
 }
 
@@ -78,7 +78,7 @@ func TestManager_ExecuteThroughRegistry(t *testing.T) {
 	cfg := map[string]PluginConfig{
 		"echo": {
 			Name:   "echo",
-			Phases: []string{"build"},
+			Phases: []string{"act"},
 			Servers: map[string]ServerConfig{
 				"echo": {
 					Type:    "stdio",
@@ -99,7 +99,7 @@ func TestManager_ExecuteThroughRegistry(t *testing.T) {
 		t.Fatalf("LoadAll: %v", err)
 	}
 
-	result := reg.Execute(ctx, tool.PhaseBuild, "echo_echo_echo", []byte(`{"text":"round-trip"}`))
+	result := reg.Execute(ctx, tool.PhaseAct, "echo_echo_echo", []byte(`{"text":"round-trip"}`))
 	if result.IsError {
 		t.Fatalf("Execute error: %s", result.Content)
 	}
@@ -114,7 +114,7 @@ func TestManager_Shutdown(t *testing.T) {
 	cfg := map[string]PluginConfig{
 		"echo": {
 			Name:   "echo",
-			Phases: []string{"build"},
+			Phases: []string{"act"},
 			Servers: map[string]ServerConfig{
 				"echo": {Type: "stdio", Command: binary},
 			},
@@ -131,7 +131,7 @@ func TestManager_Shutdown(t *testing.T) {
 	mgr.Shutdown()
 
 	// After shutdown, tool calls should return errors
-	result := reg.Execute(ctx, tool.PhaseBuild, "echo_echo_echo", []byte(`{"text":"dead"}`))
+	result := reg.Execute(ctx, tool.PhaseAct, "echo_echo_echo", []byte(`{"text":"dead"}`))
 	if !result.IsError {
 		t.Error("expected error after shutdown")
 	}
@@ -141,7 +141,7 @@ func TestManager_MissingServer_GracefulDegradation(t *testing.T) {
 	cfg := map[string]PluginConfig{
 		"broken": {
 			Name:   "broken",
-			Phases: []string{"build"},
+			Phases: []string{"act"},
 			Servers: map[string]ServerConfig{
 				"broken": {Type: "stdio", Command: "/nonexistent/binary"},
 			},
@@ -163,7 +163,7 @@ func TestManager_MissingServer_GracefulDegradation(t *testing.T) {
 
 	// No tools should be registered for the broken plugin
 	names := make(map[string]bool)
-	for _, td := range reg.Tools(tool.PhaseBuild) {
+	for _, td := range reg.Tools(tool.PhaseAct) {
 		names[td.Name] = true
 	}
 	if names["broken_broken_echo"] {
@@ -184,7 +184,7 @@ func TestManager_EndToEnd_ConfigToExecution(t *testing.T) {
 	tomlPath := filepath.Join(dir, "plugins.toml")
 	tomlContent := `[plugins.e2e]
 path = "` + filepath.Join(pluginDir, "plugin.json") + `"
-phases = ["build"]
+phases = ["act"]
 `
 	os.WriteFile(tomlPath, []byte(tomlContent), 0o644)
 
@@ -209,7 +209,7 @@ phases = ["build"]
 	}
 
 	// Step 4: Execute MCP tool through the registry (same path as agent loop)
-	result := reg.Execute(ctx, tool.PhaseBuild, "e2e_e2e_echo", []byte(`{"text":"integration"}`))
+	result := reg.Execute(ctx, tool.PhaseAct, "e2e_e2e_echo", []byte(`{"text":"integration"}`))
 	if result.IsError {
 		t.Fatalf("Execute error: %s", result.Content)
 	}
@@ -217,9 +217,9 @@ phases = ["build"]
 		t.Errorf("Content = %q, want %q", result.Content, "echo: integration")
 	}
 
-	// Step 5: Verify phase gating (not in brainstorm)
-	result = reg.Execute(ctx, tool.PhaseBrainstorm, "e2e_e2e_echo", []byte(`{"text":"blocked"}`))
+	// Step 5: Verify phase gating (not in orient)
+	result = reg.Execute(ctx, tool.PhaseOrient, "e2e_e2e_echo", []byte(`{"text":"blocked"}`))
 	if !result.IsError {
-		t.Error("expected error for brainstorm phase (tool only in build)")
+		t.Error("expected error for orient phase (tool only in act)")
 	}
 }

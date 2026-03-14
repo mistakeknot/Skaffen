@@ -243,11 +243,11 @@ func newAppModel(cfg Config) *appModel {
 	}
 	bc := breadcrumb.New(80)
 	bc.SetSteps([]breadcrumb.Step{
-		{Label: "brainstorm", Status: breadcrumb.Pending},
-		{Label: "plan", Status: breadcrumb.Pending},
-		{Label: "build", Status: breadcrumb.Active},
-		{Label: "review", Status: breadcrumb.Pending},
-		{Label: "ship", Status: breadcrumb.Pending},
+		{Label: "orient", Status: breadcrumb.Pending},
+		{Label: "decide", Status: breadcrumb.Pending},
+		{Label: "act", Status: breadcrumb.Active},
+		{Label: "reflect", Status: breadcrumb.Pending},
+		{Label: "compound", Status: breadcrumb.Pending},
 	})
 	return &appModel{
 		viewport:     vp,
@@ -265,7 +265,7 @@ func newAppModel(cfg Config) *appModel {
 		settings:     s,
 		skaffenVer:   skVer,
 		masaqVer:     mqVer,
-		phase:        "build",
+		phase:        "act",
 		modelName:    "opus",
 		logo:         newLogoModel(skVer, mqVer),
 		customCmds:    cfg.CustomCommands,

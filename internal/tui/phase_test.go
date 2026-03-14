@@ -8,7 +8,7 @@ import (
 )
 
 func TestPhaseColorAllPhases(t *testing.T) {
-	phases := []string{"brainstorm", "plan", "build", "review", "ship"}
+	phases := []string{"orient", "decide", "act", "reflect", "compound"}
 	for _, p := range phases {
 		c := phaseColor(p)
 		if c == lipgloss.Color("") {
@@ -25,11 +25,11 @@ func TestPhaseColorUnknown(t *testing.T) {
 }
 
 func TestPhaseTransition(t *testing.T) {
-	result := PhaseTransition("build", "review")
-	if !strings.Contains(result, "build") {
+	result := PhaseTransition("act", "reflect")
+	if !strings.Contains(result, "act") {
 		t.Fatal("transition should contain 'from' phase")
 	}
-	if !strings.Contains(result, "review") {
+	if !strings.Contains(result, "reflect") {
 		t.Fatal("transition should contain 'to' phase")
 	}
 	if !strings.Contains(result, "→") {
@@ -42,11 +42,11 @@ func TestNextPhase(t *testing.T) {
 		current string
 		want    string
 	}{
-		{"brainstorm", "plan"},
-		{"plan", "build"},
-		{"build", "review"},
-		{"review", "ship"},
-		{"ship", ""},
+		{"orient", "decide"},
+		{"decide", "act"},
+		{"act", "reflect"},
+		{"reflect", "compound"},
+		{"compound", ""},
 		{"unknown", ""},
 	}
 	for _, tt := range tests {
@@ -58,8 +58,8 @@ func TestNextPhase(t *testing.T) {
 }
 
 func TestPhaseLabel(t *testing.T) {
-	label := PhaseLabel("build")
-	if !strings.Contains(label, "build") {
+	label := PhaseLabel("act")
+	if !strings.Contains(label, "act") {
 		t.Fatal("PhaseLabel should contain phase name")
 	}
 }

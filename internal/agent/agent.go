@@ -64,7 +64,7 @@ func New(p provider.Provider, reg *tool.Registry, opts ...Option) *Agent {
 		router:   &NoOpRouter{},
 		session:  &NoOpSession{},
 		emitter:  &NoOpEmitter{},
-		fsm:      newPhaseFSM(tool.PhaseBuild),
+		fsm:      newPhaseFSM(tool.PhaseAct),
 		maxTurns: 100,
 	}
 	for _, opt := range opts {

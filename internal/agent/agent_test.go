@@ -166,10 +166,10 @@ func TestContextCancellation(t *testing.T) {
 }
 
 func TestPhaseGateRejection(t *testing.T) {
-	// In brainstorm phase, model tries to use "write" (not allowed)
+	// In orient phase, model tries to use "write" (not allowed)
 	mp := &mockProvider{
 		responses: []*provider.StreamResponse{
-			// Turn 1: tries write (disallowed in brainstorm)
+			// Turn 1: tries write (disallowed in orient)
 			mockStream(
 				provider.StreamEvent{Type: provider.EventToolUseStart, ID: "tu_1", Name: "write"},
 				provider.StreamEvent{Type: provider.EventToolUseDelta, Text: `{"file_path":"/tmp/x","content":"bad"}`},
@@ -186,7 +186,7 @@ func TestPhaseGateRejection(t *testing.T) {
 	reg := tool.NewRegistry()
 	tool.RegisterBuiltins(reg)
 
-	a := New(mp, reg, WithMaxTurns(10), WithStartPhase(tool.PhaseBrainstorm))
+	a := New(mp, reg, WithMaxTurns(10), WithStartPhase(tool.PhaseOrient))
 	result, err := a.Run(context.Background(), "write a file")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -275,14 +275,14 @@ func (e *recordingEmitter) Emit(ev Evidence) error {
 // --- Phase FSM Tests ---
 
 func TestPhaseFSMAdvance(t *testing.T) {
-	fsm := newPhaseFSM(tool.PhaseBrainstorm)
+	fsm := newPhaseFSM(tool.PhaseOrient)
 
 	expected := []tool.Phase{
-		tool.PhaseBrainstorm,
-		tool.PhasePlan,
-		tool.PhaseBuild,
-		tool.PhaseReview,
-		tool.PhaseShip,
+		tool.PhaseOrient,
+		tool.PhaseDecide,
+		tool.PhaseAct,
+		tool.PhaseReflect,
+		tool.PhaseCompound,
 	}
 
 	for i, want := range expected {
@@ -297,11 +297,11 @@ func TestPhaseFSMAdvance(t *testing.T) {
 	}
 }
 
-func TestPhaseFSMAdvancePastShip(t *testing.T) {
-	fsm := newPhaseFSM(tool.PhaseShip)
+func TestPhaseFSMAdvancePastCompound(t *testing.T) {
+	fsm := newPhaseFSM(tool.PhaseCompound)
 	err := fsm.Advance()
 	if err == nil {
-		t.Error("expected error advancing past ship")
+		t.Error("expected error advancing past compound")
 	}
 }
 
@@ -310,9 +310,9 @@ func TestPhaseFSMIsTerminal(t *testing.T) {
 		phase    tool.Phase
 		terminal bool
 	}{
-		{tool.PhaseBrainstorm, false},
-		{tool.PhaseBuild, false},
-		{tool.PhaseShip, true},
+		{tool.PhaseOrient, false},
+		{tool.PhaseAct, false},
+		{tool.PhaseCompound, true},
 	}
 
 	for _, tt := range tests {
@@ -323,32 +323,32 @@ func TestPhaseFSMIsTerminal(t *testing.T) {
 	}
 }
 
-func TestPhaseFSMStartAtBuild(t *testing.T) {
-	fsm := newPhaseFSM(tool.PhaseBuild)
-	if fsm.Current() != tool.PhaseBuild {
-		t.Errorf("current = %q, want %q", fsm.Current(), tool.PhaseBuild)
+func TestPhaseFSMStartAtAct(t *testing.T) {
+	fsm := newPhaseFSM(tool.PhaseAct)
+	if fsm.Current() != tool.PhaseAct {
+		t.Errorf("current = %q, want %q", fsm.Current(), tool.PhaseAct)
 	}
 	if err := fsm.Advance(); err != nil {
 		t.Fatalf("advance: %v", err)
 	}
-	if fsm.Current() != tool.PhaseReview {
-		t.Errorf("after advance: current = %q, want %q", fsm.Current(), tool.PhaseReview)
+	if fsm.Current() != tool.PhaseReflect {
+		t.Errorf("after advance: current = %q, want %q", fsm.Current(), tool.PhaseReflect)
 	}
 }
 
 func TestAgentPhaseTransition(t *testing.T) {
 	mp := &mockProvider{}
 	reg := tool.NewRegistry()
-	a := New(mp, reg, WithStartPhase(tool.PhaseBrainstorm))
+	a := New(mp, reg, WithStartPhase(tool.PhaseOrient))
 
-	if a.CurrentPhase() != tool.PhaseBrainstorm {
-		t.Errorf("phase = %q, want brainstorm", a.CurrentPhase())
+	if a.CurrentPhase() != tool.PhaseOrient {
+		t.Errorf("phase = %q, want orient", a.CurrentPhase())
 	}
 	if err := a.AdvancePhase(); err != nil {
 		t.Fatalf("advance: %v", err)
 	}
-	if a.CurrentPhase() != tool.PhasePlan {
-		t.Errorf("phase = %q, want plan", a.CurrentPhase())
+	if a.CurrentPhase() != tool.PhaseDecide {
+		t.Errorf("phase = %q, want decide", a.CurrentPhase())
 	}
 }
 

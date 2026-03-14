@@ -8,11 +8,12 @@ import (
 
 // phaseOrder is the canonical OODARC phase sequence.
 var phaseOrder = []tool.Phase{
-	tool.PhaseBrainstorm,
-	tool.PhasePlan,
-	tool.PhaseBuild,
-	tool.PhaseReview,
-	tool.PhaseShip,
+	tool.PhaseObserve,
+	tool.PhaseOrient,
+	tool.PhaseDecide,
+	tool.PhaseAct,
+	tool.PhaseReflect,
+	tool.PhaseCompound,
 }
 
 // phaseFSM manages phase transitions.
@@ -45,7 +46,7 @@ func (f *phaseFSM) Advance() error {
 	return nil
 }
 
-// IsTerminal returns true if we're at the last phase (ship).
+// IsTerminal returns true if we're at the last phase (compound).
 func (f *phaseFSM) IsTerminal() bool {
 	return f.index >= len(phaseOrder)-1
 }

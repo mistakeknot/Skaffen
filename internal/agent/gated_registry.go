@@ -11,11 +11,12 @@ import (
 
 // DefaultGates defines which tools are available per OODARC phase.
 var DefaultGates = map[string]map[string]bool{
-	string(tool.PhaseBrainstorm): {"read": true, "glob": true, "grep": true, "ls": true},
-	string(tool.PhasePlan):       {"read": true, "glob": true, "grep": true, "ls": true},
-	string(tool.PhaseBuild):      {"read": true, "write": true, "edit": true, "bash": true, "grep": true, "glob": true, "ls": true},
-	string(tool.PhaseReview):     {"read": true, "glob": true, "grep": true, "ls": true, "bash": true},
-	string(tool.PhaseShip):       {"read": true, "glob": true, "ls": true, "bash": true},
+	string(tool.PhaseObserve):  {"read": true, "glob": true, "grep": true, "ls": true},
+	string(tool.PhaseOrient):   {"read": true, "glob": true, "grep": true, "ls": true},
+	string(tool.PhaseDecide):   {"read": true, "glob": true, "grep": true, "ls": true},
+	string(tool.PhaseAct):      {"read": true, "write": true, "edit": true, "bash": true, "grep": true, "glob": true, "ls": true},
+	string(tool.PhaseReflect):  {"read": true, "glob": true, "grep": true, "ls": true, "bash": true},
+	string(tool.PhaseCompound): {"read": true, "glob": true, "ls": true, "bash": true},
 }
 
 // GatedRegistry wraps an agentloop.Registry with phase-based access gating.

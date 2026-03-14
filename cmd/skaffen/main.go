@@ -43,7 +43,7 @@ import (
 var (
 	flagProvider = flag.String("provider", "", "LLM provider: claude-code (default), anthropic")
 	flagModel    = flag.String("model", "", "Model override")
-	flagPhase    = flag.String("phase", "build", "OODARC phase (brainstorm, plan, build, review, ship)")
+	flagPhase    = flag.String("phase", "act", "OODARC phase (orient, decide, act, reflect, compound)")
 	flagPrompt   = flag.String("p", "", "Prompt text (reads stdin if empty)")
 	flagMaxTurns = flag.Int("max-turns", 100, "Maximum agent loop turns")
 	flagSystem   = flag.String("system", "", "System prompt")
@@ -146,7 +146,7 @@ func initConfig() (*config.Config, *router.Config, map[string]mcp.PluginConfig, 
 		if routerCfg.Phases == nil {
 			routerCfg.Phases = make(map[tool.Phase]string)
 		}
-		for _, ph := range []tool.Phase{tool.PhaseBrainstorm, tool.PhasePlan, tool.PhaseBuild, tool.PhaseReview, tool.PhaseShip} {
+		for _, ph := range []tool.Phase{tool.PhaseOrient, tool.PhaseDecide, tool.PhaseAct, tool.PhaseReflect, tool.PhaseCompound} {
 			routerCfg.Phases[ph] = *flagModel
 		}
 	}
@@ -192,10 +192,10 @@ func runPrint() error {
 	// Validate phase
 	phase := tool.Phase(*flagPhase)
 	switch phase {
-	case tool.PhaseBrainstorm, tool.PhasePlan, tool.PhaseBuild, tool.PhaseReview, tool.PhaseShip:
+	case tool.PhaseOrient, tool.PhaseDecide, tool.PhaseAct, tool.PhaseReflect, tool.PhaseCompound:
 		// valid
 	default:
-		return fmt.Errorf("invalid phase %q (must be brainstorm, plan, build, review, or ship)", *flagPhase)
+		return fmt.Errorf("invalid phase %q (must be orient, decide, act, reflect, or compound)", *flagPhase)
 	}
 
 	// Read prompt from -p flag or stdin
@@ -429,7 +429,7 @@ func runTUI() error {
 	// Subagent system: registry + tool + runner (runner wired after TUI starts)
 	subReg := subagent.NewTypeRegistry(filepath.Join(cfg.WorkDir(), ".skaffen", "agents"))
 	agentTool := subagent.NewAgentTool(subReg, nil) // runner set lazily
-	reg.RegisterForPhases(&agentloopToolBridge{inner: agentTool}, []tool.Phase{tool.PhaseBuild})
+	reg.RegisterForPhases(&agentloopToolBridge{inner: agentTool}, []tool.Phase{tool.PhaseAct})
 
 	// Create agent
 	a := agent.New(p, reg, opts...)

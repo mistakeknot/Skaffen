@@ -75,11 +75,11 @@ func (t *WebSearchTool) ExecuteWithPhase(ctx context.Context, phase Phase, param
 
 func (t *WebSearchTool) tierForPhase(phase Phase) string {
 	switch phase {
-	case PhaseBrainstorm:
+	case PhaseOrient:
 		return "deep"
-	case PhasePlan:
+	case PhaseDecide:
 		return "auto"
-	case PhaseBuild:
+	case PhaseAct:
 		return "instant"
 	default:
 		return "auto"

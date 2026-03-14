@@ -17,7 +17,7 @@ func makeEvidence(turn int) agent.Evidence {
 	return agent.Evidence{
 		Timestamp:  "2026-03-11T12:00:00Z",
 		SessionID:  "test-session",
-		Phase:      tool.PhaseBuild,
+		Phase:      tool.PhaseAct,
 		TurnNumber: turn,
 		ToolCalls:  []string{"read", "edit"},
 		TokensIn:   100,

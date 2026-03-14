@@ -45,23 +45,26 @@ var manifestGlobs = []string{
 	"*.md", "CHANGELOG*", "VERSION*", "*.json", "*.yaml", "*.yml", "*.toml", "*.txt",
 }
 
-// defaultGates defines which tools are available per phase with constraints.
+// defaultGates defines which tools are available per OODARC phase with constraints.
 var defaultGates = map[Phase]map[string]*GateConstraint{
-	PhaseBrainstorm: {
+	PhaseObserve: {
 		"read": nil, "glob": nil, "grep": nil, "ls": nil,
 	},
-	PhasePlan: {
+	PhaseOrient: {
 		"read": nil, "glob": nil, "grep": nil, "ls": nil,
 	},
-	PhaseBuild: {
+	PhaseDecide: {
+		"read": nil, "glob": nil, "grep": nil, "ls": nil,
+	},
+	PhaseAct: {
 		"read": nil, "write": nil, "edit": nil, "bash": nil,
 		"grep": nil, "glob": nil, "ls": nil,
 	},
-	PhaseReview: {
+	PhaseReflect: {
 		"read": nil, "glob": nil, "grep": nil, "ls": nil, "bash": nil,
 		"edit": {RateLimit: 3, RequirePrompt: true},
 	},
-	PhaseShip: {
+	PhaseCompound: {
 		"read": nil, "glob": nil, "ls": nil, "bash": nil,
 		"edit":  {AllowedGlobs: manifestGlobs},
 		"write": {AllowedGlobs: manifestGlobs},
@@ -118,22 +121,22 @@ func (r *Registry) ResetRateCounts() {
 }
 
 // Register adds a tool to the registry. It is automatically allowed in
-// the build phase (extension point for MCP tools in v0.2).
+// the act phase (extension point for MCP tools in v0.2).
 func (r *Registry) Register(t Tool) {
 	r.tools[t.Name()] = t
-	// Ensure dynamically registered tools are available in build phase
-	if r.gates[PhaseBuild] == nil {
-		r.gates[PhaseBuild] = make(map[string]*GateConstraint)
+	// Ensure dynamically registered tools are available in act phase
+	if r.gates[PhaseAct] == nil {
+		r.gates[PhaseAct] = make(map[string]*GateConstraint)
 	}
-	r.gates[PhaseBuild][t.Name()] = nil // unconstrained
+	r.gates[PhaseAct][t.Name()] = nil // unconstrained
 }
 
 // RegisterForPhases adds a tool to the registry, gated to specific phases.
-// If phases is nil or empty, defaults to build-only (same as Register).
+// If phases is nil or empty, defaults to act-only (same as Register).
 func (r *Registry) RegisterForPhases(t Tool, phases []Phase) {
 	r.tools[t.Name()] = t
 	if len(phases) == 0 {
-		phases = []Phase{PhaseBuild}
+		phases = []Phase{PhaseAct}
 	}
 	for _, phase := range phases {
 		if r.gates[phase] == nil {

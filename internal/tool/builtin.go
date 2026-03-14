@@ -11,7 +11,7 @@ func RegisterBuiltins(r *Registry) {
 	r.Register(&LsTool{})
 
 	// Web tools — gated to brainstorm, plan, and build phases
-	webPhases := []Phase{PhaseBrainstorm, PhasePlan, PhaseBuild}
+	webPhases := []Phase{PhaseOrient, PhaseDecide, PhaseAct}
 	r.RegisterForPhases(NewWebSearchTool(), webPhases)
 	r.RegisterForPhases(NewWebFetchTool(), webPhases)
 }

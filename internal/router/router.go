@@ -15,14 +15,15 @@ const (
 // Hardcoded fallback chain: opus -> sonnet -> haiku.
 var fallbackChain = []string{ModelOpus, ModelSonnet, ModelHaiku}
 
-// Phase defaults — Opus is the default for all phases.
+// Phase defaults — Opus is the default for all OODARC phases.
 // Override per-phase via config file, env vars, or runtime SetModelOverride.
 var phaseDefaults = map[tool.Phase]string{
-	tool.PhaseBrainstorm: ModelOpus,
-	tool.PhasePlan:       ModelOpus,
-	tool.PhaseBuild:      ModelOpus,
-	tool.PhaseReview:     ModelOpus,
-	tool.PhaseShip:       ModelOpus,
+	tool.PhaseObserve:  ModelOpus,
+	tool.PhaseOrient:   ModelOpus,
+	tool.PhaseDecide:   ModelOpus,
+	tool.PhaseAct:      ModelOpus,
+	tool.PhaseReflect:  ModelOpus,
+	tool.PhaseCompound: ModelOpus,
 }
 
 // DefaultRouter selects models based on phase, config overrides, and budget.

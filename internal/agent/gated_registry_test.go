@@ -31,22 +31,22 @@ func setupGatedRegistry() *GatedRegistry {
 	return NewGatedRegistry(reg, DefaultGates)
 }
 
-func TestGatedToolsBrainstormExcludesWrite(t *testing.T) {
+func TestGatedToolsOrientExcludesWrite(t *testing.T) {
 	g := setupGatedRegistry()
-	tools := g.Tools("brainstorm")
+	tools := g.Tools("orient")
 	for _, d := range tools {
 		if d.Name == "write" {
-			t.Error("brainstorm phase should not include 'write'")
+			t.Error("orient phase should not include 'write'")
 		}
 		if d.Name == "bash" {
-			t.Error("brainstorm phase should not include 'bash'")
+			t.Error("orient phase should not include 'bash'")
 		}
 	}
 }
 
-func TestGatedToolsBrainstormIncludesRead(t *testing.T) {
+func TestGatedToolsOrientIncludesRead(t *testing.T) {
 	g := setupGatedRegistry()
-	tools := g.Tools("brainstorm")
+	tools := g.Tools("orient")
 	found := false
 	for _, d := range tools {
 		if d.Name == "read" {
@@ -54,35 +54,35 @@ func TestGatedToolsBrainstormIncludesRead(t *testing.T) {
 		}
 	}
 	if !found {
-		t.Error("brainstorm phase should include 'read'")
+		t.Error("orient phase should include 'read'")
 	}
 }
 
-func TestGatedToolsBuildIncludesAll(t *testing.T) {
+func TestGatedToolsActIncludesAll(t *testing.T) {
 	g := setupGatedRegistry()
-	tools := g.Tools("build")
+	tools := g.Tools("act")
 	names := make(map[string]bool)
 	for _, d := range tools {
 		names[d.Name] = true
 	}
 	for _, want := range []string{"read", "write", "bash", "glob", "grep"} {
 		if !names[want] {
-			t.Errorf("build phase should include %q", want)
+			t.Errorf("act phase should include %q", want)
 		}
 	}
 }
 
-func TestGatedExecuteBrainstormBlocksWrite(t *testing.T) {
+func TestGatedExecuteOrientBlocksWrite(t *testing.T) {
 	g := setupGatedRegistry()
-	result := g.Execute(context.Background(), "brainstorm", "write", json.RawMessage(`{}`))
+	result := g.Execute(context.Background(), "orient", "write", json.RawMessage(`{}`))
 	if !result.IsError {
-		t.Error("expected error for write in brainstorm")
+		t.Error("expected error for write in orient")
 	}
 }
 
-func TestGatedExecuteBuildAllowsWrite(t *testing.T) {
+func TestGatedExecuteActAllowsWrite(t *testing.T) {
 	g := setupGatedRegistry()
-	result := g.Execute(context.Background(), "build", "write", json.RawMessage(`{}`))
+	result := g.Execute(context.Background(), "act", "write", json.RawMessage(`{}`))
 	if result.IsError {
 		t.Errorf("unexpected error: %s", result.Content)
 	}
@@ -99,9 +99,9 @@ func TestGatedExecuteUnknownPhase(t *testing.T) {
 	}
 }
 
-func TestGatedToolsReviewIncludesBash(t *testing.T) {
+func TestGatedToolsReflectIncludesBash(t *testing.T) {
 	g := setupGatedRegistry()
-	tools := g.Tools("review")
+	tools := g.Tools("reflect")
 	found := false
 	for _, d := range tools {
 		if d.Name == "bash" {
@@ -109,16 +109,16 @@ func TestGatedToolsReviewIncludesBash(t *testing.T) {
 		}
 	}
 	if !found {
-		t.Error("review phase should include 'bash'")
+		t.Error("reflect phase should include 'bash'")
 	}
 }
 
-func TestGatedToolsReviewExcludesWrite(t *testing.T) {
+func TestGatedToolsReflectExcludesWrite(t *testing.T) {
 	g := setupGatedRegistry()
-	tools := g.Tools("review")
+	tools := g.Tools("reflect")
 	for _, d := range tools {
 		if d.Name == "write" {
-			t.Error("review phase should not include 'write'")
+			t.Error("reflect phase should not include 'write'")
 		}
 	}
 }

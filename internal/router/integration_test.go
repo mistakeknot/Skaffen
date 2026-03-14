@@ -13,7 +13,7 @@ func TestFullRoutingPipeline(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "routing.json")
 	data := `{
-		"phases": {"review": "haiku"},
+		"phases": {"reflect": "haiku"},
 		"budget": {"max_tokens": 10000, "mode": "graceful", "degrade_at": 0.8},
 		"complexity": {"mode": "shadow"}
 	}`
@@ -27,19 +27,19 @@ func TestFullRoutingPipeline(t *testing.T) {
 	}
 	r := New(cfg)
 
-	// Turn 1: brainstorm -> opus (phase default, not overridden)
-	model, reason := r.SelectModel(tool.PhaseBrainstorm)
+	// Turn 1: orient -> opus (phase default, not overridden)
+	model, reason := r.SelectModel(tool.PhaseOrient)
 	if model != ModelOpus {
-		t.Errorf("turn1 brainstorm: model = %q, want opus", model)
+		t.Errorf("turn1 orient: model = %q, want opus", model)
 	}
 	if reason != "phase-default" {
 		t.Errorf("turn1: reason = %q", reason)
 	}
 
-	// Turn 2: review -> haiku (config override)
-	model, reason = r.SelectModel(tool.PhaseReview)
+	// Turn 2: reflect -> haiku (config override)
+	model, reason = r.SelectModel(tool.PhaseReflect)
 	if model != ModelHaiku {
-		t.Errorf("turn2 review: model = %q, want haiku", model)
+		t.Errorf("turn2 reflect: model = %q, want haiku", model)
 	}
 	if reason != "config-file" {
 		t.Errorf("turn2: reason = %q, want config-file", reason)
@@ -47,7 +47,7 @@ func TestFullRoutingPipeline(t *testing.T) {
 
 	// Record usage: 8000 tokens -> 80% of budget -> should degrade
 	r.RecordUsage(provider.Usage{InputTokens: 5000, OutputTokens: 3000})
-	model, reason = r.SelectModel(tool.PhaseBrainstorm)
+	model, reason = r.SelectModel(tool.PhaseOrient)
 	if model != ModelHaiku {
 		t.Errorf("after 80%%: model = %q, want haiku (degraded)", model)
 	}
@@ -71,16 +71,16 @@ func TestFullRoutingPipeline(t *testing.T) {
 func TestEnvVarOverridesJSON(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "routing.json")
-	data := `{"phases": {"build": "haiku"}}`
+	data := `{"phases": {"act": "haiku"}}`
 	if err := os.WriteFile(path, []byte(data), 0644); err != nil {
 		t.Fatal(err)
 	}
 
 	cfg, _ := LoadConfig(path)
-	t.Setenv("SKAFFEN_MODEL_BUILD", "opus")
+	t.Setenv("SKAFFEN_MODEL_ACT", "opus")
 	r := New(cfg)
 
-	model, reason := r.SelectModel(tool.PhaseBuild)
+	model, reason := r.SelectModel(tool.PhaseAct)
 	if model != ModelOpus {
 		t.Errorf("model = %q, want opus (env overrides JSON)", model)
 	}
@@ -100,7 +100,7 @@ func TestComplexityWithBudgetInteraction(t *testing.T) {
 	// C5 promotes to opus, but budget at 90% should degrade to haiku
 	r.SetInputTokens(5000)
 	r.RecordUsage(provider.Usage{InputTokens: 600, OutputTokens: 300})
-	model, reason := r.SelectModel(tool.PhaseBuild)
+	model, reason := r.SelectModel(tool.PhaseAct)
 	// Complexity promotes to opus, then budget degrades to haiku
 	if model != ModelHaiku {
 		t.Errorf("complexity+budget: model = %q, want haiku (budget wins)", model)

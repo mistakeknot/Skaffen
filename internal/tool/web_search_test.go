@@ -182,11 +182,11 @@ func TestTierForPhase(t *testing.T) {
 		phase Phase
 		want  string
 	}{
-		{PhaseBrainstorm, "deep"},
-		{PhasePlan, "auto"},
-		{PhaseBuild, "instant"},
-		{PhaseReview, "auto"},
-		{PhaseShip, "auto"},
+		{PhaseOrient, "deep"},
+		{PhaseDecide, "auto"},
+		{PhaseAct, "instant"},
+		{PhaseReflect, "auto"},
+		{PhaseCompound, "auto"},
 	}
 	tool := &WebSearchTool{apiKey: "test"}
 	for _, tt := range tests {
@@ -229,13 +229,13 @@ func TestExecuteWithPhaseSetsSearchType(t *testing.T) {
 	defer srv.Close()
 
 	tool := &WebSearchTool{apiKey: "test-key", httpClient: srv.Client(), baseURL: srv.URL}
-	result := tool.ExecuteWithPhase(context.Background(), PhaseBrainstorm, json.RawMessage(`{"query": "test"}`))
+	result := tool.ExecuteWithPhase(context.Background(), PhaseOrient, json.RawMessage(`{"query": "test"}`))
 
 	if result.IsError {
 		t.Fatalf("unexpected error: %s", result.Content)
 	}
 	if receivedType != "deep" {
-		t.Errorf("brainstorm should use 'deep', got %q", receivedType)
+		t.Errorf("orient should use 'deep', got %q", receivedType)
 	}
 }
 

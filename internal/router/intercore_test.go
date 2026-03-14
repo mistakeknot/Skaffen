@@ -31,7 +31,7 @@ func TestICClient_HealthMissingBinary(t *testing.T) {
 
 func TestICClient_QueryOverrideNoBinary(t *testing.T) {
 	ic := &ICClient{icPath: "/nonexistent/ic"}
-	model := ic.QueryOverride("build")
+	model := ic.QueryOverride("act")
 	if model != "" {
 		t.Errorf("QueryOverride with missing binary = %q, want empty", model)
 	}
@@ -43,7 +43,7 @@ func TestICClient_BuildRecordArgs(t *testing.T) {
 		Agent:      "skaffen",
 		Model:      "claude-sonnet-4-6",
 		Rule:       "phase-default",
-		Phase:      "build",
+		Phase:      "act",
 		SessionID:  "sess-123",
 		Complexity: 3,
 	})
@@ -53,7 +53,7 @@ func TestICClient_BuildRecordArgs(t *testing.T) {
 		"--agent=skaffen",
 		"--model=claude-sonnet-4-6",
 		"--rule=phase-default",
-		"--phase=build",
+		"--phase=act",
 		"--session=sess-123",
 		"--complexity=3",
 	}
@@ -73,7 +73,7 @@ func TestICClient_BuildRecordArgsNoOptional(t *testing.T) {
 		Agent: "skaffen",
 		Model: "claude-sonnet-4-6",
 		Rule:  "phase-default",
-		Phase: "build",
+		Phase: "act",
 	})
 	// No session, no complexity — should have 6 args (route record + 4 flags)
 	if len(args) != 6 {
@@ -91,7 +91,7 @@ func TestNewWithIC_NilICSelectModelWorks(t *testing.T) {
 	}
 
 	// SelectModel should still work
-	model, reason := r.SelectModel(tool.PhaseBuild)
+	model, reason := r.SelectModel(tool.PhaseAct)
 	if model != ModelOpus {
 		t.Errorf("model = %q, want opus", model)
 	}

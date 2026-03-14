@@ -30,9 +30,17 @@ type PhasedTool interface {
 type Phase string
 
 const (
-	PhaseBrainstorm Phase = "brainstorm"
-	PhasePlan       Phase = "plan"
-	PhaseBuild      Phase = "build"
-	PhaseReview     Phase = "review"
-	PhaseShip       Phase = "ship"
+	PhaseObserve  Phase = "observe"
+	PhaseOrient   Phase = "orient"
+	PhaseDecide   Phase = "decide"
+	PhaseAct      Phase = "act"
+	PhaseReflect  Phase = "reflect"
+	PhaseCompound Phase = "compound"
+
+	// Deprecated aliases — remove after all consumers migrate.
+	PhaseBrainstorm = PhaseOrient
+	PhasePlan       = PhaseDecide
+	PhaseBuild      = PhaseAct
+	PhaseReview     = PhaseReflect
+	PhaseShip       = PhaseCompound
 )

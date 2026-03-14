@@ -19,7 +19,7 @@ func TestEmptySession(t *testing.T) {
 	if msgs := s.Messages(); msgs != nil {
 		t.Errorf("empty session Messages() = %v, want nil", msgs)
 	}
-	if sp := s.SystemPrompt(tool.PhaseBuild, 200000); sp != "you are helpful" {
+	if sp := s.SystemPrompt(tool.PhaseAct, 200000); sp != "you are helpful" {
 		t.Errorf("SystemPrompt = %q", sp)
 	}
 }
@@ -31,7 +31,7 @@ func TestSaveAndLoadRoundtrip(t *testing.T) {
 	s1 := session.New("rt", dir, "sys", 20)
 	for i := 0; i < 3; i++ {
 		err := s1.Save(agent.Turn{
-			Phase: tool.PhaseBuild,
+			Phase: tool.PhaseAct,
 			Messages: []provider.Message{
 				{Role: provider.RoleAssistant, Content: []provider.ContentBlock{
 					{Type: "text", Text: "response"},
@@ -87,7 +87,7 @@ func TestTruncation(t *testing.T) {
 	// Save 30 turns (60 messages) with maxTurns=5
 	for i := 0; i < 30; i++ {
 		err := s.Save(agent.Turn{
-			Phase: tool.PhaseBuild,
+			Phase: tool.PhaseAct,
 			Messages: []provider.Message{
 				{Role: provider.RoleAssistant, Content: []provider.ContentBlock{
 					{Type: "text", Text: "resp"},
@@ -125,7 +125,7 @@ func TestFsyncSafety(t *testing.T) {
 	s := session.New("fsync", dir, "sys", 20)
 
 	err := s.Save(agent.Turn{
-		Phase: tool.PhaseBuild,
+		Phase: tool.PhaseAct,
 		Messages: []provider.Message{
 			{Role: provider.RoleAssistant, Content: []provider.ContentBlock{
 				{Type: "text", Text: "hello"},
@@ -164,7 +164,7 @@ func TestConcurrentSaves(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			err := s.Save(agent.Turn{
-				Phase: tool.PhaseBuild,
+				Phase: tool.PhaseAct,
 				Messages: []provider.Message{
 					{Role: provider.RoleAssistant, Content: []provider.ContentBlock{
 						{Type: "text", Text: "concurrent"},
@@ -208,7 +208,7 @@ func TestMessageCount(t *testing.T) {
 		t.Fatal("empty session should have 0 messages")
 	}
 	s.Save(agent.Turn{
-		Phase: tool.PhaseBuild,
+		Phase: tool.PhaseAct,
 		Messages: []provider.Message{
 			{Role: provider.RoleUser, Content: []provider.ContentBlock{{Type: "text", Text: "hi"}}},
 			{Role: provider.RoleAssistant, Content: []provider.ContentBlock{{Type: "text", Text: "hello"}}},
@@ -226,7 +226,7 @@ func TestCompactReducesMessages(t *testing.T) {
 	// Add 20 messages (10 turns)
 	for i := 0; i < 10; i++ {
 		s.Save(agent.Turn{
-			Phase: tool.PhaseBuild,
+			Phase: tool.PhaseAct,
 			Messages: []provider.Message{
 				{Role: provider.RoleUser, Content: []provider.ContentBlock{{Type: "text", Text: "q"}}},
 				{Role: provider.RoleAssistant, Content: []provider.ContentBlock{{Type: "text", Text: "a"}}},
@@ -259,7 +259,7 @@ func TestCompactSmallContextNoOp(t *testing.T) {
 	dir := t.TempDir()
 	s := session.New("small", dir, "sys", 100)
 	s.Save(agent.Turn{
-		Phase: tool.PhaseBuild,
+		Phase: tool.PhaseAct,
 		Messages: []provider.Message{
 			{Role: provider.RoleUser, Content: []provider.ContentBlock{{Type: "text", Text: "hi"}}},
 		},
