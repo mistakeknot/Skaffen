@@ -648,9 +648,11 @@ func (m *appModel) View() string {
 	m.contextMeter.SetValue(float64(contextMaxTokens)*m.contextPct/100, contextMaxTokens)
 	meterView := renderMeterRow(m.contextMeter, m.tokenSpark, m.width)
 
-	// Logo sits above viewport, taking space from viewport height
+	// Logo sits above viewport, taking space from viewport height.
+	// Chrome height: 1 scroll-hint + 3 prompt + 1 blank + 1 breadcrumb
+	//              + 1 blank + 1 meter + 1 status = 9
 	logoHeight := strings.Count(logoView, "\n")
-	vpHeight := m.height - 7 - logoHeight // 1 breadcrumb + 1 scroll-hint + 1 meter + 1 status + 3 prompt + logo
+	vpHeight := m.height - 9 - logoHeight
 	if vpHeight < 1 {
 		vpHeight = 1
 	}
@@ -663,16 +665,19 @@ func (m *appModel) View() string {
 	// Uses the viewport's themed indicator which shows "↓ N more lines".
 	scrollHint := m.viewport.ScrollIndicator(m.width)
 
+	// Status area with breathing room between sections.
+	statusArea := lipgloss.JoinVertical(lipgloss.Left, "", crumbView, "", meterView, statusView)
+
 	if m.approving {
-		return lipgloss.JoinVertical(lipgloss.Left, logoView, vpView, scrollHint, m.approvalQ.View(), crumbView, meterView, statusView)
+		return lipgloss.JoinVertical(lipgloss.Left, logoView, vpView, scrollHint, m.approvalQ.View(), statusArea)
 	}
 
 	if m.settingsOpen {
-		return lipgloss.JoinVertical(lipgloss.Left, logoView, vpView, scrollHint, m.settingsOverlay.View(), crumbView, meterView, statusView)
+		return lipgloss.JoinVertical(lipgloss.Left, logoView, vpView, scrollHint, m.settingsOverlay.View(), statusArea)
 	}
 
 	promptView := m.prompt.View(m.width, m.running, m.spinner.View())
-	return lipgloss.JoinVertical(lipgloss.Left, logoView, vpView, scrollHint, promptView, crumbView, meterView, statusView)
+	return lipgloss.JoinVertical(lipgloss.Left, logoView, vpView, scrollHint, promptView, statusArea)
 }
 
 // drainApproval sends false to a pending approval channel so the agent
