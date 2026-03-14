@@ -681,6 +681,9 @@ func (m *appModel) handleStreamEvent(ev agent.StreamEvent) {
 		}
 	case agent.StreamTurnComplete:
 		m.turns = ev.TurnNumber
+		if ev.Model != "" {
+			m.modelName = ev.Model
+		}
 		if ev.Usage.InputTokens > 0 {
 			m.contextPct = float64(ev.Usage.InputTokens) / float64(contextMaxTokens) * 100
 		}

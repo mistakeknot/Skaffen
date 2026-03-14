@@ -134,7 +134,7 @@ func (l *Loop) Run(ctx context.Context, task string, config LoopConfig) (*RunRes
 
 		var collected *provider.CollectedResponse
 		if l.streamCB != nil {
-			collected, err = l.collectWithCallbacks(stream, turn)
+			collected, err = l.collectWithCallbacks(stream, turn, model)
 		} else {
 			collected, err = stream.Collect()
 		}
@@ -344,7 +344,7 @@ func (l *Loop) executeToolsWithCallbacks(ctx context.Context, calls []provider.T
 
 // collectWithCallbacks iterates stream events one-by-one, emitting
 // StreamCallback events for real-time display.
-func (l *Loop) collectWithCallbacks(s *provider.StreamResponse, turn int) (*provider.CollectedResponse, error) {
+func (l *Loop) collectWithCallbacks(s *provider.StreamResponse, turn int, model string) (*provider.CollectedResponse, error) {
 	var (
 		result      provider.CollectedResponse
 		currentTool *provider.ToolCall
@@ -392,6 +392,7 @@ func (l *Loop) collectWithCallbacks(s *provider.StreamResponse, turn int) (*prov
 			result.StopReason = ev.StopReason
 			l.streamCB(StreamEvent{
 				Type:       StreamTurnComplete,
+				Model:      model,
 				Usage:      result.Usage,
 				TurnNumber: turn,
 			})

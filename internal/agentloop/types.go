@@ -124,6 +124,7 @@ type StreamEvent struct {
 	ToolResult string
 	IsError    bool
 	Phase      string
+	Model      string // model name used for this turn/phase
 	Usage      provider.Usage
 	TurnNumber int
 }

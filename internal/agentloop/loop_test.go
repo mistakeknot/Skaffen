@@ -269,7 +269,7 @@ func TestLoopRunWithToolResultEvents(t *testing.T) {
 
 	// Directly test collectWithCallbacks
 	resp := provider.NewStreamResponse(ch)
-	collected, err := loop.collectWithCallbacks(resp, 1)
+	collected, err := loop.collectWithCallbacks(resp, 1, "test-model")
 	if err != nil {
 		t.Fatalf("collectWithCallbacks error: %v", err)
 	}
@@ -328,7 +328,7 @@ func TestLoopRunWithToolResultError(t *testing.T) {
 	loop := New(&mockProvider{text: "unused"}, reg, WithStreamCallback(cb))
 
 	resp := provider.NewStreamResponse(ch)
-	_, err := loop.collectWithCallbacks(resp, 1)
+	_, err := loop.collectWithCallbacks(resp, 1, "test-model")
 	if err != nil {
 		t.Fatalf("collectWithCallbacks error: %v", err)
 	}
