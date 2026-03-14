@@ -314,6 +314,19 @@ func TestStreamPhaseChange(t *testing.T) {
 	}
 }
 
+func TestStreamPhaseChangeUpdatesModel(t *testing.T) {
+	m := setup(t)
+	m.modelName = "opus"
+	m.handleStreamEvent(agent.StreamEvent{
+		Type:  agent.StreamPhaseChange,
+		Phase: "review",
+		Model: "sonnet",
+	})
+	if m.modelName != "sonnet" {
+		t.Errorf("modelName = %q, want sonnet", m.modelName)
+	}
+}
+
 // --- Agent Done ---
 
 func TestAgentDoneSuccess(t *testing.T) {

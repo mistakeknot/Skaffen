@@ -83,6 +83,13 @@ func (a *Agent) CurrentPhase() tool.Phase {
 	return a.fsm.Current()
 }
 
+// ModelForCurrentPhase returns the model name the router would select for the
+// current phase. Used by the TUI to update the status bar on phase transitions.
+func (a *Agent) ModelForCurrentPhase() string {
+	model, _ := a.router.SelectModel(a.fsm.Current())
+	return model
+}
+
 // SetStreamCallback replaces the stream callback after construction.
 func (a *Agent) SetStreamCallback(cb StreamCallback) {
 	a.streamCB = cb

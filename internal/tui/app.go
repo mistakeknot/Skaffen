@@ -707,6 +707,9 @@ func (m *appModel) handleStreamEvent(ev agent.StreamEvent) {
 		}
 	case agent.StreamPhaseChange:
 		m.phase = ev.Phase
+		if ev.Model != "" {
+			m.modelName = ev.Model
+		}
 		m.syncBreadcrumb()
 	}
 }

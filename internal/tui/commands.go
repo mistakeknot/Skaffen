@@ -205,6 +205,9 @@ func (m *appModel) executeCommand(cmd *Command) CommandResult {
 		}
 		newPhase := string(m.agent.CurrentPhase())
 		m.phase = newPhase
+		if model := m.agent.ModelForCurrentPhase(); model != "" {
+			m.modelName = model
+		}
 		return CommandResult{
 			Message: PhaseTransition(old, newPhase),
 		}
