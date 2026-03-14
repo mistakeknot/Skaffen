@@ -78,11 +78,12 @@ func TestSessionOverride(t *testing.T) {
 
 func TestSessionCountIncrements(t *testing.T) {
 	e := trust.NewEvaluator(nil)
-	for i := 0; i < 5; i++ {
+	// Learn fewer times than DefaultPromoteThreshold to stay below promotion
+	for i := 0; i < trust.DefaultPromoteThreshold-1; i++ {
 		e.Learn("bash:make build", trust.Allow, trust.ScopeSession)
 	}
-	if got := e.SessionCount("bash:make build"); got != 5 {
-		t.Errorf("SessionCount = %d, want 5", got)
+	if got := e.SessionCount("bash:make build"); got != trust.DefaultPromoteThreshold-1 {
+		t.Errorf("SessionCount = %d, want %d", got, trust.DefaultPromoteThreshold-1)
 	}
 	// Should still be session-scoped (below threshold)
 	if overrides := e.Overrides(); len(overrides) != 0 {
@@ -92,7 +93,7 @@ func TestSessionCountIncrements(t *testing.T) {
 
 func TestAutoPromoteAtThreshold(t *testing.T) {
 	e := trust.NewEvaluator(nil)
-	for i := 0; i < trust.PromoteThreshold; i++ {
+	for i := 0; i < trust.DefaultPromoteThreshold; i++ {
 		e.Learn("bash:make build", trust.Allow, trust.ScopeSession)
 	}
 
@@ -107,8 +108,8 @@ func TestAutoPromoteAtThreshold(t *testing.T) {
 	if overrides[0].Scope != trust.ScopeGlobal {
 		t.Errorf("promoted scope = %v, want ScopeGlobal", overrides[0].Scope)
 	}
-	if overrides[0].Count != trust.PromoteThreshold {
-		t.Errorf("promoted count = %d, want %d", overrides[0].Count, trust.PromoteThreshold)
+	if overrides[0].Count != trust.DefaultPromoteThreshold {
+		t.Errorf("promoted count = %d, want %d", overrides[0].Count, trust.DefaultPromoteThreshold)
 	}
 
 	// Session count should be cleared after promotion
@@ -120,7 +121,7 @@ func TestAutoPromoteAtThreshold(t *testing.T) {
 func TestPromotedOverrideUsedInEval(t *testing.T) {
 	e := trust.NewEvaluator(nil)
 	// Promote "bash:make build" to global
-	for i := 0; i < trust.PromoteThreshold; i++ {
+	for i := 0; i < trust.DefaultPromoteThreshold; i++ {
 		e.Learn("bash:make build", trust.Allow, trust.ScopeSession)
 	}
 
@@ -160,6 +161,28 @@ func TestWebFetchRequiresPrompt(t *testing.T) {
 	got := e.Evaluate("web_fetch", `{"url": "https://example.com"}`)
 	if got != trust.Prompt {
 		t.Errorf("web_fetch should be Prompt (SSRF risk), got %v", got)
+	}
+}
+
+func TestCustomPromoteThreshold(t *testing.T) {
+	cfg := &trust.Config{PromoteThreshold: 3}
+	e := trust.NewEvaluator(cfg)
+
+	// Learn 2 times — should NOT promote yet
+	for i := 0; i < 2; i++ {
+		e.Learn("bash:cargo test", trust.Allow, trust.ScopeSession)
+	}
+	if len(e.Overrides()) != 0 {
+		t.Fatal("should not promote before custom threshold")
+	}
+
+	// Learn 3rd time — should promote
+	e.Learn("bash:cargo test", trust.Allow, trust.ScopeSession)
+	if len(e.Overrides()) != 1 {
+		t.Fatal("should promote at custom threshold of 3")
+	}
+	if e.PromoteThreshold() != 3 {
+		t.Errorf("PromoteThreshold() = %d, want 3", e.PromoteThreshold())
 	}
 }
 

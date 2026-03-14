@@ -46,31 +46,43 @@ type Override struct {
 
 // Config holds trust configuration (loaded from trust.toml).
 type Config struct {
-	Overrides []Override
+	Overrides        []Override
+	PromoteThreshold int // 0 = use DefaultPromoteThreshold
 }
 
-// PromoteThreshold is the number of session-scoped Learn calls on the same
-// pattern before auto-promoting to ScopeGlobal.
-const PromoteThreshold = 10
+// DefaultPromoteThreshold is the number of session-scoped Learn calls on the
+// same pattern before auto-promoting to ScopeGlobal.
+const DefaultPromoteThreshold = 5
 
 // Evaluator implements the three-tier trust evaluation pipeline.
 type Evaluator struct {
-	mu           sync.RWMutex
-	session      map[string]Decision
-	sessionCount map[string]int // per-pattern Learn call count
-	overrides    []Override
+	mu               sync.RWMutex
+	session          map[string]Decision
+	sessionCount     map[string]int // per-pattern Learn call count
+	overrides        []Override
+	promoteThreshold int
 }
 
 // NewEvaluator creates an Evaluator. Pass nil for built-in rules only.
 func NewEvaluator(cfg *Config) *Evaluator {
+	threshold := DefaultPromoteThreshold
 	e := &Evaluator{
-		session:      make(map[string]Decision),
-		sessionCount: make(map[string]int),
+		session:          make(map[string]Decision),
+		sessionCount:     make(map[string]int),
+		promoteThreshold: threshold,
 	}
 	if cfg != nil {
 		e.overrides = cfg.Overrides
+		if cfg.PromoteThreshold > 0 {
+			e.promoteThreshold = cfg.PromoteThreshold
+		}
 	}
 	return e
+}
+
+// PromoteThreshold returns the current promotion threshold for external access.
+func (e *Evaluator) PromoteThreshold() int {
+	return e.promoteThreshold
 }
 
 // Evaluate runs the three-tier pipeline: session → learned → built-in.
@@ -106,7 +118,7 @@ func (e *Evaluator) Learn(pattern string, decision Decision, scope Scope) {
 	if scope == ScopeSession {
 		e.session[pattern] = decision
 		e.sessionCount[pattern]++
-		if e.sessionCount[pattern] >= PromoteThreshold {
+		if e.sessionCount[pattern] >= e.promoteThreshold {
 			// Auto-promote: move from session to learned overrides
 			e.overrides = append(e.overrides, Override{
 				Pattern:  pattern,
