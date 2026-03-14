@@ -41,9 +41,12 @@ const (
 // Millennial pink, complementary blue, complementary purple.
 var brandAttractors = [3][3]float64{
 	{244, 163, 176}, // millennial pink  #f4a3b0
-	{122, 162, 247},  // blue             #7aa2f7
-	{187, 154, 247},  // purple           #bb9af7
+	{122, 162, 247}, // blue             #7aa2f7
+	{187, 154, 247}, // purple           #bb9af7
 }
+
+// brandAttractorHex for post-collapse branding.
+var brandAttractorHex = [3]string{"#f4a3b0", "#7aa2f7", "#bb9af7"}
 
 type logoTickMsg time.Time
 
@@ -213,38 +216,60 @@ func (l *logoModel) stop() {
 	l.active = false
 }
 
+// spatialKey returns a grid cell key for spatial hashing.
+func spatialKey(x, y float64) uint64 {
+	cx := uint32(x / 2.5)
+	cy := uint32(y / 2.5)
+	return uint64(cx)<<32 | uint64(cy)
+}
+
 // step advances all particles, bouncing off the bounding box edges and
-// mixing colors on collision.
+// mixing colors on collision. Uses spatial hashing for O(n) proximity checks.
 func (l *logoModel) step() {
+	// Build spatial hash: bucket particles by grid cell
+	type cellKey = uint64
+	grid := make(map[cellKey][]int, len(l.particles))
+	for i := range l.particles {
+		k := spatialKey(l.particles[i].x, l.particles[i].y)
+		grid[k] = append(grid[k], i)
+	}
+
 	for i := range l.particles {
 		p := &l.particles[i]
 
-		// Color mixing on proximity — when particles get close, blend colors
-		for j := i + 1; j < len(l.particles); j++ {
-			q := &l.particles[j]
-			dx := p.x - q.x
-			dy := (p.y - q.y) * 2.0 // scale Y for char aspect ratio
-			dist2 := dx*dx + dy*dy
-			if dist2 < 6.0 && dist2 > 0.01 {
-				// Mix strength: closer = stronger mix
-				dist := math.Sqrt(dist2)
-				mix := 0.08 * (1.0 - dist/math.Sqrt(6.0))
-				// Blend toward each other
-				p.r += (q.r - p.r) * mix
-				p.g += (q.g - p.g) * mix
-				p.b += (q.b - p.b) * mix
-				q.r += (p.r - q.r) * mix
-				q.g += (p.g - q.g) * mix
-				q.b += (p.b - q.b) * mix
+		// Color mixing on proximity — check only neighboring cells
+		cx := int(p.x / 2.5)
+		cy := int(p.y / 2.5)
+		for dy := -1; dy <= 1; dy++ {
+			for dx := -1; dx <= 1; dx++ {
+				nk := uint64(uint32(cx+dx))<<32 | uint64(uint32(cy+dy))
+				for _, j := range grid[nk] {
+					if j <= i {
+						continue // avoid double-processing pairs
+					}
+					q := &l.particles[j]
+					ddx := p.x - q.x
+					ddy := (p.y - q.y) * 2.0 // scale Y for char aspect ratio
+					dist2 := ddx*ddx + ddy*ddy
+					if dist2 < 6.0 && dist2 > 0.01 {
+						dist := math.Sqrt(dist2)
+						mix := 0.08 * (1.0 - dist/math.Sqrt(6.0))
+						p.r += (q.r - p.r) * mix
+						p.g += (q.g - p.g) * mix
+						p.b += (q.b - p.b) * mix
+						q.r += (p.r - q.r) * mix
+						q.g += (p.g - q.g) * mix
+						q.b += (p.b - q.b) * mix
 
-				// Soft repulsion so they spread out
-				force := 0.1 / (dist + 0.1)
-				nx := dx / dist * force
-				ny := (p.y - q.y) / dist * force
-				p.vx += nx
-				p.vy += ny
-				q.vx -= nx
-				q.vy -= ny
+						force := 0.1 / (dist + 0.1)
+						nx := ddx / dist * force
+						ny := (p.y - q.y) / dist * force
+						p.vx += nx
+						p.vy += ny
+						q.vx -= nx
+						q.vy -= ny
+					}
+				}
 			}
 		}
 
@@ -310,10 +335,19 @@ func (l *logoModel) step() {
 }
 
 // View renders the logo with spiral reveal + particle-driven coloring.
-// Returns empty string when collapsed (after first user interaction).
+// After collapse, shows a one-line version string in brand colors.
 func (l logoModel) View() string {
 	if l.collapsed {
-		return ""
+		c := theme.Current().Semantic()
+		nameStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(brandAttractorHex[0])).Bold(true)
+		verStyle := lipgloss.NewStyle().Foreground(c.FgDim.Color())
+		sepStyle := lipgloss.NewStyle().Foreground(c.Border.Color())
+		w := l.width
+		if w < 1 {
+			w = 60
+		}
+		return nameStyle.Render("skaffen") + verStyle.Render(" · "+l.versions) + "\n" +
+			sepStyle.Render(strings.Repeat("─", w)) + "\n"
 	}
 	c := theme.Current().Semantic()
 
