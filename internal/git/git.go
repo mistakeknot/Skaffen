@@ -82,6 +82,46 @@ func (g *Git) Push() error {
 	return err
 }
 
+// DefaultBranch returns the default branch name (main or master).
+func (g *Git) DefaultBranch() string {
+	// Try origin/main first, then origin/master, then fall back to "main"
+	if _, err := g.run("rev-parse", "--verify", "origin/main"); err == nil {
+		return "main"
+	}
+	if _, err := g.run("rev-parse", "--verify", "origin/master"); err == nil {
+		return "master"
+	}
+	return "main"
+}
+
+// DiffAgainst returns the diff between the current HEAD and the given ref.
+func (g *Git) DiffAgainst(ref string) (string, error) {
+	// Use merge-base to find the common ancestor
+	base, err := g.run("merge-base", ref, "HEAD")
+	if err != nil {
+		// Fall back to direct diff if merge-base fails
+		return g.run("diff", ref+"..HEAD")
+	}
+	return g.run("diff", strings.TrimSpace(base)+"..HEAD")
+}
+
+// LogOneline returns recent commit messages in oneline format.
+func (g *Git) LogOneline(count int, ref string) (string, error) {
+	if ref != "" {
+		return g.run("log", "--oneline", fmt.Sprintf("-%d", count), ref+"..HEAD")
+	}
+	return g.run("log", "--oneline", fmt.Sprintf("-%d", count))
+}
+
+// DiffStat returns the diffstat (files changed summary) against a ref.
+func (g *Git) DiffStat(ref string) (string, error) {
+	base, err := g.run("merge-base", ref, "HEAD")
+	if err != nil {
+		return g.run("diff", "--stat", ref+"..HEAD")
+	}
+	return g.run("diff", "--stat", strings.TrimSpace(base)+"..HEAD")
+}
+
 // IsRepo returns true if the working directory is inside a git repository.
 func (g *Git) IsRepo() bool {
 	_, err := g.run("rev-parse", "--git-dir")

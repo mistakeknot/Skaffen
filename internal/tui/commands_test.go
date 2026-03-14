@@ -457,19 +457,19 @@ func TestParseShellEscape(t *testing.T) {
 func TestExecuteCustomCommand_Template(t *testing.T) {
 	m := newTestModel()
 	m.customCmds = map[string]command.Def{
-		"review": {
-			Name:        "review",
-			Description: "Review code",
+		"greetme": {
+			Name:        "greetme",
+			Description: "Greet the user",
 			Type:        command.TypeTemplate,
-			Template:    "Please review the code.",
+			Template:    "Hello there!",
 			Source:      "user",
 		},
 	}
-	result := m.executeCommand(&Command{Name: "review"})
+	result := m.executeCommand(&Command{Name: "greetme"})
 	if result.IsError {
 		t.Fatalf("template command should not error: %s", result.Message)
 	}
-	if result.Message != "Please review the code." {
+	if result.Message != "Hello there!" {
 		t.Errorf("Message = %q, want template text", result.Message)
 	}
 }

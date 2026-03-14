@@ -63,6 +63,7 @@ func KnownCommands() map[string]string {
 		"phase":    "Show current OODARC phase",
 		"plan":     "Toggle plan mode (read-only tools only)",
 		"quit":     "Exit Skaffen",
+		"review":   "Review changes against base branch (default: main)",
 		"retry":    "Re-submit the last prompt",
 		"sessions": "List saved sessions",
 		"settings": "Show or change settings",
@@ -217,6 +218,9 @@ func (m *appModel) executeCommand(cmd *Command) CommandResult {
 
 	case "diff":
 		return m.execGitDiff()
+
+	case "review":
+		return m.execReview(cmd.Args)
 
 	case "undo":
 		return m.execGitUndo()
@@ -799,5 +803,84 @@ func (m *appModel) runShellCommand(command string) tea.Cmd {
 			ExitCode: exitCode,
 			TimedOut: timedOut,
 		}
+	}
+}
+
+// execReview generates a structured review of changes against a base branch.
+// Usage: /review [base-branch]
+func (m *appModel) execReview(args []string) CommandResult {
+	if m.git == nil {
+		return CommandResult{Message: "Not in a git repository.", IsError: true}
+	}
+
+	// Determine base branch
+	base := m.git.DefaultBranch()
+	if len(args) > 0 {
+		base = args[0]
+	}
+
+	// Get current branch
+	branch, err := m.git.CurrentBranch()
+	if err != nil {
+		return CommandResult{Message: fmt.Sprintf("Cannot determine branch: %v", err), IsError: true}
+	}
+	if branch == base {
+		return CommandResult{Message: fmt.Sprintf("Already on %s — nothing to review. Switch to a feature branch first.", base), IsError: true}
+	}
+
+	// Collect review data
+	stat, statErr := m.git.DiffStat(base)
+	commits, logErr := m.git.LogOneline(20, base)
+	diff, diffErr := m.git.DiffAgainst(base)
+
+	if diffErr != nil {
+		return CommandResult{
+			Message: fmt.Sprintf("Cannot diff against %s: %v", base, diffErr),
+			IsError: true,
+		}
+	}
+
+	if strings.TrimSpace(diff) == "" {
+		return CommandResult{Message: fmt.Sprintf("No changes between %s and %s.", base, branch)}
+	}
+
+	// Build structured review prompt to send to the agent
+	var b strings.Builder
+	b.WriteString(fmt.Sprintf("Review the changes on branch `%s` against `%s`.\n\n", branch, base))
+
+	if logErr == nil && strings.TrimSpace(commits) != "" {
+		b.WriteString("## Commits\n```\n")
+		b.WriteString(strings.TrimSpace(commits))
+		b.WriteString("\n```\n\n")
+	}
+
+	if statErr == nil && strings.TrimSpace(stat) != "" {
+		b.WriteString("## Files Changed\n```\n")
+		b.WriteString(strings.TrimSpace(stat))
+		b.WriteString("\n```\n\n")
+	}
+
+	// Cap diff to avoid overwhelming the context
+	const maxDiffLen = 30000
+	if len(diff) > maxDiffLen {
+		diff = diff[:maxDiffLen] + "\n... (truncated, " + fmt.Sprintf("%d", len(diff)-maxDiffLen) + " bytes omitted)"
+	}
+
+	b.WriteString("## Diff\n```diff\n")
+	b.WriteString(strings.TrimSpace(diff))
+	b.WriteString("\n```\n\n")
+
+	b.WriteString("Please provide a structured code review covering:\n")
+	b.WriteString("1. **Summary** — what these changes do (1-2 sentences)\n")
+	b.WriteString("2. **Correctness** — logic errors, edge cases, race conditions\n")
+	b.WriteString("3. **Security** — injection, auth, data exposure risks\n")
+	b.WriteString("4. **Style** — naming, duplication, unnecessary complexity\n")
+	b.WriteString("5. **Testing** — missing test coverage, untested paths\n")
+	b.WriteString("6. **Verdict** — LGTM, Needs Changes, or Needs Discussion\n")
+
+	// Return the review as a prompt to be submitted to the agent
+	m.pendingSkills = append(m.pendingSkills, b.String())
+	return CommandResult{
+		Message: fmt.Sprintf("Reviewing %s → %s...", branch, base),
 	}
 }
