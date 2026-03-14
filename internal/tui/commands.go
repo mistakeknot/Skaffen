@@ -58,6 +58,7 @@ func KnownCommands() map[string]string {
 		"compact":  "Compact context (free tokens by summarizing old turns)",
 		"diff":     "Show git diff",
 		"fork":     "Fork the current session (create a branch of conversation)",
+		"map":      "Show repository structure with Go symbols",
 		"help":     "Show available commands (? for keyboard shortcuts)",
 		"history":  "Show recent prompt history",
 		"model":    "Show or switch model (opus, sonnet, haiku)",
@@ -222,6 +223,9 @@ func (m *appModel) executeCommand(cmd *Command) CommandResult {
 
 	case "fork":
 		return m.execFork()
+
+	case "map":
+		return m.execMap(cmd.Args)
 
 	case "review":
 		return m.execReview(cmd.Args)
@@ -808,6 +812,25 @@ func (m *appModel) runShellCommand(command string) tea.Cmd {
 			TimedOut: timedOut,
 		}
 	}
+}
+
+// execMap generates a structural overview of the repository.
+// Usage: /map [path] — defaults to workDir
+func (m *appModel) execMap(args []string) CommandResult {
+	root := m.workDir
+	if root == "" {
+		root = "."
+	}
+	if len(args) > 0 {
+		root = args[0]
+	}
+
+	output := generateRepoMap(root)
+	if output == "" {
+		return CommandResult{Message: "No Go source files found."}
+	}
+
+	return CommandResult{Message: output}
 }
 
 // execFork creates a fork of the current session.
