@@ -96,7 +96,7 @@ func TestWindowResize(t *testing.T) {
 	}
 	// Status bar width is internal to statusbar.Model; verify it renders
 	// at the new width by checking output is non-empty.
-	updateStatusSlots(&app.status, "build", "opus", 0, 0, 0, false)
+	updateStatusSlots(&app.status, "build", "opus", 0, 0, 0, false, "")
 	if app.status.View() == "" {
 		t.Error("status bar should render after resize")
 	}

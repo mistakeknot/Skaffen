@@ -88,7 +88,8 @@ func tokenSparklineWidth(termWidth int) int {
 
 // updateStatusSlots refreshes status bar slots with current agent state.
 // When planMode is true, prepends "PLAN " to the phase with an accent color.
-func updateStatusSlots(sb *statusbar.Model, phase, model string, cost, contextPct float64, turns int, planMode bool) {
+// sandboxLabel is shown as a trailing slot when non-empty (e.g. "YOLO", "strict").
+func updateStatusSlots(sb *statusbar.Model, phase, model string, cost, contextPct float64, turns int, planMode bool, sandboxLabel string) {
 	c := theme.Current().Semantic()
 
 	phaseVal := phase
@@ -98,12 +99,20 @@ func updateStatusSlots(sb *statusbar.Model, phase, model string, cost, contextPc
 		phaseCol = c.Info.Color()
 	}
 
-	sb.SetSlots([]statusbar.Slot{
+	slots := []statusbar.Slot{
 		{Label: "", Value: phaseVal, Color: phaseCol},
 		{Label: "", Value: model, Color: c.FgDim.Color()},
 		{Label: "", Value: fmt.Sprintf("$%.2f", cost), Color: costColor(cost)},
 		{Label: "", Value: fmt.Sprintf("%d turns", turns), Color: c.Fg.Color()},
-	})
+	}
+	if sandboxLabel != "" {
+		col := c.Success.Color()
+		if sandboxLabel == "YOLO" {
+			col = c.Warning.Color()
+		}
+		slots = append(slots, statusbar.Slot{Label: "", Value: sandboxLabel, Color: col})
+	}
+	sb.SetSlots(slots)
 }
 
 // renderMeterRow renders the meter + sparkline as a single status row.

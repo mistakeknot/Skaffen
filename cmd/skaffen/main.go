@@ -453,6 +453,7 @@ func runTUI() error {
 		CustomCommands: customCmds,
 		Skills:         skills,
 		HistoryPath:    cfg.HistoryPath(),
+		SandboxLabel:   sandboxLabel(sb),
 		SubagentInit: &tui.SubagentInit{
 			AgentTool:   agentTool,
 			Registry:    subReg,
@@ -608,6 +609,21 @@ func initSandbox(workDir string) *sandbox.Sandbox {
 		policy = sandbox.DefaultPolicy(workDir)
 	}
 	return sandbox.New(policy, sandbox.ModeDefault)
+}
+
+// sandboxLabel returns a human-readable label for the TUI status bar.
+func sandboxLabel(sb *sandbox.Sandbox) string {
+	if sb == nil {
+		return ""
+	}
+	switch sb.Mode() {
+	case sandbox.ModeDisabled:
+		return "YOLO"
+	case sandbox.ModeStrict:
+		return "strict"
+	default:
+		return "sandbox"
+	}
 }
 
 func printVersion() {

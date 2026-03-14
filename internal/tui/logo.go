@@ -58,6 +58,7 @@ type particle struct {
 type logoModel struct {
 	frame      int
 	active     bool
+	collapsed  bool // true after first user interaction — hides logo entirely
 	width      int
 	versions   string
 	grid       [][]rune
@@ -66,6 +67,12 @@ type logoModel struct {
 	rows, cols int
 	particles  []particle
 	solid      [][]bool // true = non-space cell (for rendering, not collision)
+}
+
+// collapse hides the logo permanently to reclaim viewport space.
+func (l *logoModel) collapse() {
+	l.active = false
+	l.collapsed = true
 }
 
 func newLogoModel(skaffenVer, masaqVer string) logoModel {
@@ -303,7 +310,11 @@ func (l *logoModel) step() {
 }
 
 // View renders the logo with spiral reveal + particle-driven coloring.
+// Returns empty string when collapsed (after first user interaction).
 func (l logoModel) View() string {
+	if l.collapsed {
+		return ""
+	}
 	c := theme.Current().Semantic()
 
 	// Build per-cell color influence from particles

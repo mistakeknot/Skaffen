@@ -50,6 +50,7 @@ type Config struct {
 	Skills         map[string]skill.Def
 	HistoryPath    string
 	SubagentInit   *SubagentInit // nil = subagents disabled
+	SandboxLabel   string         // "sandbox", "strict", "YOLO", or ""
 }
 
 // SubagentInit carries the components needed to wire the subagent runner
@@ -159,6 +160,7 @@ type appModel struct {
 	totalCost     float64
 	contextPct    float64
 	modelName     string
+	sandboxLabel  string // status bar label: "sandbox", "strict", "YOLO", or ""
 	running       bool
 
 	// Logo animation (renders at top of viewport, animates until first keypress)
@@ -266,8 +268,9 @@ func newAppModel(cfg Config) *appModel {
 		phase:        "build",
 		modelName:    "opus",
 		logo:         newLogoModel(skVer, mqVer),
-		customCmds:   cfg.CustomCommands,
-		skills:       cfg.Skills,
+		customCmds:    cfg.CustomCommands,
+		skills:        cfg.Skills,
+		sandboxLabel:  cfg.SandboxLabel,
 		historyStore: hs,
 		pinner:       skill.NewPinner(cfg.Skills),
 		contextMeter: newContextMeter(80),
@@ -385,6 +388,10 @@ func (m *appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case submitMsg:
 		if m.running {
 			break
+		}
+		// Collapse logo on first interaction to reclaim viewport space
+		if !m.logo.collapsed {
+			m.logo.collapse()
 		}
 		// Record in prompt history
 		if m.historyStore != nil {
@@ -590,7 +597,7 @@ func (m *appModel) View() string {
 
 	// Update status slots with current state.
 	planMode := m.agent != nil && m.agent.PlanMode()
-	updateStatusSlots(&m.status, m.phase, m.modelName, m.totalCost, m.contextPct, m.turns, planMode)
+	updateStatusSlots(&m.status, m.phase, m.modelName, m.totalCost, m.contextPct, m.turns, planMode, m.sandboxLabel)
 	statusView := m.status.View()
 	crumbView := m.crumbs.View()
 
