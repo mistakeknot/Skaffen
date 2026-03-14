@@ -72,6 +72,12 @@ func TestClaudeCodeProvider_StreamText(t *testing.T) {
 	if result.Usage.OutputTokens != 6 {
 		t.Errorf("output_tokens = %d, want 6", result.Usage.OutputTokens)
 	}
+	if result.Usage.CacheCreationInputTokens != 1200 {
+		t.Errorf("cache_creation_input_tokens = %d, want 1200", result.Usage.CacheCreationInputTokens)
+	}
+	if result.Usage.CacheReadInputTokens != 3400 {
+		t.Errorf("cache_read_input_tokens = %d, want 3400", result.Usage.CacheReadInputTokens)
+	}
 }
 
 func TestClaudeCodeProvider_NonZeroExit(t *testing.T) {
@@ -184,6 +190,12 @@ func TestClaudeCodeProvider_StreamToolUse(t *testing.T) {
 	}
 	if events[4].Usage == nil || events[4].Usage.InputTokens != 300 {
 		t.Errorf("event[4].Usage = %+v, want InputTokens=300", events[4].Usage)
+	}
+	if events[4].Usage.CacheCreationInputTokens != 500 {
+		t.Errorf("cache_creation_input_tokens = %d, want 500", events[4].Usage.CacheCreationInputTokens)
+	}
+	if events[4].Usage.CacheReadInputTokens != 2000 {
+		t.Errorf("cache_read_input_tokens = %d, want 2000", events[4].Usage.CacheReadInputTokens)
 	}
 }
 

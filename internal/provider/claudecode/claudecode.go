@@ -262,8 +262,10 @@ func (p *ClaudeCodeProvider) handleUserMessage(data []byte, events chan<- provid
 func (p *ClaudeCodeProvider) handleResult(data []byte, events chan<- provider.StreamEvent) {
 	var result struct {
 		Usage struct {
-			InputTokens  int `json:"input_tokens"`
-			OutputTokens int `json:"output_tokens"`
+			InputTokens              int `json:"input_tokens"`
+			OutputTokens             int `json:"output_tokens"`
+			CacheCreationInputTokens int `json:"cache_creation_input_tokens"`
+			CacheReadInputTokens     int `json:"cache_read_input_tokens"`
 		} `json:"usage"`
 	}
 	json.Unmarshal(data, &result)
@@ -271,8 +273,10 @@ func (p *ClaudeCodeProvider) handleResult(data []byte, events chan<- provider.St
 	events <- provider.StreamEvent{
 		Type: provider.EventDone,
 		Usage: &provider.Usage{
-			InputTokens:  result.Usage.InputTokens,
-			OutputTokens: result.Usage.OutputTokens,
+			InputTokens:              result.Usage.InputTokens,
+			OutputTokens:             result.Usage.OutputTokens,
+			CacheCreationInputTokens: result.Usage.CacheCreationInputTokens,
+			CacheReadInputTokens:     result.Usage.CacheReadInputTokens,
 		},
 		StopReason: "end_turn",
 	}
