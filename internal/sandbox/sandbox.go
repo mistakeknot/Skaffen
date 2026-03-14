@@ -31,6 +31,9 @@ func (s *Sandbox) Disabled() bool {
 // Mode returns the current sandbox mode.
 func (s *Sandbox) Mode() Mode { return s.mode }
 
+// ModeString returns the human-readable name of the current sandbox mode.
+func (s *Sandbox) ModeString() string { return s.mode.String() }
+
 // Policy returns the current policy.
 func (s *Sandbox) Policy() Policy { return s.policy }
 

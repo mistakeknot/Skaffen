@@ -16,6 +16,18 @@ const (
 	ModeDisabled             // --yolo: no enforcement
 )
 
+// String returns the human-readable name of the sandbox mode.
+func (m Mode) String() string {
+	switch m {
+	case ModeStrict:
+		return "strict"
+	case ModeDisabled:
+		return "disabled"
+	default:
+		return "default"
+	}
+}
+
 // Policy defines filesystem and network access rules.
 type Policy struct {
 	WriteDirs []string `json:"write"`     // read-write access

@@ -67,6 +67,23 @@ func TestCheckPathNilSandbox(t *testing.T) {
 	}
 }
 
+func TestSandboxModeString(t *testing.T) {
+	tests := []struct {
+		mode Mode
+		want string
+	}{
+		{ModeDefault, "default"},
+		{ModeStrict, "strict"},
+		{ModeDisabled, "disabled"},
+	}
+	for _, tt := range tests {
+		s := New(DefaultPolicy(t.TempDir()), tt.mode)
+		if got := s.ModeString(); got != tt.want {
+			t.Errorf("ModeString() for mode %d = %q, want %q", tt.mode, got, tt.want)
+		}
+	}
+}
+
 func TestCheckPathDenyOverridesRead(t *testing.T) {
 	home, _ := os.UserHomeDir()
 	// home is in ReadDirs, but ~/.ssh is in DenyDirs — deny wins

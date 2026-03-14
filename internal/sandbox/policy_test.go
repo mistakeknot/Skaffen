@@ -120,6 +120,23 @@ func TestLoadFromJSON(t *testing.T) {
 	}
 }
 
+func TestModeString(t *testing.T) {
+	tests := []struct {
+		mode Mode
+		want string
+	}{
+		{ModeDefault, "default"},
+		{ModeStrict, "strict"},
+		{ModeDisabled, "disabled"},
+		{Mode(99), "default"},
+	}
+	for _, tt := range tests {
+		if got := tt.mode.String(); got != tt.want {
+			t.Errorf("Mode(%d).String() = %q, want %q", tt.mode, got, tt.want)
+		}
+	}
+}
+
 func TestLoadNoConfig(t *testing.T) {
 	dir := t.TempDir()
 	p, err := Load(dir)
