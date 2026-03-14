@@ -213,6 +213,47 @@ func (s *JSONLSession) appendRecord(record turnRecord) error {
 	return f.Sync()
 }
 
+// Fork creates a copy of the current session with a new ID.
+// The forked session has the same conversation history and system prompt.
+// Returns the new session and its ID.
+func (s *JSONLSession) Fork() (*JSONLSession, string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	newID := fmt.Sprintf("%s-fork-%d", s.id, time.Now().UnixMilli())
+
+	// Copy the JSONL file if it exists
+	srcPath := s.filePath()
+	if _, err := os.Stat(srcPath); err == nil {
+		dstPath := filepath.Join(s.dir, newID+".jsonl")
+		src, err := os.ReadFile(srcPath)
+		if err != nil {
+			return nil, "", fmt.Errorf("read source session: %w", err)
+		}
+		if err := os.MkdirAll(s.dir, 0755); err != nil {
+			return nil, "", fmt.Errorf("create session dir: %w", err)
+		}
+		if err := os.WriteFile(dstPath, src, 0644); err != nil {
+			return nil, "", fmt.Errorf("write forked session: %w", err)
+		}
+	}
+
+	// Create new session with same state
+	fork := &JSONLSession{
+		id:       newID,
+		dir:      s.dir,
+		prompt:   s.prompt,
+		maxTurns: s.maxTurns,
+		messages: make([]provider.Message, len(s.messages)),
+	}
+	copy(fork.messages, s.messages)
+
+	return fork, newID, nil
+}
+
+// ID returns the session identifier.
+func (s *JSONLSession) ID() string { return s.id }
+
 func (s *JSONLSession) filePath() string {
 	return filepath.Join(s.dir, s.id+".jsonl")
 }

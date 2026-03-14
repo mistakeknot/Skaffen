@@ -57,6 +57,7 @@ func KnownCommands() map[string]string {
 		"continue": "Resume after Esc-stop (re-send with 'please continue')",
 		"compact":  "Compact context (free tokens by summarizing old turns)",
 		"diff":     "Show git diff",
+		"fork":     "Fork the current session (create a branch of conversation)",
 		"help":     "Show available commands (? for keyboard shortcuts)",
 		"history":  "Show recent prompt history",
 		"model":    "Show or switch model (opus, sonnet, haiku)",
@@ -218,6 +219,9 @@ func (m *appModel) executeCommand(cmd *Command) CommandResult {
 
 	case "diff":
 		return m.execGitDiff()
+
+	case "fork":
+		return m.execFork()
 
 	case "review":
 		return m.execReview(cmd.Args)
@@ -803,6 +807,22 @@ func (m *appModel) runShellCommand(command string) tea.Cmd {
 			ExitCode: exitCode,
 			TimedOut: timedOut,
 		}
+	}
+}
+
+// execFork creates a fork of the current session.
+func (m *appModel) execFork() CommandResult {
+	if m.session == nil {
+		return CommandResult{Message: "No active session to fork.", IsError: true}
+	}
+
+	_, newID, err := m.session.Fork()
+	if err != nil {
+		return CommandResult{Message: fmt.Sprintf("Fork failed: %v", err), IsError: true}
+	}
+
+	return CommandResult{
+		Message: fmt.Sprintf("Session forked!\nResume the fork with: skaffen -r %s\nCurrent session continues unchanged.", newID),
 	}
 }
 

@@ -178,11 +178,11 @@ func TestCmdCompleterView(t *testing.T) {
 	}
 }
 
-func TestCmdCompleterViewContainsHistory(t *testing.T) {
+func TestCmdCompleterViewContainsFork(t *testing.T) {
 	cc := newCmdCompleter(nil, nil)
 	view := cc.View(80)
-	if !strings.Contains(view, "/history") {
-		t.Fatal("view should contain /history")
+	if !strings.Contains(view, "/fork") {
+		t.Fatal("view should contain /fork")
 	}
 }
 
