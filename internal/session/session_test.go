@@ -343,3 +343,53 @@ func TestOrientPromptWithEmptySignals(t *testing.T) {
 		t.Errorf("prompt = %q, want %q", prompt, "base prompt")
 	}
 }
+
+type mockInspirationProvider struct {
+	insp mutations.Inspiration
+}
+
+func (m *mockInspirationProvider) Inspire(_ string) mutations.Inspiration {
+	return m.insp
+}
+
+func TestOrientPromptIncludesInspiration(t *testing.T) {
+	dir := t.TempDir()
+	s := session.New("inspire-test", dir, "base prompt", 20)
+	s.SetInspiration(&mockInspirationProvider{
+		insp: mutations.Inspiration{
+			TaskType:    mutations.TaskFeature,
+			BestHistory: "Best: session s1, 8 turns",
+			Suggestions: []mutations.Suggestion{{
+				TaskType: mutations.TaskFeature,
+				Approach: "Start with tests",
+			}},
+		},
+	}, "implement new widget")
+
+	orientPrompt := s.SystemPrompt(tool.PhaseOrient, 200000)
+	if !strings.Contains(orientPrompt, "Orient Inspiration") {
+		t.Error("Orient prompt should contain inspiration")
+	}
+	if !strings.Contains(orientPrompt, "Start with tests") {
+		t.Error("Orient prompt should contain suggestion")
+	}
+
+	// Non-Orient phase should NOT have inspiration
+	actPrompt := s.SystemPrompt(tool.PhaseAct, 200000)
+	if strings.Contains(actPrompt, "Orient Inspiration") {
+		t.Error("Act prompt should NOT contain inspiration")
+	}
+}
+
+func TestOrientPromptInspirationRequiresTaskDesc(t *testing.T) {
+	dir := t.TempDir()
+	s := session.New("no-desc", dir, "base prompt", 20)
+	s.SetInspiration(&mockInspirationProvider{
+		insp: mutations.Inspiration{BestHistory: "should not appear"},
+	}, "") // empty task description
+
+	prompt := s.SystemPrompt(tool.PhaseOrient, 200000)
+	if strings.Contains(prompt, "should not appear") {
+		t.Error("inspiration should not inject when task description is empty")
+	}
+}

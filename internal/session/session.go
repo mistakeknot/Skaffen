@@ -30,6 +30,11 @@ type SignalReader interface {
 	ReadRecent(n int) ([]mutations.QualitySignal, error)
 }
 
+// InspirationProvider gathers pre-session inspiration for Orient.
+type InspirationProvider interface {
+	Inspire(taskDescription string) mutations.Inspiration
+}
+
 // JSONLSession implements agent.Session with JSONL-backed persistence.
 type JSONLSession struct {
 	id           string
@@ -37,7 +42,9 @@ type JSONLSession struct {
 	prompt       string
 	maxTurns     int
 	messages     []provider.Message
-	signalReader SignalReader // optional, for Orient quality history
+	signalReader SignalReader         // optional, for Orient quality history
+	inspiration  InspirationProvider  // optional, for Orient inspiration
+	taskDesc     string               // task description for inspiration lookup
 	mu           sync.Mutex
 }
 
@@ -59,13 +66,27 @@ func (s *JSONLSession) SetSignalReader(sr SignalReader) {
 	s.signalReader = sr
 }
 
+// SetInspiration configures the inspiration provider for Orient phase.
+func (s *JSONLSession) SetInspiration(ip InspirationProvider, taskDesc string) {
+	s.inspiration = ip
+	s.taskDesc = taskDesc
+}
+
 // SystemPrompt returns the system prompt. During Orient phase, appends
-// a quality history summary from recent sessions if a signal reader is configured.
+// quality history and inspiration data from recent sessions.
 func (s *JSONLSession) SystemPrompt(phase tool.Phase, _ int) string {
 	prompt := s.prompt
-	if phase == tool.PhaseOrient && s.signalReader != nil {
-		if summary := formatQualityHistory(s.signalReader); summary != "" {
-			prompt += "\n\n" + summary
+	if phase == tool.PhaseOrient {
+		if s.signalReader != nil {
+			if summary := formatQualityHistory(s.signalReader); summary != "" {
+				prompt += "\n\n" + summary
+			}
+		}
+		if s.inspiration != nil && s.taskDesc != "" {
+			insp := s.inspiration.Inspire(s.taskDesc)
+			if formatted := mutations.FormatInspiration(insp); formatted != "" {
+				prompt += "\n\n" + formatted
+			}
 		}
 	}
 	return prompt

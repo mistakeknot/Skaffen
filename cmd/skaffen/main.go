@@ -290,6 +290,7 @@ func runPrint() error {
 			fmt.Fprintf(os.Stderr, "skaffen: warning: load session: %v\n", err)
 		}
 		sess.SetSignalReader(sigStore)
+		sess.SetInspiration(sigStore, prompt)
 		opts = append(opts, agent.WithSession(sess))
 	} else if systemPrompt != "" {
 		opts = append(opts, agent.WithSession(&agent.NoOpSession{Prompt: systemPrompt}))
@@ -442,6 +443,7 @@ func runTUI() error {
 			fmt.Fprintf(os.Stderr, "skaffen: warning: load session: %v\n", err)
 		}
 		tuiSession.SetSignalReader(sigStore)
+		tuiSession.SetInspiration(sigStore, *flagPrompt) // prompt may be empty in TUI; inspiration only fires when non-empty
 		opts = append(opts, agent.WithSession(tuiSession))
 	} else if systemPrompt != "" {
 		opts = append(opts, agent.WithSession(&agent.NoOpSession{Prompt: systemPrompt}))
