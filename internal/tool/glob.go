@@ -46,7 +46,15 @@ func (t *GlobTool) Execute(ctx context.Context, params json.RawMessage) ToolResu
 	}
 
 	pattern := filepath.Join(base, p.Pattern)
-	matches, err := filepath.Glob(pattern)
+
+	var matches []string
+	var err error
+	if strings.Contains(p.Pattern, "**") {
+		// filepath.Glob doesn't support ** (recursive). Walk the tree and match manually.
+		matches, err = globRecursive(base, p.Pattern)
+	} else {
+		matches, err = filepath.Glob(pattern)
+	}
 	if err != nil {
 		return ToolResult{Content: fmt.Sprintf("glob: %v", err), IsError: true}
 	}
@@ -80,4 +88,57 @@ func (t *GlobTool) Execute(ctx context.Context, params json.RawMessage) ToolResu
 	}
 
 	return ToolResult{Content: strings.TrimRight(b.String(), "\n")}
+}
+
+// globRecursive handles patterns containing ** by walking the directory tree
+// and matching each path against the pattern. The ** matches zero or more
+// directory levels.
+func globRecursive(base, pattern string) ([]string, error) {
+	// Convert ** pattern to a suffix match.
+	// Common patterns: "**/*.go", "src/**/*.ts", "**/test_*.py"
+	// Strategy: walk the tree, for each file check if it matches the non-** suffix.
+	parts := strings.SplitN(pattern, "**", 2)
+	prefix := parts[0] // e.g., "src/" or ""
+	suffix := ""
+	if len(parts) > 1 {
+		suffix = strings.TrimPrefix(parts[1], "/")
+		suffix = strings.TrimPrefix(suffix, string(filepath.Separator))
+	}
+
+	searchBase := filepath.Join(base, prefix)
+	if _, err := os.Stat(searchBase); err != nil {
+		searchBase = base
+	}
+
+	var matches []string
+	err := filepath.WalkDir(searchBase, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return nil // skip inaccessible dirs
+		}
+		if d.IsDir() {
+			// Skip hidden dirs and common large dirs
+			name := d.Name()
+			if name != "." && strings.HasPrefix(name, ".") {
+				return filepath.SkipDir
+			}
+			if name == "node_modules" || name == "vendor" || name == "__pycache__" {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+
+		if suffix == "" {
+			matches = append(matches, path)
+			return nil
+		}
+
+		// Match the file against the suffix pattern
+		matched, _ := filepath.Match(suffix, d.Name())
+		if matched {
+			matches = append(matches, path)
+		}
+		return nil
+	})
+
+	return matches, err
 }

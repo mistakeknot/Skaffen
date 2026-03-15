@@ -16,6 +16,9 @@ type grepParams struct {
 	Path       string `json:"path,omitempty"`        // default "."
 	Glob       string `json:"glob,omitempty"`        // e.g., "*.go"
 	OutputMode string `json:"output_mode,omitempty"` // "content", "files_with_matches" (default), "count"
+	After      int    `json:"after,omitempty"`       // lines of context after match (-A)
+	Before     int    `json:"before,omitempty"`       // lines of context before match (-B)
+	Context    int    `json:"context,omitempty"`      // lines of context around match (-C)
 }
 
 func (t *GrepTool) Name() string        { return "grep" }
@@ -27,7 +30,10 @@ func (t *GrepTool) Schema() json.RawMessage {
 			"pattern": {"type": "string", "description": "Regex pattern to search for"},
 			"path": {"type": "string", "description": "File or directory to search (default '.')"},
 			"glob": {"type": "string", "description": "Glob pattern to filter files (e.g., '*.go')"},
-			"output_mode": {"type": "string", "enum": ["content", "files_with_matches", "count"], "description": "Output mode (default 'files_with_matches')"}
+			"output_mode": {"type": "string", "enum": ["content", "files_with_matches", "count"], "description": "Output mode (default 'files_with_matches')"},
+			"after": {"type": "integer", "description": "Lines of context after each match (like grep -A)"},
+			"before": {"type": "integer", "description": "Lines of context before each match (like grep -B)"},
+			"context": {"type": "integer", "description": "Lines of context around each match (like grep -C)"}
 		},
 		"required": ["pattern"]
 	}`)
@@ -88,6 +94,17 @@ func buildRgArgs(p grepParams, path string) []string {
 	default: // files_with_matches
 		args = append(args, "-l")
 	}
+	// Context lines (only meaningful for "content" mode, but rg handles gracefully)
+	if p.Context > 0 {
+		args = append(args, "-C", fmt.Sprintf("%d", p.Context))
+	} else {
+		if p.Before > 0 {
+			args = append(args, "-B", fmt.Sprintf("%d", p.Before))
+		}
+		if p.After > 0 {
+			args = append(args, "-A", fmt.Sprintf("%d", p.After))
+		}
+	}
 	if p.Glob != "" {
 		args = append(args, "--glob", p.Glob)
 	}
@@ -105,6 +122,16 @@ func buildGrepArgs(p grepParams, path string) []string {
 		args = append(args, "-c")
 	default:
 		args = append(args, "-l")
+	}
+	if p.Context > 0 {
+		args = append(args, "-C", fmt.Sprintf("%d", p.Context))
+	} else {
+		if p.Before > 0 {
+			args = append(args, "-B", fmt.Sprintf("%d", p.Before))
+		}
+		if p.After > 0 {
+			args = append(args, "-A", fmt.Sprintf("%d", p.After))
+		}
 	}
 	if p.Glob != "" {
 		args = append(args, "--include", p.Glob)

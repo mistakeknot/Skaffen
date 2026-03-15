@@ -11,8 +11,10 @@ import (
 )
 
 const (
-	defaultBashTimeout = 120 // seconds
-	maxOutputBytes     = 10240 // 10KB
+	defaultBashTimeout = 120   // seconds
+	maxOutputBytes     = 10240 // 10KB total cap
+	headKeepBytes      = 2048  // 2KB from start (command echo, setup output)
+	tailKeepBytes      = 8192  // 8KB from end (test results, tracebacks)
 )
 
 // BashTool executes shell commands.
@@ -66,7 +68,13 @@ func (t *BashTool) Execute(ctx context.Context, params json.RawMessage) ToolResu
 
 	output := string(out)
 	if len(output) > maxOutputBytes {
-		output = output[:maxOutputBytes] + "\n... (truncated)"
+		// Sandwich truncation: keep head (setup/command echo) + tail (test results/tracebacks).
+		// Test runners like pytest put diagnostic content (assertion diffs, tracebacks) at the
+		// end of output. Head-only truncation loses exactly the content the agent needs most.
+		head := output[:headKeepBytes]
+		tail := output[len(output)-tailKeepBytes:]
+		omitted := len(output) - headKeepBytes - tailKeepBytes
+		output = head + fmt.Sprintf("\n\n... (%d bytes omitted) ...\n\n", omitted) + tail
 	}
 
 	if ctx.Err() == context.DeadlineExceeded {

@@ -74,6 +74,7 @@ func (s *JSONLSession) SetInspiration(ip InspirationProvider, taskDesc string) {
 
 // SystemPrompt returns the system prompt. During Orient phase, appends
 // quality history and inspiration data from recent sessions.
+// During Act phase, appends fault localization guidance.
 func (s *JSONLSession) SystemPrompt(phase tool.Phase, _ int) string {
 	prompt := s.prompt
 	if phase == tool.PhaseOrient {
@@ -89,8 +90,33 @@ func (s *JSONLSession) SystemPrompt(phase tool.Phase, _ int) string {
 			}
 		}
 	}
+	// Inject fault localization guidance for Act phase (covers print mode).
+	// This teaches the agent to form a hypothesis before searching, which
+	// dramatically improves localization accuracy on unfamiliar codebases.
+	if phase == tool.PhaseAct {
+		prompt += faultLocalizationGuidance
+	}
 	return prompt
 }
+
+const faultLocalizationGuidance = `
+
+## Fault Localization Strategy
+
+Before making any code changes, follow this sequence:
+
+1. **Form a hypothesis first.** After reading the issue/prompt, write down your fault hypothesis: which file, which function or class, and what the failure mode is. Do this BEFORE searching the codebase.
+
+2. **Localize with targeted search.** Use grep with context lines (-C 5) to find the specific code path. Start with the most distinctive term from the error message or feature description. Use glob to map the repo structure (find test files, module boundaries).
+
+3. **Confirm before editing.** Read the specific function you plan to change. Verify your hypothesis matches the actual code. If it doesn't, revise your hypothesis — don't force a fix on the wrong location.
+
+4. **Test after every edit.** Run the relevant tests immediately after making changes. If tests fail, read the FULL error output (tracebacks are at the bottom). Distinguish between:
+   - Environment failure (missing dependency, import error) → fix the environment
+   - Logic failure (assertion error, wrong output) → revise your fix
+   - Unrelated failure (pre-existing test failure) → ignore and focus on your target
+
+5. **Review your diff.** Before finishing, check what you actually changed with a git diff. Verify the changes match your hypothesis and don't include unintended modifications.`
 
 // formatQualityHistory reads recent quality signals and formats a compact summary.
 func formatQualityHistory(sr SignalReader) string {

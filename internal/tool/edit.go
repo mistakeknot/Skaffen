@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 	"strings"
 )
 
@@ -71,5 +72,31 @@ func (t *EditTool) Execute(ctx context.Context, params json.RawMessage) ToolResu
 		return ToolResult{Content: fmt.Sprintf("write: %v", err), IsError: true}
 	}
 
-	return ToolResult{Content: fmt.Sprintf("replaced %d occurrence(s) in %s", count, p.FilePath)}
+	msg := fmt.Sprintf("replaced %d occurrence(s) in %s", count, p.FilePath)
+
+	// Post-edit syntax validation for Python files.
+	// Catches syntax errors immediately instead of waiting for test runs.
+	if strings.HasSuffix(p.FilePath, ".py") {
+		if warning := pyCompileCheck(p.FilePath); warning != "" {
+			msg += "\n\nWARNING: " + warning
+		}
+	}
+
+	return ToolResult{Content: msg}
+}
+
+// pyCompileCheck runs python3 -m py_compile on a file and returns a warning
+// string if syntax errors are found. Returns empty string on success or if
+// python3 is not available.
+func pyCompileCheck(path string) string {
+	cmd := exec.Command("python3", "-m", "py_compile", path)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		output := strings.TrimSpace(string(out))
+		if output != "" {
+			return fmt.Sprintf("Python syntax error:\n%s", output)
+		}
+		return fmt.Sprintf("Python syntax check failed: %v", err)
+	}
+	return ""
 }

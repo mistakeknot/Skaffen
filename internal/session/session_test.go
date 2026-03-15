@@ -21,8 +21,12 @@ func TestEmptySession(t *testing.T) {
 	if msgs := s.Messages(); msgs != nil {
 		t.Errorf("empty session Messages() = %v, want nil", msgs)
 	}
-	if sp := s.SystemPrompt(tool.PhaseAct, 200000); sp != "you are helpful" {
-		t.Errorf("SystemPrompt = %q", sp)
+	sp := s.SystemPrompt(tool.PhaseAct, 200000)
+	if !strings.HasPrefix(sp, "you are helpful") {
+		t.Errorf("SystemPrompt should start with base prompt, got %q", sp[:50])
+	}
+	if !strings.Contains(sp, "Fault Localization Strategy") {
+		t.Errorf("SystemPrompt for Act phase should include fault localization guidance")
 	}
 }
 
