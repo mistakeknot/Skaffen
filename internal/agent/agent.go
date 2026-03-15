@@ -225,7 +225,7 @@ func (a *Agent) runWithContent(ctx context.Context, content []provider.ContentBl
 		sig, aggErr := mutations.Aggregate(a.evidenceDir, a.sessionID)
 		if aggErr != nil {
 			log.Printf("quality signal aggregation: %v", aggErr)
-		} else if writeErr := a.signalStore.Write(sig); writeErr != nil {
+		} else if writeErr := a.signalStore.WriteForType(sig); writeErr != nil {
 			log.Printf("quality signal write: %v", writeErr)
 		}
 	}

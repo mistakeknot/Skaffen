@@ -89,5 +89,49 @@ func Aggregate(evidenceDir, sessionID string) (QualitySignal, error) {
 	last := records[len(records)-1]
 	sig.Human.Outcome = last.Outcome
 
+	// Infer task type from tool usage patterns
+	sig.TaskType = inferTaskType(records)
+
 	return sig, nil
+}
+
+// inferTaskType guesses the task type from evidence patterns.
+// Uses tool call patterns as heuristic — not perfect, but good enough
+// for per-type bucketing.
+func inferTaskType(records []evidenceRecord) TaskType {
+	var hasWrite, hasEdit, hasBash, hasGrep bool
+	var writeCount, editCount int
+	for _, r := range records {
+		for _, tc := range r.ToolCalls {
+			switch tc {
+			case "write", "Write":
+				hasWrite = true
+				writeCount++
+			case "edit", "Edit":
+				hasEdit = true
+				editCount++
+			case "bash", "Bash":
+				hasBash = true
+			case "grep", "Grep", "glob", "Glob", "read", "Read":
+				hasGrep = true
+			}
+		}
+	}
+
+	// Heuristic: mostly writes with few edits → new feature or docs
+	// Mostly edits → bug fix or refactor
+	// Heavy bash + edits → optimization
+	// Mostly reads/greps → docs or research
+	switch {
+	case !hasWrite && !hasEdit && hasGrep:
+		return TaskDocs
+	case hasWrite && writeCount > editCount:
+		return TaskFeature
+	case hasEdit && editCount > 5 && hasBash:
+		return TaskRefactor
+	case hasEdit && hasBash:
+		return TaskBugFix
+	default:
+		return TaskGeneral
+	}
 }

@@ -141,11 +141,25 @@ func (e *NoOpEmitter) Emit(_ Evidence) error { return nil }
 // SignalStore persists and retrieves quality signals across sessions.
 type SignalStore interface {
 	Write(sig mutations.QualitySignal) error
+	WriteForType(sig mutations.QualitySignal) error
 	ReadRecent(n int) ([]mutations.QualitySignal, error)
+	ReadRecentForType(tt mutations.TaskType, n int) ([]mutations.QualitySignal, error)
+	BestApproach(tt mutations.TaskType) ([]mutations.QualitySignal, error)
+	Suggest(tt mutations.TaskType) ([]mutations.Suggestion, error)
 }
 
 // NoOpSignalStore discards all signals.
 type NoOpSignalStore struct{}
 
-func (s *NoOpSignalStore) Write(_ mutations.QualitySignal) error                { return nil }
-func (s *NoOpSignalStore) ReadRecent(_ int) ([]mutations.QualitySignal, error) { return nil, nil }
+func (s *NoOpSignalStore) Write(_ mutations.QualitySignal) error                   { return nil }
+func (s *NoOpSignalStore) WriteForType(_ mutations.QualitySignal) error            { return nil }
+func (s *NoOpSignalStore) ReadRecent(_ int) ([]mutations.QualitySignal, error)     { return nil, nil }
+func (s *NoOpSignalStore) ReadRecentForType(_ mutations.TaskType, _ int) ([]mutations.QualitySignal, error) {
+	return nil, nil
+}
+func (s *NoOpSignalStore) BestApproach(_ mutations.TaskType) ([]mutations.QualitySignal, error) {
+	return nil, nil
+}
+func (s *NoOpSignalStore) Suggest(_ mutations.TaskType) ([]mutations.Suggestion, error) {
+	return nil, nil
+}

@@ -1,11 +1,24 @@
 package mutations
 
+// TaskType categorizes the kind of work a session performed.
+type TaskType string
+
+const (
+	TaskBugFix       TaskType = "bug-fix"
+	TaskFeature      TaskType = "feature"
+	TaskRefactor     TaskType = "refactor"
+	TaskOptimization TaskType = "optimization"
+	TaskDocs         TaskType = "docs"
+	TaskGeneral      TaskType = "general" // fallback when type can't be determined
+)
+
 // QualitySignal captures aggregated quality metrics from a session.
 // Written by the Compound phase, read by Orient on subsequent sessions.
 type QualitySignal struct {
-	SessionID string `json:"session_id"`
-	Timestamp string `json:"timestamp"`
-	Phase     string `json:"phase"` // OODARC phase name (e.g. "compound")
+	SessionID string   `json:"session_id"`
+	Timestamp string   `json:"timestamp"`
+	Phase     string   `json:"phase"`     // OODARC phase name (e.g. "compound")
+	TaskType  TaskType `json:"task_type"` // categorization for per-type tracking
 	Hard      HardSignals  `json:"hard"`
 	Soft      SoftSignals  `json:"soft"`
 	Human     HumanSignals `json:"human"`
