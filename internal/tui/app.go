@@ -203,6 +203,10 @@ type appModel struct {
 	// Last submitted prompt (for /retry)
 	lastPrompt string
 
+	// Esc-stop state for /continue
+	wasInterrupted  bool   // true if last run was cancelled via Esc
+	interruptedText string // partial response text at time of interruption
+
 	// Subagent tracker for inline status rendering
 	subagents        *subagentTracker
 	subagentRegistry *subagent.TypeRegistry // for /model subagent settings
@@ -333,9 +337,11 @@ func (m *appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		// Esc stops the current agent run (but not when an overlay is showing)
 		if msg.Type == tea.KeyEsc && m.running && m.cancelRun != nil && !m.approving && !m.settingsOpen {
+			m.wasInterrupted = true
+			m.interruptedText = m.md.Content()
 			m.cancelRun()
 			infoStyle := lipgloss.NewStyle().Foreground(theme.Current().Semantic().Info.Color())
-			m.viewport.AppendContent("\n" + infoStyle.Render("Stopped.") + "\n")
+			m.viewport.AppendContent("\n" + infoStyle.Render("Stopped. Use /continue to resume.") + "\n")
 			break
 		}
 		// Plan mode toggle: Shift+Tab toggles read-only mode (only when idle)
@@ -431,6 +437,8 @@ func (m *appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.running = true
 		m.lastPrompt = msg.Text
+		m.wasInterrupted = false
+		m.interruptedText = ""
 		// Extract image @mentions first (produces ContentBlocks + display text with badges)
 		displayText, imageBlocks := ExpandImageMentions(msg.Text, m.workDir)
 		// Render user message with badges for images

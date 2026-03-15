@@ -652,6 +652,7 @@ func TestExecuteCommand_ContinueNoHistory(t *testing.T) {
 func TestExecuteCommand_ContinueWithHistory(t *testing.T) {
 	m := newTestModel()
 	m.lastPrompt = "explain the code"
+	m.wasInterrupted = true
 	result := m.executeCommand(&Command{Name: "continue"})
 	if result.IsError {
 		t.Fatalf("continue should not error: %s", result.Message)
@@ -664,6 +665,36 @@ func TestExecuteCommand_ContinueWithHistory(t *testing.T) {
 	}
 	if !strings.Contains(result.Message, "Continuing") {
 		t.Fatalf("should mention continuing, got: %s", result.Message)
+	}
+}
+
+func TestExecuteCommand_ContinueNotInterrupted(t *testing.T) {
+	m := newTestModel()
+	m.lastPrompt = "explain the code"
+	m.wasInterrupted = false
+	result := m.executeCommand(&Command{Name: "continue"})
+	if !result.IsError {
+		t.Fatal("continue without interruption should be an error")
+	}
+	if !strings.Contains(result.Message, "completed normally") {
+		t.Fatalf("should mention completed normally, got: %s", result.Message)
+	}
+}
+
+func TestExecuteCommand_ContinueWithPartialText(t *testing.T) {
+	m := newTestModel()
+	m.lastPrompt = "explain the code"
+	m.wasInterrupted = true
+	m.interruptedText = "Here is what the code does: it reads from the file and"
+	result := m.executeCommand(&Command{Name: "continue"})
+	if result.IsError {
+		t.Fatalf("continue should not error: %s", result.Message)
+	}
+	if !strings.Contains(result.Retry, "already written") {
+		t.Fatal("Retry should mention what was already written")
+	}
+	if !strings.Contains(result.Retry, "reads from the file") {
+		t.Fatal("Retry should include the partial text")
 	}
 }
 

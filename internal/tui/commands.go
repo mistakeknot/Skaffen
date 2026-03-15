@@ -55,7 +55,7 @@ func KnownCommands() map[string]string {
 		"advance":  "Advance to next OODARC phase",
 		"clear":    "Clear viewport",
 		"commit":   "Auto-commit current changes",
-		"continue": "Resume after Esc-stop (re-send with 'please continue')",
+		"continue": "Resume after Esc-stop with context of what was in progress",
 		"compact":  "Compact context (free tokens by summarizing old turns)",
 		"diff":     "Show git diff",
 		"fork":     "Fork the current session (create a branch of conversation)",
@@ -259,9 +259,33 @@ func (m *appModel) executeCommand(cmd *Command) CommandResult {
 		if m.lastPrompt == "" {
 			return CommandResult{Message: "No previous prompt to continue.", IsError: true}
 		}
+		if !m.wasInterrupted {
+			return CommandResult{Message: "Last run completed normally. Use /retry to re-run.", IsError: true}
+		}
+		// Build a continuation prompt that gives the agent context about what
+		// was happening when the user pressed Esc. The session already contains
+		// the full conversation history including the original prompt, so we
+		// only need to tell the agent to resume — not re-send the original.
+		var continuePrompt strings.Builder
+		continuePrompt.WriteString("The previous response was interrupted by the user. ")
+		continuePrompt.WriteString("Please continue from where you left off.\n\n")
+		continuePrompt.WriteString("Original request: ")
+		continuePrompt.WriteString(m.lastPrompt)
+		if m.interruptedText != "" {
+			// Include a summary of what was already generated so the agent
+			// doesn't repeat itself.
+			partial := m.interruptedText
+			if len(partial) > 500 {
+				partial = partial[len(partial)-500:]
+			}
+			continuePrompt.WriteString("\n\nYou had already written (ending with):\n")
+			continuePrompt.WriteString(partial)
+		}
+		display := truncate(m.lastPrompt, 60)
+		m.wasInterrupted = false // clear so double /continue doesn't re-trigger
 		return CommandResult{
-			Message: "Continuing from where you left off...",
-			Retry:   m.lastPrompt + "\n\nPlease continue from where you left off.",
+			Message: fmt.Sprintf("Continuing: %s", display),
+			Retry:   continuePrompt.String(),
 		}
 
 	case "sessions":
