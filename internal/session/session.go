@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/mistakeknot/Skaffen/internal/agent"
+	"github.com/mistakeknot/Skaffen/internal/mutations"
 	"github.com/mistakeknot/Skaffen/internal/provider"
 	"github.com/mistakeknot/Skaffen/internal/tool"
 )
@@ -24,14 +25,20 @@ type turnRecord struct {
 	Timestamp string             `json:"timestamp"`
 }
 
+// SignalReader reads quality signals for Orient prompt injection.
+type SignalReader interface {
+	ReadRecent(n int) ([]mutations.QualitySignal, error)
+}
+
 // JSONLSession implements agent.Session with JSONL-backed persistence.
 type JSONLSession struct {
-	id       string
-	dir      string
-	prompt   string
-	maxTurns int
-	messages []provider.Message
-	mu       sync.Mutex
+	id           string
+	dir          string
+	prompt       string
+	maxTurns     int
+	messages     []provider.Message
+	signalReader SignalReader // optional, for Orient quality history
+	mu           sync.Mutex
 }
 
 // New creates a JSONLSession.
@@ -47,10 +54,60 @@ func New(id, dir, systemPrompt string, maxTurns int) *JSONLSession {
 	}
 }
 
-// SystemPrompt returns the system prompt. The budget parameter is ignored —
-// JSONLSession returns a static prompt regardless of budget.
-func (s *JSONLSession) SystemPrompt(_ tool.Phase, _ int) string {
-	return s.prompt
+// SetSignalReader configures quality signal reading for Orient prompt injection.
+func (s *JSONLSession) SetSignalReader(sr SignalReader) {
+	s.signalReader = sr
+}
+
+// SystemPrompt returns the system prompt. During Orient phase, appends
+// a quality history summary from recent sessions if a signal reader is configured.
+func (s *JSONLSession) SystemPrompt(phase tool.Phase, _ int) string {
+	prompt := s.prompt
+	if phase == tool.PhaseOrient && s.signalReader != nil {
+		if summary := formatQualityHistory(s.signalReader); summary != "" {
+			prompt += "\n\n" + summary
+		}
+	}
+	return prompt
+}
+
+// formatQualityHistory reads recent quality signals and formats a compact summary.
+func formatQualityHistory(sr SignalReader) string {
+	signals, err := sr.ReadRecent(5)
+	if err != nil || len(signals) == 0 {
+		return ""
+	}
+
+	var totalTurns int
+	var totalEfficiency float64
+	var errorSessions, successSessions int
+	var maxComplexity int
+
+	for _, sig := range signals {
+		totalTurns += sig.Hard.TurnCount
+		totalEfficiency += sig.Hard.TokenEfficiency
+		if sig.Soft.ToolErrorRate > 0 {
+			errorSessions++
+		}
+		if sig.Human.Outcome == "success" {
+			successSessions++
+		}
+		if sig.Soft.ComplexityTier > maxComplexity {
+			maxComplexity = sig.Soft.ComplexityTier
+		}
+	}
+
+	n := len(signals)
+	avgTurns := totalTurns / n
+	avgEfficiency := totalEfficiency / float64(n)
+
+	return fmt.Sprintf("## Quality History (last %d sessions)\n"+
+		"- Avg turns: %d, Token efficiency: %.2f\n"+
+		"- Tool errors: %d/%d sessions, Max complexity: C%d\n"+
+		"- Outcome: %d/%d success",
+		n, avgTurns, avgEfficiency,
+		errorSessions, n, maxComplexity,
+		successSessions, n)
 }
 
 // Messages returns the conversation history.

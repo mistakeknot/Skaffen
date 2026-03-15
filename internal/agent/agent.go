@@ -3,9 +3,11 @@ package agent
 import (
 	"context"
 	"encoding/json"
+	"log"
 
 	"github.com/mistakeknot/Skaffen/internal/agentloop"
 	"github.com/mistakeknot/Skaffen/internal/hooks"
+	"github.com/mistakeknot/Skaffen/internal/mutations"
 	"github.com/mistakeknot/Skaffen/internal/provider"
 	"github.com/mistakeknot/Skaffen/internal/tool"
 )
@@ -22,7 +24,9 @@ type Agent struct {
 	sessionID string // for evidence attribution
 	streamCB  StreamCallback
 	approver  ToolApprover
-	hookExec  *hooks.Executor // lifecycle hooks (nil = disabled)
+	hookExec    *hooks.Executor // lifecycle hooks (nil = disabled)
+	signalStore SignalStore     // quality signal persistence
+	evidenceDir string          // path to evidence JSONL directory
 
 	maxTurns int // safety limit, default 100
 }
@@ -56,16 +60,23 @@ func WithStreamCallback(cb StreamCallback) Option { return func(a *Agent) { a.st
 // WithHooks sets the lifecycle hook executor.
 func WithHooks(h *hooks.Executor) Option { return func(a *Agent) { a.hookExec = h } }
 
+// WithSignalStore sets the quality signal persistence backend.
+func WithSignalStore(s SignalStore) Option { return func(a *Agent) { a.signalStore = s } }
+
+// WithEvidenceDir sets the path to the evidence JSONL directory.
+func WithEvidenceDir(dir string) Option { return func(a *Agent) { a.evidenceDir = dir } }
+
 // New creates an Agent with the given provider, tool registry, and options.
 func New(p provider.Provider, reg *tool.Registry, opts ...Option) *Agent {
 	a := &Agent{
-		provider: p,
-		registry: reg,
-		router:   &NoOpRouter{},
-		session:  &NoOpSession{},
-		emitter:  &NoOpEmitter{},
-		fsm:      newPhaseFSM(tool.PhaseAct),
-		maxTurns: 100,
+		provider:    p,
+		registry:    reg,
+		router:      &NoOpRouter{},
+		session:     &NoOpSession{},
+		emitter:     &NoOpEmitter{},
+		signalStore: &NoOpSignalStore{},
+		fsm:         newPhaseFSM(tool.PhaseAct),
+		maxTurns:    100,
 	}
 	for _, opt := range opts {
 		opt(a)
@@ -107,6 +118,9 @@ func (a *Agent) SetPlanMode(on bool) { a.registry.SetPlanMode(on) }
 
 // PlanMode returns whether plan mode is active.
 func (a *Agent) PlanMode() bool { return a.registry.PlanMode() }
+
+// SignalStore returns the quality signal store for use by tools and session.
+func (a *Agent) SignalStore() SignalStore { return a.signalStore }
 
 // SetModelOverride sets a runtime model override if the router supports it.
 // Returns false if the router does not implement ModelOverrideSetter.
@@ -204,6 +218,16 @@ func (a *Agent) runWithContent(ctx context.Context, content []provider.ContentBl
 	result, err := loop.RunWithContent(ctx, content, config)
 	if err != nil {
 		return nil, err
+	}
+
+	// Compound phase: aggregate evidence and write quality signal
+	if phase == tool.PhaseCompound && a.evidenceDir != "" {
+		sig, aggErr := mutations.Aggregate(a.evidenceDir, a.sessionID)
+		if aggErr != nil {
+			log.Printf("quality signal aggregation: %v", aggErr)
+		} else if writeErr := a.signalStore.Write(sig); writeErr != nil {
+			log.Printf("quality signal write: %v", writeErr)
+		}
 	}
 
 	return &RunResult{

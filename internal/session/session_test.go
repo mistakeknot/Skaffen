@@ -3,10 +3,12 @@ package session_test
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 
 	"github.com/mistakeknot/Skaffen/internal/agent"
+	"github.com/mistakeknot/Skaffen/internal/mutations"
 	"github.com/mistakeknot/Skaffen/internal/provider"
 	"github.com/mistakeknot/Skaffen/internal/session"
 	"github.com/mistakeknot/Skaffen/internal/tool"
@@ -280,5 +282,64 @@ func TestLoadNonexistentFile(t *testing.T) {
 	}
 	if msgs := s.Messages(); msgs != nil {
 		t.Errorf("Messages after load nonexistent = %v, want nil", msgs)
+	}
+}
+
+type mockSignalReader struct {
+	signals []mutations.QualitySignal
+}
+
+func (m *mockSignalReader) ReadRecent(n int) ([]mutations.QualitySignal, error) {
+	if len(m.signals) <= n {
+		return m.signals, nil
+	}
+	return m.signals[len(m.signals)-n:], nil
+}
+
+func TestOrientPromptIncludesQualityHistory(t *testing.T) {
+	dir := t.TempDir()
+	s := session.New("orient-test", dir, "base prompt", 20)
+	s.SetSignalReader(&mockSignalReader{
+		signals: []mutations.QualitySignal{
+			{SessionID: "s1", Phase: "compound", Hard: mutations.HardSignals{TurnCount: 10, TokenEfficiency: 0.5}, Soft: mutations.SoftSignals{ComplexityTier: 3}, Human: mutations.HumanSignals{Outcome: "success"}},
+			{SessionID: "s2", Phase: "compound", Hard: mutations.HardSignals{TurnCount: 14, TokenEfficiency: 0.6}, Soft: mutations.SoftSignals{ComplexityTier: 4}, Human: mutations.HumanSignals{Outcome: "success"}},
+		},
+	})
+
+	// Orient phase should include quality history
+	orientPrompt := s.SystemPrompt(tool.PhaseOrient, 200000)
+	if !strings.Contains(orientPrompt, "Quality History") {
+		t.Error("Orient prompt should contain quality history")
+	}
+	if !strings.Contains(orientPrompt, "base prompt") {
+		t.Error("Orient prompt should still contain base prompt")
+	}
+
+	// Act phase should NOT include quality history
+	actPrompt := s.SystemPrompt(tool.PhaseAct, 200000)
+	if strings.Contains(actPrompt, "Quality History") {
+		t.Error("Act prompt should NOT contain quality history")
+	}
+}
+
+func TestOrientPromptWithoutSignalReader(t *testing.T) {
+	dir := t.TempDir()
+	s := session.New("no-reader", dir, "base prompt", 20)
+
+	// Without signal reader, Orient prompt should just be the base
+	prompt := s.SystemPrompt(tool.PhaseOrient, 200000)
+	if prompt != "base prompt" {
+		t.Errorf("prompt = %q, want %q", prompt, "base prompt")
+	}
+}
+
+func TestOrientPromptWithEmptySignals(t *testing.T) {
+	dir := t.TempDir()
+	s := session.New("empty-signals", dir, "base prompt", 20)
+	s.SetSignalReader(&mockSignalReader{signals: nil})
+
+	prompt := s.SystemPrompt(tool.PhaseOrient, 200000)
+	if prompt != "base prompt" {
+		t.Errorf("prompt = %q, want %q", prompt, "base prompt")
 	}
 }

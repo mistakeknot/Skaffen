@@ -2,6 +2,7 @@ package agent
 
 import (
 	"github.com/mistakeknot/Skaffen/internal/agentloop"
+	"github.com/mistakeknot/Skaffen/internal/mutations"
 	"github.com/mistakeknot/Skaffen/internal/provider"
 	"github.com/mistakeknot/Skaffen/internal/tool"
 )
@@ -136,3 +137,15 @@ func (s *NoOpSession) Messages() []provider.Message            { return nil }
 type NoOpEmitter struct{}
 
 func (e *NoOpEmitter) Emit(_ Evidence) error { return nil }
+
+// SignalStore persists and retrieves quality signals across sessions.
+type SignalStore interface {
+	Write(sig mutations.QualitySignal) error
+	ReadRecent(n int) ([]mutations.QualitySignal, error)
+}
+
+// NoOpSignalStore discards all signals.
+type NoOpSignalStore struct{}
+
+func (s *NoOpSignalStore) Write(_ mutations.QualitySignal) error                { return nil }
+func (s *NoOpSignalStore) ReadRecent(_ int) ([]mutations.QualitySignal, error) { return nil, nil }

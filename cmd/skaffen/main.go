@@ -25,6 +25,7 @@ import (
 	"github.com/mistakeknot/Skaffen/internal/contextfiles"
 	"github.com/mistakeknot/Skaffen/internal/evidence"
 	"github.com/mistakeknot/Skaffen/internal/mcp"
+	"github.com/mistakeknot/Skaffen/internal/mutations"
 	"github.com/mistakeknot/Skaffen/internal/provider"
 	"github.com/mistakeknot/Skaffen/internal/router"
 	"github.com/mistakeknot/Skaffen/internal/sandbox"
@@ -279,11 +280,16 @@ func runPrint() error {
 	// Build system prompt from context files + --system flag
 	systemPrompt := buildSystemPrompt(cfg.WorkDir(), *flagSystem)
 
+	// Quality signal store — enables Compound → Orient feedback loop
+	sigStore := mutations.NewStore(filepath.Join(cfg.UserDir(), "mutations"))
+	tool.RegisterQualityHistory(reg, sigStore)
+
 	if *flagSession != "" {
 		sess := session.New(*flagSession, cfg.SessionDir(), systemPrompt, 20)
 		if err := sess.Load(); err != nil {
 			fmt.Fprintf(os.Stderr, "skaffen: warning: load session: %v\n", err)
 		}
+		sess.SetSignalReader(sigStore)
 		opts = append(opts, agent.WithSession(sess))
 	} else if systemPrompt != "" {
 		opts = append(opts, agent.WithSession(&agent.NoOpSession{Prompt: systemPrompt}))
@@ -292,6 +298,8 @@ func runPrint() error {
 	// Evidence emission — always enabled
 	emitter := evidence.New(cfg.EvidenceDir(), sessionID)
 	opts = append(opts, agent.WithEmitter(emitter), agent.WithSessionID(sessionID))
+
+	opts = append(opts, agent.WithSignalStore(sigStore), agent.WithEvidenceDir(cfg.EvidenceDir()))
 
 	// Lifecycle hooks — only gate in headless mode (no trust evaluator)
 	if hookExec := loadHooks(cfg, sessionID, string(phase)); hookExec != nil {
@@ -423,12 +431,17 @@ func runTUI() error {
 	// Working directory + context files
 	systemPrompt := buildSystemPrompt(cfg.WorkDir(), *flagSystem)
 
+	// Quality signal store — enables Compound → Orient feedback loop
+	sigStore := mutations.NewStore(filepath.Join(cfg.UserDir(), "mutations"))
+	tool.RegisterQualityHistory(reg, sigStore)
+
 	var tuiSession *session.JSONLSession
 	if *flagSession != "" {
 		tuiSession = session.New(*flagSession, cfg.SessionDir(), systemPrompt, 20)
 		if err := tuiSession.Load(); err != nil {
 			fmt.Fprintf(os.Stderr, "skaffen: warning: load session: %v\n", err)
 		}
+		tuiSession.SetSignalReader(sigStore)
 		opts = append(opts, agent.WithSession(tuiSession))
 	} else if systemPrompt != "" {
 		opts = append(opts, agent.WithSession(&agent.NoOpSession{Prompt: systemPrompt}))
@@ -437,6 +450,8 @@ func runTUI() error {
 	// Evidence
 	emitter := evidence.New(cfg.EvidenceDir(), sessionID)
 	opts = append(opts, agent.WithEmitter(emitter), agent.WithSessionID(sessionID))
+
+	opts = append(opts, agent.WithSignalStore(sigStore), agent.WithEvidenceDir(cfg.EvidenceDir()))
 
 	// Trust evaluator
 	trustEval := trust.NewEvaluator(nil)
