@@ -480,7 +480,8 @@ func runTUI() error {
 		CustomCommands: customCmds,
 		Skills:         skills,
 		HistoryPath:    cfg.HistoryPath(),
-		SandboxLabel:   sandboxLabel(sb),
+		SandboxLabel:     sandboxLabel(sb),
+		KeybindingsPaths: cfg.KeybindingsPaths(),
 		SubagentInit: &tui.SubagentInit{
 			AgentTool:   agentTool,
 			Registry:    subReg,

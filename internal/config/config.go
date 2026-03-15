@@ -156,6 +156,24 @@ func (c *Config) HookPaths() []string {
 	return paths
 }
 
+// KeybindingsPaths returns keybindings config paths to load (user-global + per-project).
+// Per-project keybindings override user-global on a per-action basis.
+// Returns only paths that exist on disk.
+func (c *Config) KeybindingsPaths() []string {
+	var paths []string
+	userPath := filepath.Join(c.userDir, "keybindings.json")
+	if fileExists(userPath) {
+		paths = append(paths, userPath)
+	}
+	if c.projectDir != "" {
+		projPath := filepath.Join(c.projectDir, ".skaffen", "keybindings.json")
+		if fileExists(projPath) {
+			paths = append(paths, projPath)
+		}
+	}
+	return paths
+}
+
 // SessionDir returns the user-global sessions directory (always ~/.skaffen/sessions).
 func (c *Config) SessionDir() string { return filepath.Join(c.userDir, "sessions") }
 

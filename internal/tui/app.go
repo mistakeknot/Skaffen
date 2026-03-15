@@ -50,7 +50,8 @@ type Config struct {
 	Skills         map[string]skill.Def
 	HistoryPath    string
 	SubagentInit   *SubagentInit // nil = subagents disabled
-	SandboxLabel   string         // "sandbox", "strict", "YOLO", or ""
+	SandboxLabel     string         // "sandbox", "strict", "YOLO", or ""
+	KeybindingsPaths []string       // paths to keybindings.json files (user + project)
 }
 
 // SubagentInit carries the components needed to wire the subagent runner
@@ -162,6 +163,7 @@ type appModel struct {
 	contextPct    float64
 	modelName     string
 	sandboxLabel  string // status bar label: "sandbox", "strict", "YOLO", or ""
+	keybindings   *Keybindings
 	running       bool
 
 	// Logo animation (renders at top of viewport, animates until first keypress)
@@ -251,6 +253,8 @@ func newAppModel(cfg Config) *appModel {
 		{Label: "reflect", Status: breadcrumb.Pending},
 		{Label: "compound", Status: breadcrumb.Pending},
 	})
+	kb := LoadKeybindings(cfg.KeybindingsPaths)
+	pm.keybindings = kb
 	return &appModel{
 		viewport:     vp,
 		md:           markdown.New(80),
@@ -273,6 +277,7 @@ func newAppModel(cfg Config) *appModel {
 		customCmds:    cfg.CustomCommands,
 		skills:        cfg.Skills,
 		sandboxLabel:  cfg.SandboxLabel,
+		keybindings:   kb,
 		historyStore: hs,
 		pinner:       skill.NewPinner(cfg.Skills),
 		contextMeter: newContextMeter(80),
@@ -375,7 +380,7 @@ func (m *appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Viewport scrolling: when prompt is focused, only pass through
 		// dedicated scroll keys (PgUp/PgDn/Home/End/Ctrl+U/Ctrl+D) —
 		// arrow keys belong to the textinput for cursor movement.
-		if m.running || isScrollKey(msg) {
+		if m.running || isScrollKey(msg) || isScrollKeyCustom(msg, m.keybindings) {
 			vp, cmd := m.viewport.Update(msg)
 			m.viewport = vp
 			cmds = append(cmds, cmd)
@@ -876,6 +881,14 @@ func isScrollKey(msg tea.KeyMsg) bool {
 		return true
 	}
 	return false
+}
+
+// isScrollKeyCustom checks custom keybindings for scroll keys.
+func isScrollKeyCustom(msg tea.KeyMsg, kb *Keybindings) bool {
+	if kb == nil {
+		return isScrollKey(msg)
+	}
+	return kb.IsScrollKey(msg.String())
 }
 
 // isTypedChar returns true for actual user-typed printable characters.

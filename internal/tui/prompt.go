@@ -28,6 +28,7 @@ type promptModel struct {
 	workDir      string
 	customCmds   map[string]command.Def
 	skills       map[string]skill.Def
+	keybindings  *Keybindings
 }
 
 func newPromptModel() promptModel {
@@ -116,8 +117,14 @@ func (p promptModel) Update(msg tea.Msg) (promptModel, tea.Cmd) {
 
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
-		switch msg.String() {
-		case "enter":
+		kb := p.keybindings
+		if kb == nil {
+			kb = DefaultKeybindings()
+		}
+		keyStr := msg.String()
+
+		switch {
+		case kb.MatchesAction(keyStr, ActionSubmit):
 			text := p.fullText()
 			if strings.TrimSpace(text) == "" {
 				return p, nil
@@ -125,12 +132,12 @@ func (p promptModel) Update(msg tea.Msg) (promptModel, tea.Cmd) {
 			p.input.SetValue("")
 			p.lines = nil
 			return p, func() tea.Msg { return submitMsg{Text: text} }
-		case "shift+enter", "alt+enter":
+		case kb.MatchesAction(keyStr, ActionNewline):
 			// Add newline
 			p.lines = append(p.lines, p.input.Value())
 			p.input.SetValue("")
 			return p, nil
-		case "ctrl+w":
+		case kb.MatchesAction(keyStr, ActionDeleteWord):
 			// Delete previous word (standard Unix terminal behavior)
 			v := p.input.Value()
 			pos := p.input.Position()
@@ -149,43 +156,46 @@ func (p promptModel) Update(msg tea.Msg) (promptModel, tea.Cmd) {
 				p.input.SetCursor(i + 1)
 			}
 			return p, nil
-		case "ctrl+g":
+		case kb.MatchesAction(keyStr, ActionEditor):
 			return p, openEditor(p.fullText())
-		case "ctrl+r":
+		case kb.MatchesAction(keyStr, ActionHistory):
 			if p.historyStore != nil {
 				p.history = newHistoryModel(p.historyStore, p.input.Value())
 				p.searching = true
 				return p, nil
 			}
 		default:
-			// Check for ? trigger on empty prompt (no accumulated lines)
-			if len(msg.Runes) == 1 && msg.Runes[0] == '?' &&
-				len(p.lines) == 0 && p.input.Value() == "" {
-				p.keyHelp = newKeyHelpModel()
-				p.helping = true
-				return p, nil
-			}
-			// Check for / trigger at start of empty input (no accumulated lines)
-			if len(msg.Runes) == 1 && msg.Runes[0] == '/' &&
-				len(p.lines) == 0 && p.input.Value() == "" {
-				// Let textinput handle the '/' character first
-				var cmd tea.Cmd
-				p.input, cmd = p.input.Update(msg)
-				p.completer = newCmdCompleter(p.customCmds, p.skills)
-				p.completing = true
-				return p, cmd
-			}
-			// Check for @ trigger
-			if len(msg.Runes) == 1 && msg.Runes[0] == '@' {
-				var cmd tea.Cmd
-				p.input, cmd = p.input.Update(msg)
-				root := p.workDir
-				if root == "" {
-					root = "."
+			// Check for single-rune triggers on empty prompt
+			if len(msg.Runes) == 1 {
+				r := msg.Runes[0]
+				emptyPrompt := len(p.lines) == 0 && p.input.Value() == ""
+
+				// Help trigger (empty prompt only)
+				if emptyPrompt && kb.MatchesRune(r, ActionHelp) {
+					p.keyHelp = newKeyHelpModel()
+					p.helping = true
+					return p, nil
 				}
-				p.picker = newFilePicker(root)
-				p.picking = true
-				return p, cmd
+				// Slash command trigger (empty prompt only)
+				if emptyPrompt && kb.MatchesRune(r, ActionSlashCmd) {
+					var cmd tea.Cmd
+					p.input, cmd = p.input.Update(msg)
+					p.completer = newCmdCompleter(p.customCmds, p.skills)
+					p.completing = true
+					return p, cmd
+				}
+				// File picker trigger
+				if kb.MatchesRune(r, ActionFilePicker) {
+					var cmd tea.Cmd
+					p.input, cmd = p.input.Update(msg)
+					root := p.workDir
+					if root == "" {
+						root = "."
+					}
+					p.picker = newFilePicker(root)
+					p.picking = true
+					return p, cmd
+				}
 			}
 		}
 	}
