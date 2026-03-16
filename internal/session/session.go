@@ -116,7 +116,29 @@ Before making any code changes, follow this sequence:
    - Logic failure (assertion error, wrong output) → revise your fix
    - Unrelated failure (pre-existing test failure) → ignore and focus on your target
 
-5. **Review your diff.** Before finishing, check what you actually changed with a git diff. Verify the changes match your hypothesis and don't include unintended modifications.`
+5. **Review your diff.** Before finishing, check what you actually changed with a git diff. Verify the changes match your hypothesis and don't include unintended modifications.
+
+## Iterate Until Tests Pass
+
+You MUST follow a fix-test-retry loop. Do NOT stop after a single fix attempt.
+
+**Loop procedure:**
+1. Make your fix based on your hypothesis.
+2. Run the relevant test(s) immediately.
+3. If tests PASS → review your diff, then you are done.
+4. If tests FAIL → analyze the error output carefully:
+   a. Read the FULL traceback (errors are at the bottom of the output).
+   b. Determine: did your fix address the wrong location, use the wrong approach, or introduce a new issue?
+   c. Revise your hypothesis based on the new evidence.
+   d. Undo or adjust your previous change, then apply a new fix.
+   e. Go back to step 2.
+
+**Retry budget:** Make up to 5 fix attempts. If the same test keeps failing after 3 attempts with the same approach, abandon that hypothesis entirely and try a fundamentally different fix strategy (different file, different function, different root cause).
+
+**Critical rules:**
+- NEVER declare the task complete without running the tests and seeing them pass.
+- If you run out of retries, submit your best attempt — a partial fix that passes some tests is better than no fix.
+- Each retry should learn from the previous failure. Do not repeat the same fix that already failed.`
 
 // formatQualityHistory reads recent quality signals and formats a compact summary.
 func formatQualityHistory(sr SignalReader) string {
