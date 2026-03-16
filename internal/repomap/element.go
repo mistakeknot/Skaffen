@@ -10,7 +10,8 @@ import (
 type Option func(*elementConfig)
 
 type elementConfig struct {
-	fetcher EdgeFetcher
+	fetcher       EdgeFetcher
+	personalizeFn PersonalizationFunc
 }
 
 // WithEdgeFetcher injects an external edge source (e.g. intermap MCP).
@@ -19,6 +20,15 @@ type elementConfig struct {
 func WithEdgeFetcher(f EdgeFetcher) Option {
 	return func(c *elementConfig) {
 		c.fetcher = f
+	}
+}
+
+// WithPersonalization injects a callback that provides conversation context
+// (chat files, diff files) for personalized PageRank. If omitted, PageRank
+// runs with uniform teleportation (no personalization).
+func WithPersonalization(fn PersonalizationFunc) Option {
+	return func(c *elementConfig) {
+		c.personalizeFn = fn
 	}
 }
 
@@ -43,11 +53,11 @@ func NewElement(workDir string, opts ...Option) priompt.Element {
 			"observe": +15, "orient": +15, "decide": +5,
 			"act": 0, "reflect": -15, "compound": -20,
 		},
-		Render: contentFunc(workDir, cfg.fetcher),
+		Render: contentFunc(workDir, cfg.fetcher, cfg.personalizeFn),
 	}
 }
 
-func contentFunc(workDir string, fetcher EdgeFetcher) priompt.ContentFunc {
+func contentFunc(workDir string, fetcher EdgeFetcher, personalizeFn PersonalizationFunc) priompt.ContentFunc {
 	return func(ctx priompt.RenderContext) string {
 		maxTokens := ctx.Budget * 15 / 100
 		if maxTokens < 500 {
@@ -63,11 +73,20 @@ func contentFunc(workDir string, fetcher EdgeFetcher) priompt.ContentFunc {
 		}
 
 		// Build file-level graph from reference edges.
-		g, _, idFiles := buildFileGraph(edges)
+		g, fileIDs, idFiles := buildFileGraph(edges)
 
-		// Run PageRank (no personalization yet -- added in F5).
+		// Build personalization vector from conversation context.
+		var pers map[uint32]float64
+		if personalizeFn != nil {
+			chatFiles, diffFiles := personalizeFn()
+			if len(chatFiles) > 0 || len(diffFiles) > 0 {
+				pers = BuildPersonalization(fileIDs, chatFiles, diffFiles)
+			}
+		}
+
+		// Run personalized PageRank.
 		fileRanks := make(map[string]float64)
-		g.Rank(0.85, 1e-6, nil, func(node uint32, rank float64) {
+		g.Rank(0.85, 1e-6, pers, func(node uint32, rank float64) {
 			if f, ok := idFiles[node]; ok {
 				fileRanks[f] = rank
 			}
