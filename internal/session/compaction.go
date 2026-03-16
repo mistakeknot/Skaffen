@@ -24,6 +24,95 @@ type CompactionSummary struct {
 	OpenQuestions []string // unresolved issues or pending work
 }
 
+// CompactIntent describes the current work intent, which biases how the
+// compaction summary emphasizes different fields. Debugging intent promotes
+// errors and test output; building intent promotes files and decisions.
+type CompactIntent string
+
+const (
+	IntentDefault  CompactIntent = ""          // balanced rendering (same as Format)
+	IntentDebugging CompactIntent = "debugging" // emphasize errors, test results, stack traces
+	IntentBuilding CompactIntent = "building"  // emphasize files, decisions, acceptance criteria
+)
+
+// FormatWithIntent renders the CompactionSummary with field ordering and
+// emphasis biased by the given intent. Debugging intent puts errors and
+// test results first; building intent puts files and decisions first.
+// IntentDefault falls back to the standard Format() ordering.
+func (cs CompactionSummary) FormatWithIntent(intent CompactIntent) string {
+	type section struct {
+		label   string
+		content string
+	}
+
+	var all []section
+
+	// Always include goal and phase first
+	if cs.Goal != "" {
+		all = append(all, section{"goal", "**Goal:** " + cs.Goal})
+	}
+	if cs.Phase != "" {
+		all = append(all, section{"phase", "**Phase:** " + cs.Phase})
+	}
+
+	// Intent-biased sections: promoted fields come first
+	switch intent {
+	case IntentDebugging:
+		// Errors and test results are most important when debugging
+		if len(cs.Errors) > 0 {
+			all = append(all, section{"errors", "**Errors encountered:**\n- " + strings.Join(cs.Errors, "\n- ")})
+		}
+		if cs.TestResults != "" {
+			all = append(all, section{"tests", "**Tests:** " + cs.TestResults})
+		}
+		if len(cs.FilesMutated) > 0 {
+			all = append(all, section{"mutated", "**Files modified:** " + strings.Join(dedup(cs.FilesMutated), ", ")})
+		}
+		if len(cs.Decisions) > 0 {
+			all = append(all, section{"decisions", "**Decisions:**\n- " + strings.Join(cs.Decisions, "\n- ")})
+		}
+		if len(cs.FilesRead) > 0 {
+			all = append(all, section{"read", "**Files read:** " + strings.Join(dedup(cs.FilesRead), ", ")})
+		}
+		if len(cs.OpenQuestions) > 0 {
+			all = append(all, section{"questions", "**Open questions:**\n- " + strings.Join(cs.OpenQuestions, "\n- ")})
+		}
+
+	case IntentBuilding:
+		// Files and decisions are most important when building
+		if len(cs.FilesMutated) > 0 {
+			all = append(all, section{"mutated", "**Files modified:** " + strings.Join(dedup(cs.FilesMutated), ", ")})
+		}
+		if len(cs.Decisions) > 0 {
+			all = append(all, section{"decisions", "**Decisions:**\n- " + strings.Join(cs.Decisions, "\n- ")})
+		}
+		if len(cs.FilesRead) > 0 {
+			all = append(all, section{"read", "**Files read:** " + strings.Join(dedup(cs.FilesRead), ", ")})
+		}
+		if cs.TestResults != "" {
+			all = append(all, section{"tests", "**Tests:** " + cs.TestResults})
+		}
+		if len(cs.Errors) > 0 {
+			all = append(all, section{"errors", "**Errors encountered:**\n- " + strings.Join(cs.Errors, "\n- ")})
+		}
+		if len(cs.OpenQuestions) > 0 {
+			all = append(all, section{"questions", "**Open questions:**\n- " + strings.Join(cs.OpenQuestions, "\n- ")})
+		}
+
+	default:
+		return cs.Format()
+	}
+
+	if len(all) == 0 {
+		return ""
+	}
+	contents := make([]string, len(all))
+	for i, s := range all {
+		contents[i] = s.content
+	}
+	return strings.Join(contents, "\n\n")
+}
+
 // Format renders the CompactionSummary as a structured prompt section.
 // Each non-empty field becomes a labeled block. Empty fields are omitted.
 func (cs CompactionSummary) Format() string {

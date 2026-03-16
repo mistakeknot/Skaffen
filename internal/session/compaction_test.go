@@ -98,6 +98,75 @@ func TestCompactStructured(t *testing.T) {
 	}
 }
 
+func TestFormatWithIntentDebugging(t *testing.T) {
+	cs := CompactionSummary{
+		Goal:         "Fix login bug",
+		Decisions:    []string{"Use bcrypt"},
+		FilesRead:    []string{"auth.go"},
+		FilesMutated: []string{"auth.go"},
+		TestResults:  "1 failed",
+		Errors:       []string{"TestLogin: wrong hash"},
+	}
+
+	result := cs.FormatWithIntent(IntentDebugging)
+
+	// Errors should appear before files and decisions
+	errIdx := strings.Index(result, "Errors encountered")
+	fileIdx := strings.Index(result, "Files read")
+	decIdx := strings.Index(result, "Decisions")
+	if errIdx > fileIdx {
+		t.Error("debugging intent should put errors before files")
+	}
+	if errIdx > decIdx {
+		t.Error("debugging intent should put errors before decisions")
+	}
+}
+
+func TestFormatWithIntentBuilding(t *testing.T) {
+	cs := CompactionSummary{
+		Goal:         "Add feature",
+		Decisions:    []string{"Use pattern X"},
+		FilesRead:    []string{"main.go"},
+		FilesMutated: []string{"handler.go"},
+		TestResults:  "all pass",
+		Errors:       []string{"minor warning"},
+	}
+
+	result := cs.FormatWithIntent(IntentBuilding)
+
+	// Files should appear before errors and test results
+	fileIdx := strings.Index(result, "Files modified")
+	errIdx := strings.Index(result, "Errors encountered")
+	testIdx := strings.Index(result, "Tests")
+	if fileIdx > errIdx {
+		t.Error("building intent should put files before errors")
+	}
+	if fileIdx > testIdx {
+		t.Error("building intent should put files before tests")
+	}
+}
+
+func TestFormatWithIntentDefaultFallback(t *testing.T) {
+	cs := CompactionSummary{
+		Goal:    "test",
+		Errors:  []string{"err"},
+	}
+
+	// Default intent should produce same output as Format()
+	defaultResult := cs.FormatWithIntent(IntentDefault)
+	formatResult := cs.Format()
+	if defaultResult != formatResult {
+		t.Errorf("default intent should match Format()\ngot:  %q\nwant: %q", defaultResult, formatResult)
+	}
+}
+
+func TestFormatWithIntentEmpty(t *testing.T) {
+	cs := CompactionSummary{}
+	if cs.FormatWithIntent(IntentDebugging) != "" {
+		t.Error("empty summary with intent should produce empty string")
+	}
+}
+
 func TestCompactStructuredEmptySummaryNoOp(t *testing.T) {
 	dir := t.TempDir()
 	s := New("noop", dir, "sys", 100)
