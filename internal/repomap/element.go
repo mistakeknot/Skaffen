@@ -6,11 +6,35 @@ import (
 	"github.com/mistakeknot/Masaq/priompt"
 )
 
+// Option configures NewElement behavior.
+type Option func(*elementConfig)
+
+type elementConfig struct {
+	fetcher EdgeFetcher
+}
+
+// WithEdgeFetcher injects an external edge source (e.g. intermap MCP).
+// If the fetcher returns an error or nil data, the element falls back
+// to ExtractGoTags (graceful degradation).
+func WithEdgeFetcher(f EdgeFetcher) Option {
+	return func(c *elementConfig) {
+		c.fetcher = f
+	}
+}
+
 // NewElement creates a priompt Element for the repo map.
-// workDir is the project root used for Go tag extraction.
+// workDir is the project root used for tag extraction. Options allow
+// injecting an external EdgeFetcher; if omitted or if the fetcher fails,
+// ExtractGoTags is used as the fallback.
+//
 // The element uses a ContentFunc that adapts output to the available
 // token budget (15% of total, capped at 8K, floor of 500 tokens).
-func NewElement(workDir string) priompt.Element {
+func NewElement(workDir string, opts ...Option) priompt.Element {
+	var cfg elementConfig
+	for _, o := range opts {
+		o(&cfg)
+	}
+
 	return priompt.Element{
 		Name:     "repomap",
 		Priority: 35,
@@ -19,11 +43,11 @@ func NewElement(workDir string) priompt.Element {
 			"observe": +15, "orient": +15, "decide": +5,
 			"act": 0, "reflect": -15, "compound": -20,
 		},
-		Render: contentFunc(workDir),
+		Render: contentFunc(workDir, cfg.fetcher),
 	}
 }
 
-func contentFunc(workDir string) priompt.ContentFunc {
+func contentFunc(workDir string, fetcher EdgeFetcher) priompt.ContentFunc {
 	return func(ctx priompt.RenderContext) string {
 		maxTokens := ctx.Budget * 15 / 100
 		if maxTokens < 500 {
@@ -33,7 +57,7 @@ func contentFunc(workDir string) priompt.ContentFunc {
 			maxTokens = 8000
 		}
 
-		defs, edges := ExtractGoTags(workDir, 200)
+		defs, edges := fetchDefsAndEdges(workDir, fetcher)
 		if len(defs) == 0 {
 			return ""
 		}
@@ -55,6 +79,21 @@ func contentFunc(workDir string) priompt.ContentFunc {
 		// Binary-search fit to token budget.
 		return binarySearchFit(ranked, maxTokens)
 	}
+}
+
+// fetchDefsAndEdges tries the MCP fetcher first, falling back to
+// ExtractGoTags if the fetcher is nil, returns an error, or returns
+// no definitions.
+func fetchDefsAndEdges(workDir string, fetcher EdgeFetcher) ([]TagDef, []RefEdge) {
+	if fetcher != nil {
+		defs, edges, err := fetcher.FetchEdges(workDir)
+		if err == nil && len(defs) > 0 {
+			return defs, edges
+		}
+		// Graceful degradation: fetcher failed or returned nothing,
+		// fall through to Go-native extraction.
+	}
+	return ExtractGoTags(workDir, 200)
 }
 
 // buildFileGraph creates a Graph from reference edges, mapping file paths
