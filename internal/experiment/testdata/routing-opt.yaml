@@ -1,0 +1,32 @@
+name: routing-opt
+metric:
+  name: cost_per_turn
+  unit: usd
+  direction: minimize
+  baseline: 0.42
+secondary_metrics:
+  - name: test_pass_rate
+    direction: maximize
+    baseline: 0.98
+    regression_threshold: 0.02
+  - name: build_time_s
+    direction: minimize
+    baseline: 12.5
+    regression_threshold: 3.0
+benchmark:
+  command: "go test ./internal/router/... -bench=. -count=3"
+  metric_pattern: "cost_per_turn=([0-9.]+)"
+  secondary_patterns:
+    test_pass_rate: "pass_rate=([0-9.]+)"
+    build_time_s: "build_time=([0-9.]+)"
+  timeout: 120s
+git:
+  worktree: true
+  auto_commit: true
+budget:
+  max_experiments: 50
+  max_consecutive_failures: 5
+ideas:
+  - "Lower Haiku threshold from C3 to C2"
+  - "Remove Orient phase for trivial tasks"
+  - "Cache model responses for identical prompts"

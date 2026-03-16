@@ -134,6 +134,12 @@ func (r *Registry) Register(t Tool) {
 // RegisterForPhases adds a tool to the registry, gated to specific phases.
 // If phases is nil or empty, defaults to act-only (same as Register).
 func (r *Registry) RegisterForPhases(t Tool, phases []Phase) {
+	r.RegisterForPhasesWithConstraint(t, phases, nil)
+}
+
+// RegisterForPhasesWithConstraint adds a tool with a gate constraint per phase.
+// A nil constraint means unconstrained (allowed without prompting).
+func (r *Registry) RegisterForPhasesWithConstraint(t Tool, phases []Phase, gc *GateConstraint) {
 	r.tools[t.Name()] = t
 	if len(phases) == 0 {
 		phases = []Phase{PhaseAct}
@@ -142,7 +148,7 @@ func (r *Registry) RegisterForPhases(t Tool, phases []Phase) {
 		if r.gates[phase] == nil {
 			r.gates[phase] = make(map[string]*GateConstraint)
 		}
-		r.gates[phase][t.Name()] = nil // unconstrained
+		r.gates[phase][t.Name()] = gc
 	}
 }
 

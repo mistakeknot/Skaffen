@@ -52,12 +52,12 @@ func (e *JSONLEmitter) Emit(ev agent.Evidence) error {
 }
 
 func (e *JSONLEmitter) appendJSONL(ev agent.Evidence) error {
-	if err := os.MkdirAll(e.dir, 0755); err != nil {
+	if err := os.MkdirAll(e.dir, 0700); err != nil {
 		return fmt.Errorf("create evidence dir: %w", err)
 	}
 
 	path := filepath.Join(e.dir, e.sessionID+".jsonl")
-	f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
 	if err != nil {
 		return fmt.Errorf("open evidence file: %w", err)
 	}
@@ -99,13 +99,24 @@ func (e *JSONLEmitter) BridgeArgs(ev agent.Evidence) []string {
 	}
 
 	eventType := "turn_complete"
-	if ev.Outcome == "success" && ev.StopReason == "end_turn" {
+	source := "interspect"
+	if ev.ExperimentEvent != nil {
+		source = "autoresearch"
+		switch ev.ExperimentEvent.Decision {
+		case "keep":
+			eventType = "experiment_kept"
+		case "discard":
+			eventType = "experiment_discarded"
+		default:
+			eventType = "experiment_" + ev.ExperimentEvent.Type
+		}
+	} else if ev.Outcome == "success" && ev.StopReason == "end_turn" {
 		eventType = "session_end"
 	}
 
 	args := []string{
 		"events", "record",
-		"--source=interspect",
+		"--source=" + source,
 		"--type=" + eventType,
 		"--payload=" + string(payloadJSON),
 	}

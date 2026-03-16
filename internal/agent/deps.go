@@ -83,6 +83,16 @@ type Evidence struct {
 	ExcludedStable     []string       `json:"excluded_stable,omitempty"`
 	Model              string         `json:"model,omitempty"`
 	ModelReason        string         `json:"model_reason,omitempty"`
+	ExperimentEvent    *ExperimentEvent `json:"experiment,omitempty"`
+}
+
+// ExperimentEvent captures autoresearch experiment data within a turn's evidence.
+type ExperimentEvent struct {
+	Type       string  `json:"type"`                 // experiment_init, experiment_run, experiment_log
+	Campaign   string  `json:"campaign"`
+	Hypothesis string  `json:"hypothesis,omitempty"`
+	Decision   string  `json:"decision,omitempty"`
+	Delta      float64 `json:"delta,omitempty"`
 }
 
 // FileActivity records a file operation observed during a turn.

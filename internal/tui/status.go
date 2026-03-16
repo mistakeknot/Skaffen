@@ -89,7 +89,8 @@ func tokenSparklineWidth(termWidth int) int {
 // updateStatusSlots refreshes status bar slots with current agent state.
 // Phase is shown in the breadcrumb, not here — the status bar shows runtime state.
 // planMode adds a "PLAN" badge; sandboxLabel adds a trailing badge.
-func updateStatusSlots(sb *statusbar.Model, phase, model string, cost, contextPct float64, turns int, planMode bool, sandboxLabel string) {
+// exp shows experiment progress when an autoresearch campaign is active.
+func updateStatusSlots(sb *statusbar.Model, phase, model string, cost, contextPct float64, turns int, planMode bool, sandboxLabel string, exp experimentSlotData) {
 	c := theme.Current().Semantic()
 
 	var slots []statusbar.Slot
@@ -105,6 +106,12 @@ func updateStatusSlots(sb *statusbar.Model, phase, model string, cost, contextPc
 		statusbar.Slot{Label: "", Value: fmt.Sprintf("%d turns", turns), Color: c.Fg.Color()},
 	)
 
+	// Experiment progress slot
+	if exp.Active {
+		expValue := fmt.Sprintf("exp: %d/%d %+.1f%s", exp.Count, exp.Max, exp.Delta, exp.Unit)
+		slots = append(slots, statusbar.Slot{Label: "", Value: expValue, Color: expColor(exp.Delta)})
+	}
+
 	if sandboxLabel != "" {
 		col := c.Success.Color()
 		if sandboxLabel == "YOLO" {
@@ -113,6 +120,28 @@ func updateStatusSlots(sb *statusbar.Model, phase, model string, cost, contextPc
 		slots = append(slots, statusbar.Slot{Label: "", Value: sandboxLabel, Color: col})
 	}
 	sb.SetSlots(slots)
+}
+
+// experimentSlotData holds experiment state for the status bar (value type, thread-safe).
+type experimentSlotData struct {
+	Active bool
+	Count  int
+	Max    int
+	Delta  float64
+	Unit   string
+}
+
+// expColor returns a brand color based on experiment delta direction.
+func expColor(delta float64) lipgloss.Color {
+	c := theme.Current().Semantic()
+	switch {
+	case delta > 0:
+		return c.Success.Color()
+	case delta < 0:
+		return c.Warning.Color()
+	default:
+		return c.FgDim.Color()
+	}
 }
 
 // renderMeterRow renders the meter + sparkline as a single status row.
