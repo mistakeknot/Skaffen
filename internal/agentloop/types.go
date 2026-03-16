@@ -73,6 +73,21 @@ type FileActivity struct {
 	Operation string `json:"op"` // "read", "write", "edit"
 }
 
+// FailureType classifies the kind of failure in a turn.
+// Enables typed failure learning in the Reflect phase — the agent can
+// distinguish "wrong plan" from "wrong tool usage" from "hallucinated path"
+// and adjust its strategy accordingly.
+type FailureType string
+
+const (
+	FailNone          FailureType = ""              // success — no failure
+	FailToolError     FailureType = "tool_error"    // tool execution failed (timeout, permission, crash)
+	FailTestFailure   FailureType = "test_failure"  // tests failed after edit (nonzero exit from test runner)
+	FailHallucination FailureType = "hallucination" // referenced nonexistent file, function, or API
+	FailPlanError     FailureType = "plan_error"    // correct execution of wrong plan (tests pass but wrong behavior)
+	FailSyntaxError   FailureType = "syntax_error"  // produced invalid code (compile error, parse error)
+)
+
 // Evidence captures one turn's structured data for the reflect step.
 type Evidence struct {
 	Timestamp          string         `json:"timestamp"`
@@ -88,6 +103,7 @@ type Evidence struct {
 	StopReason         string         `json:"stop_reason"`
 	DurationMs         int64          `json:"duration_ms,omitempty"`
 	Outcome            string         `json:"outcome,omitempty"`
+	Failure            FailureType    `json:"failure_type,omitempty"`
 	BudgetSpent        int            `json:"budget_spent,omitempty"`
 	BudgetMax          int            `json:"budget_max,omitempty"`
 	BudgetPercentage   float64        `json:"budget_pct,omitempty"`
