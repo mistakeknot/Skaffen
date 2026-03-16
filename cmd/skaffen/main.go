@@ -18,6 +18,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/mistakeknot/Masaq/priompt"
 	"github.com/mistakeknot/Masaq/theme"
 	"github.com/mistakeknot/Skaffen/internal/agent"
 	"github.com/mistakeknot/Skaffen/internal/agentloop"
@@ -30,6 +31,7 @@ import (
 	"github.com/mistakeknot/Skaffen/internal/mutations"
 	"github.com/mistakeknot/Skaffen/internal/plugin"
 	"github.com/mistakeknot/Skaffen/internal/provider"
+	"github.com/mistakeknot/Skaffen/internal/repomap"
 	"github.com/mistakeknot/Skaffen/internal/router"
 	"github.com/mistakeknot/Skaffen/internal/sandbox"
 	"github.com/mistakeknot/Skaffen/internal/session"
@@ -301,6 +303,12 @@ func runPrint() error {
 	sigStore := mutations.NewStore(filepath.Join(cfg.UserDir(), "mutations"))
 	tool.RegisterQualityHistory(reg, sigStore)
 
+	// Build priompt sections: stable context-files + dynamic repomap
+	sections := []priompt.Element{
+		{Name: "context-files", Content: systemPrompt, Priority: 85, Stable: true},
+		repomap.NewElement(cfg.WorkDir()),
+	}
+
 	if *flagSession != "" {
 		sess := session.New(*flagSession, cfg.SessionDir(), systemPrompt, 20)
 		if err := sess.Load(); err != nil {
@@ -308,9 +316,10 @@ func runPrint() error {
 		}
 		sess.SetSignalReader(sigStore)
 		sess.SetInspiration(sigStore, prompt)
-		opts = append(opts, agent.WithSession(sess))
-	} else if systemPrompt != "" {
-		opts = append(opts, agent.WithSession(&agent.NoOpSession{Prompt: systemPrompt}))
+		opts = append(opts, agent.WithSession(session.NewPriomptSession(sess, sections)))
+	} else {
+		opts = append(opts, agent.WithSession(session.NewPriomptSession(
+			&agent.NoOpSession{Prompt: systemPrompt}, sections)))
 	}
 
 	// Evidence emission — always enabled
@@ -515,6 +524,12 @@ func runTUI() error {
 	sigStore := mutations.NewStore(filepath.Join(cfg.UserDir(), "mutations"))
 	tool.RegisterQualityHistory(reg, sigStore)
 
+	// Build priompt sections: stable context-files + dynamic repomap
+	tuiSections := []priompt.Element{
+		{Name: "context-files", Content: systemPrompt, Priority: 85, Stable: true},
+		repomap.NewElement(cfg.WorkDir()),
+	}
+
 	var tuiSession *session.JSONLSession
 	if *flagSession != "" {
 		tuiSession = session.New(*flagSession, cfg.SessionDir(), systemPrompt, 20)
@@ -523,9 +538,10 @@ func runTUI() error {
 		}
 		tuiSession.SetSignalReader(sigStore)
 		tuiSession.SetInspiration(sigStore, *flagPrompt) // prompt may be empty in TUI; inspiration only fires when non-empty
-		opts = append(opts, agent.WithSession(tuiSession))
-	} else if systemPrompt != "" {
-		opts = append(opts, agent.WithSession(&agent.NoOpSession{Prompt: systemPrompt}))
+		opts = append(opts, agent.WithSession(session.NewPriomptSession(tuiSession, tuiSections)))
+	} else {
+		opts = append(opts, agent.WithSession(session.NewPriomptSession(
+			&agent.NoOpSession{Prompt: systemPrompt}, tuiSections)))
 	}
 
 	// Evidence

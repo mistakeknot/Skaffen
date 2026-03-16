@@ -9,21 +9,22 @@ import (
 	"github.com/mistakeknot/Masaq/priompt"
 )
 
-// PriomptSession wraps a JSONLSession and uses priority-based prompt
+// PriomptSession wraps an agent.Session and uses priority-based prompt
 // composition to assemble the system prompt within a token budget.
 // It implements both agent.Session and agent.RenderReporter.
 type PriomptSession struct {
-	inner    *JSONLSession
+	inner    agent.Session
 	sections []priompt.Element
 
 	mu         sync.Mutex
 	lastRender priompt.RenderResult
 }
 
-// NewPriomptSession creates a PriomptSession wrapping the given JSONLSession.
-// If sections is nil or empty, no prompt elements are rendered and SystemPrompt
+// NewPriomptSession creates a PriomptSession wrapping the given session.
+// The inner session handles Save/Messages; PriomptSession owns SystemPrompt
+// rendering via priompt.Render. If sections is nil or empty, SystemPrompt
 // returns an empty string.
-func NewPriomptSession(inner *JSONLSession, sections []priompt.Element) *PriomptSession {
+func NewPriomptSession(inner agent.Session, sections []priompt.Element) *PriomptSession {
 	return &PriomptSession{
 		inner:    inner,
 		sections: sections,
