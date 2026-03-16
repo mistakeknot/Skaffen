@@ -44,7 +44,9 @@ func (t *LogExperimentTool) Schema() json.RawMessage {
 			"decision": {"type": "string", "enum": ["keep", "discard", "investigate"]},
 			"metric_value": {"type": "number", "description": "Primary metric value from run_experiment"},
 			"secondary_values": {"type": "object", "description": "Map of secondary metric name to value"},
-			"notes": {"type": "string", "description": "Optional notes about what was learned"}
+			"notes": {"type": "string", "description": "Optional notes about what was learned"},
+			"mutation_id": {"type": "string", "description": "Mutation ID if this experiment was driven by a structured mutation"},
+			"mutation_type": {"type": "string", "description": "Mutation type (parameter_sweep, swap, toggle, etc.)"}
 		},
 		"required": ["campaign", "decision", "metric_value"]
 	}`)
@@ -56,18 +58,22 @@ type logParams struct {
 	MetricValue     float64            `json:"metric_value"`
 	SecondaryValues map[string]float64 `json:"secondary_values"`
 	Notes           string             `json:"notes"`
+	MutationID      string             `json:"mutation_id,omitempty"`
+	MutationType    string             `json:"mutation_type,omitempty"`
 }
 
 type logResult struct {
-	ExperimentID     string  `json:"experiment_id"`
-	AgentDecision    string  `json:"agent_decision"`
-	EffectiveDecision string `json:"effective_decision"`
-	OverrideReason   string  `json:"override_reason,omitempty"`
-	Delta            float64 `json:"delta"`
-	CumulativeDelta  float64 `json:"cumulative_delta"`
-	GitSHA           string  `json:"git_sha,omitempty"`
-	CampaignComplete bool    `json:"campaign_complete"`
-	StopReason       string  `json:"stop_reason,omitempty"`
+	ExperimentID      string                       `json:"experiment_id"`
+	AgentDecision     string                       `json:"agent_decision"`
+	EffectiveDecision string                       `json:"effective_decision"`
+	OverrideReason    string                       `json:"override_reason,omitempty"`
+	Delta             float64                      `json:"delta"`
+	CumulativeDelta   float64                      `json:"cumulative_delta"`
+	GitSHA            string                       `json:"git_sha,omitempty"`
+	CampaignComplete  bool                         `json:"campaign_complete"`
+	StopReason        string                       `json:"stop_reason,omitempty"`
+	NextMutation      *experiment.ExpandedMutation `json:"next_mutation,omitempty"`
+	PendingMutations  int                          `json:"pending_mutations"`
 }
 
 func (t *LogExperimentTool) Execute(ctx context.Context, params json.RawMessage) ToolResult {
@@ -141,7 +147,7 @@ func (t *LogExperimentTool) Execute(ctx context.Context, params json.RawMessage)
 
 	// Write experiment record to JSONL
 	rec := experiment.ExperimentRecord{
-		Hypothesis:     p.Notes, // hypothesis text carried in notes for this tool
+		Hypothesis:     p.Notes,
 		Status:         status,
 		MetricBefore:   currentBest,
 		MetricAfter:    p.MetricValue,
@@ -152,6 +158,8 @@ func (t *LogExperimentTool) Execute(ctx context.Context, params json.RawMessage)
 		OverrideReason: overrideReason,
 		GitSHA:         gitSHA,
 		Notes:          p.Notes,
+		MutationID:     p.MutationID,
+		MutationType:   p.MutationType,
 	}
 
 	if err := seg.LogExperiment(rec); err != nil {
@@ -182,6 +190,8 @@ func (t *LogExperimentTool) Execute(ctx context.Context, params json.RawMessage)
 		GitSHA:            gitSHA,
 		CampaignComplete:  stop,
 		StopReason:        stopReason,
+		NextMutation:      seg.NextMutation(),
+		PendingMutations:  seg.PendingMutationCount(),
 	}
 
 	data, _ := json.Marshal(result)

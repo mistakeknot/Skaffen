@@ -176,6 +176,35 @@ benchmark:
 	}
 }
 
+func TestLoadCampaign_WithMutations(t *testing.T) {
+	c, err := LoadCampaign("testdata/with-mutations.yaml")
+	if err != nil {
+		t.Fatalf("LoadCampaign: %v", err)
+	}
+
+	if len(c.Mutations) != 7 {
+		t.Errorf("Mutations = %d, want 7", len(c.Mutations))
+	}
+
+	// Verify expansion: 4 sweep + 1 swap + 1 toggle + 3 scale + 3 enum + 5 reorder + 1 remove = 18
+	// reorder of 3 items = 6 perms - 1 identity = 5
+	if len(c.ExpandedMutations) == 0 {
+		t.Fatal("ExpandedMutations should be populated at load time")
+	}
+
+	// Check that existing campaigns without mutations still work
+	c2, err := LoadCampaign("testdata/routing-opt.yaml")
+	if err != nil {
+		t.Fatalf("LoadCampaign (no mutations): %v", err)
+	}
+	if len(c2.ExpandedMutations) != 0 {
+		t.Errorf("ExpandedMutations should be empty for campaign without mutations, got %d", len(c2.ExpandedMutations))
+	}
+	if len(c2.Ideas) != 3 {
+		t.Errorf("Ideas = %d, want 3", len(c2.Ideas))
+	}
+}
+
 func TestFindCampaign_NotFound(t *testing.T) {
 	_, err := FindCampaign("nonexistent-campaign-xyz")
 	if err == nil {

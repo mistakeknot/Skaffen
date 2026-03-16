@@ -1,0 +1,46 @@
+name: mutation-demo
+metric:
+  name: throughput
+  unit: ops/s
+  direction: maximize
+  baseline: 1000.0
+benchmark:
+  command: "echo throughput=1200"
+  metric_pattern: "throughput=([0-9]+)"
+  timeout: 10s
+budget:
+  max_experiments: 50
+  max_consecutive_failures: 5
+mutations:
+  - type: parameter_sweep
+    param: batch_size
+    file: internal/agent/config.go
+    range: [16, 64]
+    step: 16
+    description: "Sweep batch size from 16 to 64"
+  - type: swap
+    target: json.Marshal
+    replacement: jsoniter.Marshal
+    files: ["internal/tool/*.go"]
+  - type: toggle
+    flag: enable_cache
+    file: internal/session/cache.go
+  - type: scale
+    param: timeout_ms
+    file: internal/provider/anthropic/client.go
+    factors: [0.5, 2.0, 4.0]
+  - type: enum_sweep
+    param: model
+    values: ["haiku", "sonnet", "opus"]
+    file: internal/router/defaults.go
+  - type: reorder
+    items: ["observe", "orient", "decide"]
+    file: internal/agent/phases.go
+    max_permutations: 6
+  - type: remove
+    target: debug_metrics_collection
+    file: internal/evidence/emitter.go
+    lines: "45-52"
+ideas:
+  - "Reduce allocations in hot loop"
+  - "Use sync.Pool for temporary buffers"

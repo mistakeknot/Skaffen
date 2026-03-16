@@ -46,6 +46,8 @@ type ExperimentRecord struct {
 	GitSHA         string             `json:"git_sha,omitempty"`
 	DurationMs     int64              `json:"duration_ms"`
 	Notes          string             `json:"notes,omitempty"`
+	MutationID     string             `json:"mutation_id,omitempty"`
+	MutationType   string             `json:"mutation_type,omitempty"`
 }
 
 // SummaryRecord written at segment end with aggregate statistics.
@@ -107,11 +109,12 @@ func (s *Store) OpenSegment(campaign *Campaign, sessionID string) (*Segment, boo
 	}
 
 	seg = &Segment{
-		id:               segID,
-		campaignName:     campaign.Name,
-		storePath:        path,
-		originalBaseline: campaign.Metric.Baseline,
-		currentBest:      campaign.Metric.Baseline,
+		id:                 segID,
+		campaignName:       campaign.Name,
+		storePath:          path,
+		originalBaseline:   campaign.Metric.Baseline,
+		currentBest:        campaign.Metric.Baseline,
+		completedMutations: make(map[string]bool),
 	}
 	return seg, false, nil
 }
@@ -162,11 +165,12 @@ func (s *Store) LoadSegment(campaignName string) (*Segment, error) {
 				continue
 			}
 			seg = &Segment{
-				id:               rec.ID,
-				campaignName:     rec.Campaign,
-				storePath:        path,
-				originalBaseline: rec.OriginalBaseline,
-				currentBest:      rec.OriginalBaseline,
+				id:                 rec.ID,
+				campaignName:       rec.Campaign,
+				storePath:          path,
+				originalBaseline:   rec.OriginalBaseline,
+				currentBest:        rec.OriginalBaseline,
+				completedMutations: make(map[string]bool),
 			}
 
 		case RecordTypeExperiment:
@@ -190,6 +194,9 @@ func (s *Store) LoadSegment(campaignName string) (*Segment, error) {
 				seg.consecutiveFailures++
 			default:
 				seg.consecutiveFailures++
+			}
+			if rec.MutationID != "" {
+				seg.completedMutations[rec.MutationID] = true
 			}
 
 		case RecordTypeSummary:
@@ -247,6 +254,10 @@ type Segment struct {
 	keptCount           int
 	discardedCount      int
 	consecutiveFailures int
+
+	// Mutation tracking
+	completedMutations map[string]bool
+	pendingMutations   []ExpandedMutation
 }
 
 // ID returns the segment identifier.
@@ -277,6 +288,37 @@ func (s *Segment) ExperimentCount() int {
 	return s.experimentCount
 }
 
+// SetPendingMutations sets the pending mutations, filtering out already-completed ones.
+func (s *Segment) SetPendingMutations(all []ExpandedMutation) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.pendingMutations = nil
+	for _, m := range all {
+		if !s.completedMutations[m.ID] {
+			s.pendingMutations = append(s.pendingMutations, m)
+		}
+	}
+}
+
+// NextMutation returns the first pending mutation, or nil if exhausted.
+func (s *Segment) NextMutation() *ExpandedMutation {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if len(s.pendingMutations) == 0 {
+		return nil
+	}
+	// Return a copy to avoid race
+	m := s.pendingMutations[0]
+	return &m
+}
+
+// PendingMutationCount returns the number of mutations not yet tried.
+func (s *Segment) PendingMutationCount() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return len(s.pendingMutations)
+}
+
 // LogExperiment appends an experiment record to the JSONL file and updates state.
 func (s *Segment) LogExperiment(rec ExperimentRecord) error {
 	s.mu.Lock()
@@ -304,6 +346,21 @@ func (s *Segment) LogExperiment(rec ExperimentRecord) error {
 	}
 	s.cumulativeDelta = s.currentBest - s.originalBaseline
 
+	// Track mutation completion
+	if rec.MutationID != "" {
+		if s.completedMutations == nil {
+			s.completedMutations = make(map[string]bool)
+		}
+		s.completedMutations[rec.MutationID] = true
+		// Remove from pending
+		for i, m := range s.pendingMutations {
+			if m.ID == rec.MutationID {
+				s.pendingMutations = append(s.pendingMutations[:i], s.pendingMutations[i+1:]...)
+				break
+			}
+		}
+	}
+
 	return nil
 }
 
@@ -323,11 +380,12 @@ func (s *Segment) ShouldStop(maxExperiments, maxConsecFailures int) (bool, strin
 
 // ExperimentStatus is a value-copy snapshot of segment state for TUI display.
 type ExperimentStatus struct {
-	Active          bool
-	Count           int
-	Max             int
-	CumulativeDelta float64
-	Unit            string
+	Active           bool
+	Count            int
+	Max              int
+	CumulativeDelta  float64
+	Unit             string
+	PendingMutations int
 }
 
 // Snapshot returns a thread-safe value-copy of the current state.
@@ -335,11 +393,12 @@ func (s *Segment) Snapshot(maxExperiments int, unit string) ExperimentStatus {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return ExperimentStatus{
-		Active:          true,
-		Count:           s.experimentCount,
-		Max:             maxExperiments,
-		CumulativeDelta: s.cumulativeDelta,
-		Unit:            unit,
+		Active:           true,
+		Count:            s.experimentCount,
+		Max:              maxExperiments,
+		CumulativeDelta:  s.cumulativeDelta,
+		Unit:             unit,
+		PendingMutations: len(s.pendingMutations),
 	}
 }
 

@@ -372,6 +372,109 @@ func TestCrashRecoveryWorktree(t *testing.T) {
 	t.Log("Crash recovery: worktree cleaned, segment resumed correctly")
 }
 
+// TestMutationDrivenCampaign exercises the mutation→experiment→resume cycle.
+func TestMutationDrivenCampaign(t *testing.T) {
+	storeDir := filepath.Join(t.TempDir(), "experiments")
+	store := NewStore(storeDir)
+
+	// Campaign with 3 mutations: 1 sweep (3 values) + 1 swap + 1 toggle = 5 expanded
+	campaign := &Campaign{
+		Name:   "mut-test",
+		Metric: MetricConfig{Name: "speed", Baseline: 1.0},
+		Mutations: []Mutation{
+			{Type: MutationParameterSweep, Param: "threshold", Range: [2]float64{0.1, 0.3}, Step: 0.1},
+			{Type: MutationSwap, Target: "A", Replacement: "B"},
+			{Type: MutationToggle, Flag: "debug"},
+		},
+	}
+
+	// Expand mutations
+	expanded, err := ExpandMutations(campaign.Mutations)
+	if err != nil {
+		t.Fatal(err)
+	}
+	campaign.ExpandedMutations = expanded
+
+	if len(expanded) != 5 {
+		t.Fatalf("expanded = %d, want 5", len(expanded))
+	}
+
+	// Open segment and set pending mutations
+	seg, _, err := store.OpenSegment(campaign, "session-mut")
+	if err != nil {
+		t.Fatal(err)
+	}
+	seg.SetPendingMutations(expanded)
+
+	if seg.PendingMutationCount() != 5 {
+		t.Errorf("pending = %d, want 5", seg.PendingMutationCount())
+	}
+
+	// Process first 3 mutations
+	for i := 0; i < 3; i++ {
+		m := seg.NextMutation()
+		if m == nil {
+			t.Fatalf("NextMutation nil at %d, expected mutation", i)
+		}
+		t.Logf("Mutation %d: %s", i, m.ID)
+
+		seg.LogExperiment(ExperimentRecord{
+			MetricBefore:  1.0,
+			MetricAfter:   1.1,
+			Delta:         0.1,
+			AgentDecision: "keep",
+			Decision:      "keep",
+			MutationID:    m.ID,
+			MutationType:  string(m.Type),
+		})
+	}
+
+	if seg.PendingMutationCount() != 2 {
+		t.Errorf("after 3 mutations: pending = %d, want 2", seg.PendingMutationCount())
+	}
+
+	// Simulate crash: resume from JSONL
+	seg2, err := store.LoadSegment("mut-test")
+	if err != nil {
+		t.Fatalf("LoadSegment: %v", err)
+	}
+	seg2.SetPendingMutations(expanded) // Re-set with full list; completed are filtered
+
+	if seg2.PendingMutationCount() != 2 {
+		t.Errorf("after resume: pending = %d, want 2", seg2.PendingMutationCount())
+	}
+	if seg2.ExperimentCount() != 3 {
+		t.Errorf("after resume: experiments = %d, want 3", seg2.ExperimentCount())
+	}
+
+	// Process remaining 2 mutations
+	for i := 0; i < 2; i++ {
+		m := seg2.NextMutation()
+		if m == nil {
+			t.Fatalf("NextMutation nil at resumed %d", i)
+		}
+		seg2.LogExperiment(ExperimentRecord{
+			MetricBefore:  1.0,
+			MetricAfter:   1.1,
+			Delta:         0.1,
+			AgentDecision: "keep",
+			Decision:      "keep",
+			MutationID:    m.ID,
+			MutationType:  string(m.Type),
+		})
+	}
+
+	// All mutations exhausted
+	if seg2.NextMutation() != nil {
+		t.Error("NextMutation should be nil after all mutations processed")
+	}
+	if seg2.PendingMutationCount() != 0 {
+		t.Errorf("pending = %d, want 0", seg2.PendingMutationCount())
+	}
+
+	t.Logf("Mutation campaign: 5 mutations processed, resume correct, exhaustion detected")
+}
+
 // TestConsecutiveFailureStop verifies the campaign stops after N consecutive failures.
 func TestConsecutiveFailureStop(t *testing.T) {
 	storeDir := filepath.Join(t.TempDir(), "experiments")

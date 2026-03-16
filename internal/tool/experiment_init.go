@@ -55,13 +55,16 @@ type initParams struct {
 }
 
 type initResult struct {
-	CampaignName     string  `json:"campaign_name"`
-	Resumed          bool    `json:"resumed"`
-	OriginalBaseline float64 `json:"original_baseline"`
-	CurrentBest      float64 `json:"current_best"`
-	ExperimentCount  int     `json:"experiment_count"`
-	WorktreeDir      string  `json:"worktree_dir"`
-	Hypothesis       string  `json:"hypothesis"`
+	CampaignName     string                     `json:"campaign_name"`
+	Resumed          bool                       `json:"resumed"`
+	OriginalBaseline float64                    `json:"original_baseline"`
+	CurrentBest      float64                    `json:"current_best"`
+	ExperimentCount  int                        `json:"experiment_count"`
+	WorktreeDir      string                     `json:"worktree_dir"`
+	Hypothesis       string                     `json:"hypothesis"`
+	NextMutation     *experiment.ExpandedMutation `json:"next_mutation,omitempty"`
+	PendingMutations int                        `json:"pending_mutations"`
+	PendingIdeas     int                        `json:"pending_ideas"`
 }
 
 func (t *InitExperimentTool) Execute(ctx context.Context, params json.RawMessage) ToolResult {
@@ -93,6 +96,11 @@ func (t *InitExperimentTool) Execute(ctx context.Context, params json.RawMessage
 		return ToolResult{Content: fmt.Sprintf("segment open failed: %v", err), IsError: true}
 	}
 
+	// Set pending mutations (filters out already-completed ones)
+	if len(campaign.ExpandedMutations) > 0 {
+		seg.SetPendingMutations(campaign.ExpandedMutations)
+	}
+
 	result := initResult{
 		CampaignName:     campaign.Name,
 		Resumed:          resumed,
@@ -101,6 +109,9 @@ func (t *InitExperimentTool) Execute(ctx context.Context, params json.RawMessage
 		ExperimentCount:  seg.ExperimentCount(),
 		WorktreeDir:      t.wt.WorktreeDir(p.Campaign),
 		Hypothesis:       p.Hypothesis,
+		NextMutation:     seg.NextMutation(),
+		PendingMutations: seg.PendingMutationCount(),
+		PendingIdeas:     len(campaign.Ideas),
 	}
 
 	data, _ := json.Marshal(result)
@@ -112,6 +123,9 @@ func (t *InitExperimentTool) Execute(ctx context.Context, params json.RawMessage
 	} else {
 		status = fmt.Sprintf("Initialized campaign %q (baseline: %.4f). Worktree: %s\nHypothesis: %s",
 			campaign.Name, campaign.Metric.Baseline, t.wt.WorktreeDir(p.Campaign), p.Hypothesis)
+	}
+	if result.PendingMutations > 0 {
+		status += fmt.Sprintf("\nPending: %d mutations + %d ideas", result.PendingMutations, result.PendingIdeas)
 	}
 
 	// Include structured JSON for machine consumption

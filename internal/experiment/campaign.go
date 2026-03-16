@@ -26,6 +26,10 @@ type Campaign struct {
 	Git              GitConfig         `yaml:"git"`
 	Budget           BudgetConfig      `yaml:"budget"`
 	Ideas            []string          `yaml:"ideas"`
+	Mutations        []Mutation        `yaml:"mutations,omitempty"`
+
+	// ExpandedMutations is computed at load time, not from YAML.
+	ExpandedMutations []ExpandedMutation `yaml:"-"`
 }
 
 // MetricConfig defines the primary metric to optimize.
@@ -121,6 +125,15 @@ func LoadCampaign(path string) (*Campaign, error) {
 		c.Benchmark.Timeout = 120 * time.Second
 	}
 
+	// Expand mutations to concrete experiments
+	if len(c.Mutations) > 0 {
+		expanded, err := ExpandMutations(c.Mutations)
+		if err != nil {
+			return nil, fmt.Errorf("load campaign %q: %w", path, err)
+		}
+		c.ExpandedMutations = expanded
+	}
+
 	return &c, nil
 }
 
@@ -173,6 +186,12 @@ func (c *Campaign) validate() error {
 		}
 		if sm.Direction != Minimize && sm.Direction != Maximize {
 			return fmt.Errorf("secondary_metrics[%d].direction must be %q or %q", i, Minimize, Maximize)
+		}
+	}
+
+	for i, m := range c.Mutations {
+		if err := ValidateMutation(m); err != nil {
+			return fmt.Errorf("mutations[%d]: %w", i, err)
 		}
 	}
 
