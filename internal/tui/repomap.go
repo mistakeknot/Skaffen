@@ -1,14 +1,10 @@
 package tui
 
 import (
-	"fmt"
-	"go/ast"
-	"go/parser"
-	"go/token"
-	"os"
-	"path/filepath"
 	"sort"
 	"strings"
+
+	"github.com/mistakeknot/Skaffen/internal/repomap"
 )
 
 const (
@@ -18,47 +14,39 @@ const (
 
 // generateRepoMap walks a directory tree, parses Go files, and produces
 // a structural overview showing packages with their exported types and functions.
+// This is a thin wrapper around the repomap package.
 func generateRepoMap(root string) string {
-	pkgs := make(map[string][]string) // package path → symbols
-	fileCount := 0
-
-	filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
-		if err != nil {
-			return nil // skip unreadable dirs
-		}
-		// Skip hidden dirs, vendor, testdata, node_modules
-		if d.IsDir() {
-			base := d.Name()
-			if strings.HasPrefix(base, ".") || base == "vendor" || base == "testdata" || base == "node_modules" {
-				return filepath.SkipDir
-			}
-			return nil
-		}
-		if !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
-			return nil
-		}
-		if fileCount >= maxMapFiles {
-			return filepath.SkipAll
-		}
-		fileCount++
-
-		rel, _ := filepath.Rel(root, path)
-		dir := filepath.Dir(rel)
-
-		symbols := extractGoSymbols(path)
-		if len(symbols) > 0 {
-			pkgs[dir] = append(pkgs[dir], symbols...)
-		}
-		return nil
-	})
-
-	if len(pkgs) == 0 {
+	defs, _ := repomap.ExtractGoTags(root, maxMapFiles)
+	if len(defs) == 0 {
 		return ""
 	}
 
-	// Sort packages
-	dirs := make([]string, 0, len(pkgs))
-	for d := range pkgs {
+	// Group by directory (matching the original alphabetical output)
+	type pkgInfo struct {
+		dir     string
+		symbols []string
+	}
+	pkgMap := make(map[string]*pkgInfo)
+	for _, d := range defs {
+		dir := dirOf(d.File)
+		if pkgMap[dir] == nil {
+			pkgMap[dir] = &pkgInfo{dir: dir}
+		}
+		var sym string
+		switch d.Kind {
+		case "method":
+			sym = "func (" + d.Scope + ") " + d.Name + "()"
+		case "func":
+			sym = "func " + d.Name + "()"
+		case "type":
+			sym = "type " + d.Name
+		}
+		pkgMap[dir].symbols = append(pkgMap[dir].symbols, sym)
+	}
+
+	// Sort packages alphabetically (original behavior)
+	dirs := make([]string, 0, len(pkgMap))
+	for d := range pkgMap {
 		dirs = append(dirs, d)
 	}
 	sort.Strings(dirs)
@@ -68,26 +56,24 @@ func generateRepoMap(root string) string {
 	b.WriteString(strings.Repeat("=", 40) + "\n\n")
 
 	for _, dir := range dirs {
-		symbols := pkgs[dir]
-		if len(symbols) == 0 {
+		info := pkgMap[dir]
+		if len(info.symbols) == 0 {
 			continue
 		}
 		// Deduplicate
 		seen := make(map[string]bool)
 		var unique []string
-		for _, s := range symbols {
+		for _, s := range info.symbols {
 			if !seen[s] {
 				seen[s] = true
 				unique = append(unique, s)
 			}
 		}
-
-		fmt.Fprintf(&b, "%s/\n", dir)
+		b.WriteString(dir + "/\n")
 		for _, s := range unique {
-			fmt.Fprintf(&b, "  %s\n", s)
+			b.WriteString("  " + s + "\n")
 		}
 		b.WriteString("\n")
-
 		if b.Len() > maxMapOutput {
 			b.WriteString("... (truncated)\n")
 			break
@@ -97,49 +83,11 @@ func generateRepoMap(root string) string {
 	return strings.TrimRight(b.String(), "\n")
 }
 
-// extractGoSymbols parses a Go file and returns exported symbols.
-// Format: "type TypeName", "func FuncName()", "func (T) Method()"
-func extractGoSymbols(path string) []string {
-	fset := token.NewFileSet()
-	f, err := parser.ParseFile(fset, path, nil, 0)
-	if err != nil {
-		return nil
+// dirOf returns filepath.Dir without importing path/filepath to keep this thin.
+func dirOf(path string) string {
+	i := strings.LastIndexByte(path, '/')
+	if i < 0 {
+		return "."
 	}
-
-	var symbols []string
-	for _, decl := range f.Decls {
-		switch d := decl.(type) {
-		case *ast.GenDecl:
-			for _, spec := range d.Specs {
-				switch s := spec.(type) {
-				case *ast.TypeSpec:
-					if s.Name.IsExported() {
-						symbols = append(symbols, fmt.Sprintf("type %s", s.Name.Name))
-					}
-				}
-			}
-		case *ast.FuncDecl:
-			if d.Name.IsExported() {
-				if d.Recv != nil && len(d.Recv.List) > 0 {
-					recv := formatRecv(d.Recv.List[0].Type)
-					symbols = append(symbols, fmt.Sprintf("func (%s) %s()", recv, d.Name.Name))
-				} else {
-					symbols = append(symbols, fmt.Sprintf("func %s()", d.Name.Name))
-				}
-			}
-		}
-	}
-	return symbols
-}
-
-// formatRecv extracts the receiver type name from an AST expression.
-func formatRecv(expr ast.Expr) string {
-	switch t := expr.(type) {
-	case *ast.StarExpr:
-		return "*" + formatRecv(t.X)
-	case *ast.Ident:
-		return t.Name
-	default:
-		return "?"
-	}
+	return path[:i]
 }

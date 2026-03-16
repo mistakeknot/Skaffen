@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/mistakeknot/Skaffen/internal/repomap"
 )
 
 func TestGenerateRepoMap(t *testing.T) {
@@ -61,10 +63,9 @@ func TestSomething() {}
 	}
 }
 
-func TestExtractGoSymbols(t *testing.T) {
+func TestExtractGoTags_ExportedOnly(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, "example.go")
-	os.WriteFile(path, []byte(`package example
+	os.WriteFile(filepath.Join(dir, "example.go"), []byte(`package example
 
 type MyType struct{}
 type private struct{}
@@ -74,8 +75,8 @@ func unexported() {}
 func (m *MyType) Method() {}
 `), 0644)
 
-	symbols := extractGoSymbols(path)
-	if len(symbols) != 3 {
-		t.Fatalf("expected 3 exported symbols, got %d: %v", len(symbols), symbols)
+	defs, _ := repomap.ExtractGoTags(dir, 100)
+	if len(defs) != 3 {
+		t.Fatalf("expected 3 exported symbols, got %d: %+v", len(defs), defs)
 	}
 }
