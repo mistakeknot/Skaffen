@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"flag"
@@ -8,6 +9,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"os/exec"
 	"os/signal"
 	"path/filepath"
 	"runtime"
@@ -60,6 +62,8 @@ var (
 	flagYolo      = flag.Bool("yolo", false, "Disable all sandbox enforcement (alias for --dangerously-disable-sandbox)")
 	flagNoSandbox = flag.Bool("dangerously-disable-sandbox", false, "Disable all sandbox enforcement")
 	flagSandboxMode = flag.String("sandbox", "default", "Sandbox mode: default, strict")
+	flagIterate   = flag.Int("iterate", 0, "Max iterate-on-failure cycles (0 = single-shot, print mode only)")
+	flagTestCmd   = flag.String("test-cmd", "", "Shell command to run tests between iterate cycles (required with --iterate)")
 )
 
 func main() {
@@ -316,47 +320,109 @@ func runPrint() error {
 		fmt.Fprintln(os.Stderr, "skaffen: plan mode (read-only)")
 	}
 
+	// Validate iterate flags
+	maxIterations := *flagIterate
+	testCmd := *flagTestCmd
+	if maxIterations > 0 && testCmd == "" {
+		return fmt.Errorf("--test-cmd is required when using --iterate")
+	}
+
 	// Expand @mentions: extract images first, then text files
 	workDir := cfg.WorkDir()
 	displayText, imageBlocks := tui.ExpandImageMentions(prompt, workDir)
 	expandedPrompt := tui.ExpandAtMentions(displayText, workDir)
 
-	// Run agent loop
-	var result *agent.RunResult
-	if len(imageBlocks) > 0 {
-		result, err = a.RunWithImages(ctx, expandedPrompt, imageBlocks)
-	} else {
-		result, err = a.Run(ctx, expandedPrompt)
-	}
-	if err != nil {
-		return err
+	// Iterate loop: run agent, test, retry on failure
+	iteration := 0
+	currentPrompt := expandedPrompt
+	var totalUsage provider.Usage
+
+	for {
+		iteration++
+
+		// Run agent loop
+		var result *agent.RunResult
+		if iteration == 1 && len(imageBlocks) > 0 {
+			result, err = a.RunWithImages(ctx, currentPrompt, imageBlocks)
+		} else {
+			result, err = a.Run(ctx, currentPrompt)
+		}
+		if err != nil {
+			return err
+		}
+
+		// Accumulate usage across iterations
+		totalUsage.InputTokens += result.Usage.InputTokens
+		totalUsage.OutputTokens += result.Usage.OutputTokens
+		totalUsage.CacheCreationInputTokens += result.Usage.CacheCreationInputTokens
+		totalUsage.CacheReadInputTokens += result.Usage.CacheReadInputTokens
+
+		// Print response to stdout
+		fmt.Print(result.Response)
+
+		// If no iterate mode or max iterations reached, we're done
+		if maxIterations == 0 || iteration > maxIterations {
+			break
+		}
+
+		// Run test command
+		fmt.Fprintf(os.Stderr, "\n[iterate %d/%d] running test: %s\n", iteration, maxIterations, testCmd)
+		testResult, testErr := runTestCmd(ctx, testCmd)
+		if testErr == nil {
+			fmt.Fprintf(os.Stderr, "[iterate %d/%d] tests passed — done\n", iteration, maxIterations)
+			break
+		}
+
+		// Tests failed — feed failure back for next iteration
+		fmt.Fprintf(os.Stderr, "[iterate %d/%d] tests failed, retrying...\n", iteration, maxIterations)
+		currentPrompt = fmt.Sprintf(
+			"The previous fix attempt did not resolve the issue. The test command `%s` failed.\n\n"+
+				"Test output:\n```\n%s\n```\n\n"+
+				"Please analyze the test failure, identify what went wrong with the previous fix, "+
+				"and try a different approach. Focus on the root cause indicated by the test output.",
+			testCmd, testResult,
+		)
 	}
 
-	// Print response to stdout
-	fmt.Print(result.Response)
-
-	// Print usage to stderr (include cache tokens if nonzero)
-	if result.Usage.CacheReadInputTokens > 0 || result.Usage.CacheCreationInputTokens > 0 {
-		fmt.Fprintf(os.Stderr, "\n[%d turns, %d in / %d out tokens, %d cache_read / %d cache_create]\n",
-			result.Turns, result.Usage.InputTokens, result.Usage.OutputTokens,
-			result.Usage.CacheReadInputTokens, result.Usage.CacheCreationInputTokens)
+	// Print total usage to stderr
+	if totalUsage.CacheReadInputTokens > 0 || totalUsage.CacheCreationInputTokens > 0 {
+		fmt.Fprintf(os.Stderr, "\n[%d iteration(s), %d in / %d out tokens, %d cache_read / %d cache_create]\n",
+			iteration, totalUsage.InputTokens, totalUsage.OutputTokens,
+			totalUsage.CacheReadInputTokens, totalUsage.CacheCreationInputTokens)
 	} else {
-		fmt.Fprintf(os.Stderr, "\n[%d turns, %d in / %d out tokens]\n",
-			result.Turns, result.Usage.InputTokens, result.Usage.OutputTokens)
+		fmt.Fprintf(os.Stderr, "\n[%d iteration(s), %d in / %d out tokens]\n",
+			iteration, totalUsage.InputTokens, totalUsage.OutputTokens)
 	}
 
 	// Report tokens to intercore (best-effort, fire-and-forget)
 	if ic != nil {
 		ic.ReportTokens(router.TokenReport{
 			SessionID:           sessionID,
-			InputTokens:         result.Usage.InputTokens,
-			OutputTokens:        result.Usage.OutputTokens,
-			CacheCreationTokens: result.Usage.CacheCreationInputTokens,
-			CacheReadTokens:     result.Usage.CacheReadInputTokens,
+			InputTokens:         totalUsage.InputTokens,
+			OutputTokens:        totalUsage.OutputTokens,
+			CacheCreationTokens: totalUsage.CacheCreationInputTokens,
+			CacheReadTokens:     totalUsage.CacheReadInputTokens,
 		})
 	}
 
 	return nil
+}
+
+// runTestCmd executes a test command and returns its combined output.
+// Returns nil error if the command exits 0 (tests pass).
+func runTestCmd(ctx context.Context, cmdStr string) (string, error) {
+	cmd := exec.CommandContext(ctx, "bash", "-c", cmdStr)
+	var buf bytes.Buffer
+	cmd.Stdout = &buf
+	cmd.Stderr = &buf
+	err := cmd.Run()
+	output := buf.String()
+	// Truncate very long output to avoid blowing up the context window
+	const maxOutput = 8000
+	if len(output) > maxOutput {
+		output = output[:maxOutput/2] + "\n\n... (truncated) ...\n\n" + output[len(output)-maxOutput/2:]
+	}
+	return output, err
 }
 
 func runTUI() error {

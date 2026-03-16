@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -179,6 +180,57 @@ func TestBuildSystemPromptEmpty(t *testing.T) {
 	if result != "" {
 		t.Fatalf("expected empty result, got: %s", result)
 	}
+}
+
+func TestIterateRequiresTestCmd(t *testing.T) {
+	binary := t.TempDir() + "/skaffen"
+	cmd := exec.Command("go", "build", "-o", binary, ".")
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("build failed: %v\n%s", err, out)
+	}
+
+	cmd = exec.Command(binary, "-mode", "print", "-iterate", "3", "-p", "fix the bug")
+	cmd.Env = append(os.Environ(), "ANTHROPIC_API_KEY=test-key")
+	out, err := cmd.CombinedOutput()
+	if err == nil {
+		t.Error("expected error when --iterate used without --test-cmd")
+	}
+	if !bytes.Contains(out, []byte("--test-cmd is required")) {
+		t.Errorf("error message: %s", string(out))
+	}
+}
+
+func TestRunTestCmd(t *testing.T) {
+	t.Run("passing", func(t *testing.T) {
+		output, err := runTestCmd(context.Background(), "echo 'all tests passed'")
+		if err != nil {
+			t.Errorf("expected pass, got error: %v", err)
+		}
+		if !strings.Contains(output, "all tests passed") {
+			t.Errorf("unexpected output: %s", output)
+		}
+	})
+
+	t.Run("failing", func(t *testing.T) {
+		output, err := runTestCmd(context.Background(), "echo 'FAILED test_foo' && exit 1")
+		if err == nil {
+			t.Error("expected failure")
+		}
+		if !strings.Contains(output, "FAILED test_foo") {
+			t.Errorf("unexpected output: %s", output)
+		}
+	})
+
+	t.Run("truncation", func(t *testing.T) {
+		// Generate output larger than 8000 chars
+		output, _ := runTestCmd(context.Background(), "python3 -c \"print('x' * 20000)\"")
+		if len(output) > 10000 {
+			t.Errorf("expected truncated output, got %d chars", len(output))
+		}
+		if !strings.Contains(output, "truncated") {
+			t.Errorf("expected truncation marker in output")
+		}
+	})
 }
 
 func TestAutoDetectProvider(t *testing.T) {

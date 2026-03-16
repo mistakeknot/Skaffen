@@ -15,6 +15,7 @@ import (
 	"github.com/mistakeknot/Masaq/question"
 	msettings "github.com/mistakeknot/Masaq/settings"
 	"github.com/mistakeknot/Masaq/spinner"
+	"github.com/mistakeknot/Masaq/tabbar"
 )
 
 // --- helpers ---
@@ -96,7 +97,7 @@ func TestWindowResize(t *testing.T) {
 	}
 	// Status bar width is internal to statusbar.Model; verify it renders
 	// at the new width by checking output is non-empty.
-	updateStatusSlots(&app.status, "build", "opus", 0, 0, 0, false, "")
+	updateStatusSlots(&app.status, "build", "opus", 0, 0, 0, false, "", experimentSlotData{})
 	if app.status.View() == "" {
 		t.Error("status bar should render after resize")
 	}
@@ -949,7 +950,7 @@ func TestScrollIndicatorHiddenAtBottom(t *testing.T) {
 	// Content fits on screen — no indicator
 	m.viewport.AppendContent("short content\n")
 	view := m.View()
-	if strings.Contains(view, "new content") {
+	if strings.Contains(view, "more lines") {
 		t.Fatal("scroll indicator should not show when at bottom")
 	}
 }
@@ -963,7 +964,7 @@ func TestScrollIndicatorShownWhenScrolledUp(t *testing.T) {
 	// Scroll up so we're no longer at bottom
 	m.viewport.ScrollUp(10)
 	view := m.View()
-	if !strings.Contains(view, "new content") {
+	if !strings.Contains(view, "more lines") {
 		t.Fatal("scroll indicator should show when scrolled up with overflow content")
 	}
 }
@@ -977,14 +978,41 @@ func TestScrollIndicatorHiddenAfterScrollToBottom(t *testing.T) {
 	m.viewport.ScrollUp(10)
 	// Verify indicator appears
 	view := m.View()
-	if !strings.Contains(view, "new content") {
+	if !strings.Contains(view, "more lines") {
 		t.Fatal("scroll indicator should show before scrolling back")
 	}
 	// Now scroll back to bottom
 	m.viewport.ScrollToBottom()
 	view = m.View()
-	if strings.Contains(view, "new content") {
+	if strings.Contains(view, "more lines") {
 		t.Fatal("scroll indicator should hide after scrolling to bottom")
+	}
+}
+
+func TestShowFromTopScrollsToStartOfOutput(t *testing.T) {
+	m := setup(t)
+	m.logo.stop()
+	// Fill viewport with old content so it's already scrolled
+	for i := 0; i < 50; i++ {
+		m.viewport.AppendContent(fmt.Sprintf("old line %d\n", i))
+	}
+	// Simulate a ShowFromTop command result (like /help) with enough lines to overflow
+	var helpLines strings.Builder
+	for i := 1; i <= 40; i++ {
+		helpLines.WriteString(fmt.Sprintf("help line %d\n", i))
+	}
+	m.Update(commandResultMsg{
+		Message:     helpLines.String(),
+		ShowFromTop: true,
+	})
+	// The viewport should NOT be at the bottom — it should show help from the top
+	if m.viewport.AtBottom() {
+		t.Fatal("ShowFromTop should scroll to the start of the command output, not the bottom")
+	}
+	// The view should contain the beginning of the help output
+	view := m.viewport.View()
+	if !strings.Contains(view, "help line 1") {
+		t.Fatal("ShowFromTop should make the first line of help visible")
 	}
 }
 
@@ -1023,5 +1051,90 @@ func TestEscInOverlayDoesNotStopAgent(t *testing.T) {
 
 	if cancelled {
 		t.Fatal("Esc in approval overlay should not stop the agent")
+	}
+}
+
+// --- Minsize guard ---
+
+func TestMinsizeBlocksSmallTerminal(t *testing.T) {
+	m := newAppModel(Config{WorkDir: t.TempDir()})
+	m.Update(tea.WindowSizeMsg{Width: 30, Height: 5})
+
+	view := m.View()
+	if !strings.Contains(view, "Terminal too small") {
+		t.Fatal("view should show minsize warning for small terminal")
+	}
+	// Should NOT contain normal chrome
+	if strings.Contains(view, "Ask anything") {
+		t.Fatal("normal prompt should not render when terminal is too small")
+	}
+}
+
+func TestMinsizeAllowsNormalTerminal(t *testing.T) {
+	m := newAppModel(Config{WorkDir: t.TempDir()})
+	m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+
+	view := m.View()
+	if strings.Contains(view, "Terminal too small") {
+		t.Fatal("minsize warning should not show for normal-sized terminal")
+	}
+	if !strings.Contains(view, "Ask anything") {
+		t.Fatal("normal prompt should render for normal-sized terminal")
+	}
+}
+
+func TestMinsizeThresholds(t *testing.T) {
+	m := newAppModel(Config{})
+	// Exact minimum should pass
+	m.Update(tea.WindowSizeMsg{Width: 40, Height: 10})
+	if m.sizeGuard.ShouldBlock() {
+		t.Fatal("exact minimum dimensions should not block")
+	}
+	// One below minimum width should block
+	m.Update(tea.WindowSizeMsg{Width: 39, Height: 10})
+	if !m.sizeGuard.ShouldBlock() {
+		t.Fatal("below minimum width should block")
+	}
+	// One below minimum height should block
+	m.Update(tea.WindowSizeMsg{Width: 40, Height: 9})
+	if !m.sizeGuard.ShouldBlock() {
+		t.Fatal("below minimum height should block")
+	}
+}
+
+// --- Tabbar ---
+
+func TestTabbarInitialized(t *testing.T) {
+	m := newAppModel(Config{})
+	if m.tabs.Active() != 0 {
+		t.Fatalf("initial tab = %d, want 0", m.tabs.Active())
+	}
+	view := m.tabs.View()
+	if !strings.Contains(view, "Chat") {
+		t.Fatal("tabbar should contain Chat tab")
+	}
+}
+
+func TestTabbarRenderedInView(t *testing.T) {
+	m := setup(t)
+	view := m.View()
+	if !strings.Contains(view, "Chat") {
+		t.Fatal("main view should contain tabbar with Chat tab")
+	}
+}
+
+func TestTabbarChangedMsgHandled(t *testing.T) {
+	m := setup(t)
+	// Should not panic on tabbar.ChangedMsg
+	m.Update(tabbar.ChangedMsg{Index: 0})
+}
+
+func TestTabbarReceivesWindowSize(t *testing.T) {
+	m := newAppModel(Config{})
+	m.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
+	// Tabbar should have width set — verify it renders without truncation issues
+	view := m.tabs.View()
+	if view == "" {
+		t.Fatal("tabbar should render after receiving window size")
 	}
 }

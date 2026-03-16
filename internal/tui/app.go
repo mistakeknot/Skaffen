@@ -27,11 +27,13 @@ import (
 	"github.com/mistakeknot/Masaq/keys"
 	"github.com/mistakeknot/Masaq/markdown"
 	"github.com/mistakeknot/Masaq/meter"
+	"github.com/mistakeknot/Masaq/minsize"
 	"github.com/mistakeknot/Masaq/question"
 	msettings "github.com/mistakeknot/Masaq/settings"
 	"github.com/mistakeknot/Masaq/sparkline"
 	"github.com/mistakeknot/Masaq/spinner"
 	"github.com/mistakeknot/Masaq/statusbar"
+	"github.com/mistakeknot/Masaq/tabbar"
 	"github.com/mistakeknot/Masaq/theme"
 	"github.com/mistakeknot/Masaq/viewport"
 )
@@ -65,6 +67,10 @@ type SubagentInit struct {
 
 // subagentStatusMsg wraps a subagent.StatusUpdate for the Bubble Tea message loop.
 type subagentStatusMsg subagent.StatusUpdate
+
+// experimentStatusMsg carries autoresearch experiment state to the TUI.
+// Sent by experiment tools via a callback registered at construction.
+type experimentStatusMsg experimentSlotData
 
 // Run starts the TUI REPL.
 func Run(cfg Config) error {
@@ -162,7 +168,8 @@ type appModel struct {
 	totalCost     float64
 	contextPct    float64
 	modelName     string
-	sandboxLabel  string // status bar label: "sandbox", "strict", "YOLO", or ""
+	sandboxLabel  string             // status bar label: "sandbox", "strict", "YOLO", or ""
+	expStatus     experimentSlotData // autoresearch experiment progress
 	keybindings   *Keybindings
 	running       bool
 
@@ -213,6 +220,12 @@ type appModel struct {
 
 	// Tool timers: track start time of in-flight tool calls by name
 	toolTimers map[string]time.Time
+
+	// Minimum terminal size guard
+	sizeGuard minsize.Model
+
+	// Tab bar for view switching
+	tabs tabbar.Model
 }
 
 func newAppModel(cfg Config) *appModel {
@@ -259,6 +272,9 @@ func newAppModel(cfg Config) *appModel {
 	})
 	kb := LoadKeybindings(cfg.KeybindingsPaths)
 	pm.keybindings = kb
+	tb := tabbar.New([]tabbar.Tab{
+		{Label: "Chat", Key: "c"},
+	})
 	return &appModel{
 		viewport:     vp,
 		md:           markdown.New(80),
@@ -286,6 +302,8 @@ func newAppModel(cfg Config) *appModel {
 		pinner:       skill.NewPinner(cfg.Skills),
 		contextMeter: newContextMeter(80),
 		tokenSpark:   newTokenSparkline(80),
+		sizeGuard:    minsize.New(40, 10),
+		tabs:         tb,
 	}
 }
 
@@ -300,8 +318,9 @@ func (m *appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
-		// Layout: breadcrumb=1, scroll-hint=1, meter=1, status=1, prompt=3, rest=viewport
-		vpHeight := m.height - 7 // 1 breadcrumb + 1 scroll-hint + 1 meter + 1 status + 3 prompt
+		m.sizeGuard.SetSize(msg.Width, msg.Height)
+		// Layout: tabbar=1, breadcrumb=1, scroll-hint=1, meter=1, status=1, prompt=3, rest=viewport
+		vpHeight := m.height - 8 // 1 tabbar + 1 breadcrumb + 1 scroll-hint + 1 meter + 1 status + 3 prompt
 		if vpHeight < 1 {
 			vpHeight = 1
 		}
@@ -315,6 +334,8 @@ func (m *appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.contextMeter.SetValue(float64(contextMaxTokens)*m.contextPct/100, contextMaxTokens)
 		m.tokenSpark = newTokenSparkline(m.width)
 		m.logo.width = m.width
+		// Forward size to tabbar
+		m.tabs, _ = m.tabs.Update(msg)
 
 	case logoTickMsg:
 		if m.logo.active {
@@ -636,6 +657,13 @@ func (m *appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.viewport.AppendContent("\r" + m.subagents.View(m.width) + "\n")
 		}
 
+	case experimentStatusMsg:
+		m.expStatus = experimentSlotData(msg)
+
+	case tabbar.ChangedMsg:
+		// Tab changed — future: switch visible content view
+		_ = msg.Index
+
 	case agentDoneMsg:
 		m.running = false
 		m.cancelRun = nil
@@ -651,12 +679,18 @@ func (m *appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m *appModel) View() string {
+	// Terminal too small — show warning instead of the full layout.
+	if m.sizeGuard.ShouldBlock() {
+		return m.sizeGuard.View()
+	}
+
 	logoView := m.logo.View()
 	vpView := m.viewport.View()
+	tabView := m.tabs.View()
 
 	// Update status slots with current state.
 	planMode := m.agent != nil && m.agent.PlanMode()
-	updateStatusSlots(&m.status, m.phase, m.modelName, m.totalCost, m.contextPct, m.turns, planMode, m.sandboxLabel)
+	updateStatusSlots(&m.status, m.phase, m.modelName, m.totalCost, m.contextPct, m.turns, planMode, m.sandboxLabel, m.expStatus)
 	statusView := m.status.View()
 	crumbView := m.crumbs.View()
 
@@ -665,10 +699,10 @@ func (m *appModel) View() string {
 	meterView := renderMeterRow(m.contextMeter, m.tokenSpark, m.width)
 
 	// Logo sits above viewport, taking space from viewport height.
-	// Chrome height: 1 scroll-hint + 3 prompt + 1 rule + 1 breadcrumb
-	//              + 1 rule + 1 meter + 1 rule + 1 status = 10
+	// Chrome height: 1 tabbar + 1 scroll-hint + 3 prompt + 1 rule + 1 breadcrumb
+	//              + 1 rule + 1 meter + 1 rule + 1 status = 11
 	logoHeight := strings.Count(logoView, "\n")
-	vpHeight := m.height - 10 - logoHeight
+	vpHeight := m.height - 11 - logoHeight
 	if vpHeight < 1 {
 		vpHeight = 1
 	}
@@ -687,15 +721,15 @@ func (m *appModel) View() string {
 	statusArea := lipgloss.JoinVertical(lipgloss.Left, rule, crumbView, rule, meterView, rule, statusView)
 
 	if m.approving {
-		return lipgloss.JoinVertical(lipgloss.Left, logoView, vpView, scrollHint, m.approvalQ.View(), statusArea)
+		return lipgloss.JoinVertical(lipgloss.Left, tabView, logoView, vpView, scrollHint, m.approvalQ.View(), statusArea)
 	}
 
 	if m.settingsOpen {
-		return lipgloss.JoinVertical(lipgloss.Left, logoView, vpView, scrollHint, m.settingsOverlay.View(), statusArea)
+		return lipgloss.JoinVertical(lipgloss.Left, tabView, logoView, vpView, scrollHint, m.settingsOverlay.View(), statusArea)
 	}
 
 	promptView := m.prompt.View(m.width, m.running, m.spinner.View())
-	return lipgloss.JoinVertical(lipgloss.Left, logoView, vpView, scrollHint, promptView, statusArea)
+	return lipgloss.JoinVertical(lipgloss.Left, tabView, logoView, vpView, scrollHint, promptView, statusArea)
 }
 
 // drainApproval sends false to a pending approval channel so the agent
