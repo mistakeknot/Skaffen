@@ -28,6 +28,7 @@ import (
 	"github.com/mistakeknot/Skaffen/internal/evidence"
 	"github.com/mistakeknot/Skaffen/internal/mcp"
 	"github.com/mistakeknot/Skaffen/internal/mutations"
+	"github.com/mistakeknot/Skaffen/internal/plugin"
 	"github.com/mistakeknot/Skaffen/internal/provider"
 	"github.com/mistakeknot/Skaffen/internal/router"
 	"github.com/mistakeknot/Skaffen/internal/sandbox"
@@ -181,6 +182,18 @@ func initConfig() (*config.Config, *router.Config, map[string]mcp.PluginConfig, 
 		}
 		if pluginsCfg == nil {
 			pluginsCfg = make(map[string]mcp.PluginConfig)
+		}
+	}
+
+	// Auto-discover Interverse plugins (MCP servers merged here;
+	// skills/commands/agents/hooks injected later in runTUI/runPrint)
+	if ivDir := cfg.InterverseDir(); ivDir != "" {
+		discovered, err := mcp.DiscoverPlugins(ivDir)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "skaffen: warning: interverse discovery: %v\n", err)
+		} else if len(discovered) > 0 {
+			// Discovered plugins are base; explicit plugins.toml wins on collision
+			pluginsCfg = mcp.MergePluginConfigs(discovered, pluginsCfg)
 		}
 	}
 
@@ -538,6 +551,21 @@ func runTUI() error {
 
 	// Subagent system: registry + tool + runner (runner wired after TUI starts)
 	subReg := subagent.NewTypeRegistry(filepath.Join(cfg.WorkDir(), ".skaffen", "agents"))
+
+	// Auto-discover Interverse plugin capabilities (skills, commands, agents)
+	// MCP servers were already merged in initConfig(); this handles the rest.
+	if ivDir := cfg.InterverseDir(); ivDir != "" {
+		ivPlugins, err := plugin.Discover(ivDir)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "skaffen: warning: interverse plugins: %v\n", err)
+		}
+		for _, p := range ivPlugins {
+			plugin.Inject(p, pluginsCfg, skills, customCmds, subReg, nil)
+		}
+		if len(ivPlugins) > 0 {
+			fmt.Fprintf(os.Stderr, "skaffen: loaded %d interverse plugin(s)\n", len(ivPlugins))
+		}
+	}
 	agentTool := subagent.NewAgentTool(subReg, nil) // runner set lazily
 	reg.RegisterForPhases(&agentloopToolBridge{inner: agentTool}, []tool.Phase{tool.PhaseAct})
 

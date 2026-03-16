@@ -86,6 +86,15 @@ func (r *TypeRegistry) List() []SubagentType {
 	return result
 }
 
+// Register adds a subagent type to the registry. If a type with the same
+// name already exists, the existing type is preserved (first-registered wins).
+func (r *TypeRegistry) Register(st SubagentType) {
+	if _, exists := r.types[st.Name]; exists {
+		return
+	}
+	r.types[st.Name] = st
+}
+
 // Names returns sorted type names (for Agent tool schema enum).
 func (r *TypeRegistry) Names() []string {
 	names := make([]string, 0, len(r.types))

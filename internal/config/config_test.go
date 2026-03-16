@@ -421,6 +421,54 @@ func TestSkillDirs_Precedence(t *testing.T) {
 	}
 }
 
+func TestInterverseDir_Exists(t *testing.T) {
+	root := t.TempDir()
+
+	ivDir := filepath.Join(root, "interverse")
+	if err := os.MkdirAll(ivDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := &Config{
+		userDir:    filepath.Join(root, "user"),
+		projectDir: root,
+		workDir:    root,
+	}
+
+	got := cfg.InterverseDir()
+	if got != ivDir {
+		t.Errorf("InterverseDir = %q, want %q", got, ivDir)
+	}
+}
+
+func TestInterverseDir_NoDir(t *testing.T) {
+	root := t.TempDir()
+
+	cfg := &Config{
+		userDir:    filepath.Join(root, "user"),
+		projectDir: root,
+		workDir:    root,
+	}
+
+	got := cfg.InterverseDir()
+	if got != "" {
+		t.Errorf("InterverseDir = %q, want empty (no interverse/ dir)", got)
+	}
+}
+
+func TestInterverseDir_NoProject(t *testing.T) {
+	cfg := &Config{
+		userDir:    "/home/test/.skaffen",
+		projectDir: "",
+		workDir:    "/tmp",
+	}
+
+	got := cfg.InterverseDir()
+	if got != "" {
+		t.Errorf("InterverseDir = %q, want empty (no project root)", got)
+	}
+}
+
 func TestFileExists(t *testing.T) {
 	dir := t.TempDir()
 	f := filepath.Join(dir, "test.txt")

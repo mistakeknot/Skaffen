@@ -186,6 +186,19 @@ func (c *Config) HistoryPath() string { return filepath.Join(c.userDir, "history
 // ProjectDir returns the project root (parent of .skaffen/), empty if none found.
 func (c *Config) ProjectDir() string { return c.projectDir }
 
+// InterverseDir returns the path to the interverse/ directory if it exists
+// at the project root. Returns empty string if not found or no project root.
+func (c *Config) InterverseDir() string {
+	if c.projectDir == "" {
+		return ""
+	}
+	ivDir := filepath.Join(c.projectDir, "interverse")
+	if dirExists(ivDir) {
+		return ivDir
+	}
+	return ""
+}
+
 // WorkDir returns the working directory used for config resolution.
 func (c *Config) WorkDir() string { return c.workDir }
 
