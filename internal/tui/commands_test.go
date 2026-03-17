@@ -101,14 +101,15 @@ func TestFormatHelpSorted(t *testing.T) {
 
 func newTestModel() *appModel {
 	return &appModel{
-		compact:    compact.New(80),
-		viewport:   viewport.New(80, 20),
-		session:    session.New("test", "", "", 20),
-		settings:   defaultSettings(),
-		phase:      "build",
-		modelName:  "opus",
-		skaffenVer: "0.2.0",
-		masaqVer:   "0.1.0",
+		compact:      compact.New(80),
+		viewport:     viewport.New(80, 20),
+		session:      session.New("test", "", "", 20),
+		settings:     defaultSettings(),
+		phase:        "build",
+		modelName:    "opus",
+		skaffenVer:   "0.2.0",
+		masaqVer:     "0.1.0",
+		compactState: newCompactionState(),
 	}
 }
 

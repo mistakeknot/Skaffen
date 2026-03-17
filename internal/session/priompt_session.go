@@ -33,9 +33,14 @@ func NewPriomptSession(inner agent.Session, sections []priompt.Element) *Priompt
 
 // SystemPrompt renders the prompt elements within the given budget using
 // priompt.Render, stores the result for RenderReporter access, and returns
-// the assembled prompt string.
+// the assembled prompt string. Turn count is estimated from messages.
 func (s *PriomptSession) SystemPrompt(phase tool.Phase, budget int) string {
-	result := priompt.Render(s.sections, budget, priompt.WithPhase(string(phase)))
+	// Estimate turn count from message count (roughly 2 messages per turn).
+	turnCount := len(s.inner.Messages()) / 2
+	result := priompt.Render(s.sections, budget,
+		priompt.WithPhase(string(phase)),
+		priompt.WithTurnCount(turnCount),
+	)
 
 	s.mu.Lock()
 	s.lastRender = result

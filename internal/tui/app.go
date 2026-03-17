@@ -221,6 +221,9 @@ type appModel struct {
 	// Tool timers: track start time of in-flight tool calls by name
 	toolTimers map[string]time.Time
 
+	// Compaction state: accumulates file activity and errors for structured compaction
+	compactState *compactionState
+
 	// Minimum terminal size guard
 	sizeGuard minsize.Model
 
@@ -304,6 +307,7 @@ func newAppModel(cfg Config) *appModel {
 		tokenSpark:   newTokenSparkline(80),
 		sizeGuard:    minsize.New(40, 10),
 		tabs:         tb,
+		compactState: newCompactionState(),
 	}
 }
 
@@ -760,6 +764,9 @@ func (m *appModel) handleStreamEvent(ev agent.StreamEvent) {
 		}
 		m.toolTimers[ev.ToolName] = time.Now()
 	case agent.StreamToolComplete:
+		// Feed compaction state accumulator
+		m.compactState.observeToolComplete(ev)
+
 		// Compute elapsed time
 		elapsed := ""
 		if start, ok := m.toolTimers[ev.ToolName]; ok {

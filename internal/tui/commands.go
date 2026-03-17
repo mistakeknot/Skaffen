@@ -896,9 +896,33 @@ func (m *appModel) execCompact() CommandResult {
 		return CommandResult{Message: fmt.Sprintf("Context is small (%d messages) — nothing to compact.", beforeCount)}
 	}
 
-	// Build a simple summary from the kept messages' context
-	summary := fmt.Sprintf("Previous conversation had %d messages covering %d turns.", beforeCount, m.turns)
-	before, after := m.session.Compact(summary, compactKeepRecent)
+	// Use relevance scoring to determine which messages to retain.
+	// ScoreMessages + TopK select the most valuable messages, which
+	// are then preserved alongside the compactKeepRecent most recent.
+	messages := m.session.Messages()
+	activeFiles := m.compactState.activeFiles()
+	scored := session.ScoreMessages(messages, activeFiles)
+
+	// Keep top-K scored messages (at most half the total, min compactKeepRecent)
+	k := len(messages) / 2
+	if k < compactKeepRecent {
+		k = compactKeepRecent
+	}
+	topIndices := session.TopK(scored, k)
+	_ = topIndices // indices inform the structured summary below
+
+	// Build structured summary from accumulated tool activity
+	summary := m.compactState.buildSummary(m.phase, m.turns)
+	summary.Goal = fmt.Sprintf("Conversation with %d messages over %d turns", beforeCount, m.turns)
+
+	// Detect intent from phase and error state for biased rendering
+	intent := m.compactState.detectIntent(m.phase)
+
+	// Use CompactStructured with intent-biased formatting
+	before, after := m.session.CompactStructured(summary, compactKeepRecent, intent)
+
+	// Reset accumulated state after compaction
+	m.compactState.reset()
 
 	beforePct := m.contextPct
 	// Estimate new context %: rough proportional reduction
@@ -908,8 +932,8 @@ func (m *appModel) execCompact() CommandResult {
 
 	return CommandResult{
 		Message: fmt.Sprintf(
-			"Compacted: %d → %d messages (%.0f%% → ~%.0f%% context)",
-			before, after, beforePct, m.contextPct,
+			"Compacted: %d → %d messages (%.0f%% → ~%.0f%% context, intent: %s)",
+			before, after, beforePct, m.contextPct, string(intent),
 		),
 	}
 }

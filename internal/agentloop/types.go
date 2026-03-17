@@ -17,10 +17,11 @@ type SelectionHints struct {
 
 // PromptHints carries optional context for system prompt generation.
 type PromptHints struct {
-	Phase    string // optional
-	Budget   int
-	Model    string
-	PlanMode bool
+	Phase     string // optional
+	Budget    int
+	Model     string
+	PlanMode  bool
+	TurnCount int // current turn number (1-indexed)
 }
 
 // Router selects which model to use per turn and tracks token budget.

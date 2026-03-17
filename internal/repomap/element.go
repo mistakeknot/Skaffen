@@ -59,7 +59,16 @@ func NewElement(workDir string, opts ...Option) priompt.Element {
 
 func contentFunc(workDir string, fetcher EdgeFetcher, personalizeFn PersonalizationFunc) priompt.ContentFunc {
 	return func(ctx priompt.RenderContext) string {
-		maxTokens := ctx.Budget * 15 / 100
+		// Adapt budget allocation based on turn count: early turns get
+		// more repomap context (15%), later turns get less (5%) since
+		// the agent has already built its mental model.
+		pct := 15
+		if ctx.TurnCount > 8 {
+			pct = 5
+		} else if ctx.TurnCount > 4 {
+			pct = 10
+		}
+		maxTokens := ctx.Budget * pct / 100
 		if maxTokens < 500 {
 			return "" // not worth including below floor
 		}

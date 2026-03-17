@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/mistakeknot/Skaffen/internal/provider"
@@ -124,10 +125,11 @@ func (l *Loop) RunWithContent(ctx context.Context, content []provider.ContentBlo
 			promptBudget = 0
 		}
 		systemPrompt := l.session.SystemPrompt(PromptHints{
-			Phase:    config.Hints.Phase,
-			Budget:   promptBudget,
-			Model:    model,
-			PlanMode: config.PlanMode,
+			Phase:     config.Hints.Phase,
+			Budget:    promptBudget,
+			Model:     model,
+			PlanMode:  config.PlanMode,
+			TurnCount: turn,
 		})
 
 		cfg := provider.Config{
@@ -183,6 +185,14 @@ func (l *Loop) RunWithContent(ctx context.Context, content []provider.ContentBlo
 		if collected.StopReason == "tool_use" {
 			outcome = "tool_use"
 		}
+
+		// Classify failure from tool results in this turn
+		var failure FailureType
+		if collected.StopReason == "tool_use" && len(messages) > 0 {
+			lastMsg := messages[len(messages)-1]
+			failure = classifyFailure(collected.ToolCalls, lastMsg.Content)
+		}
+
 		bs := l.router.BudgetState()
 		ev := Evidence{
 			Timestamp:        time.Now().UTC().Format(time.RFC3339),
@@ -198,6 +208,7 @@ func (l *Loop) RunWithContent(ctx context.Context, content []provider.ContentBlo
 			StopReason:          collected.StopReason,
 			DurationMs:       turnDuration.Milliseconds(),
 			Outcome:          outcome,
+			Failure:          failure,
 			BudgetSpent:      bs.Spent,
 			BudgetMax:        bs.Max,
 			BudgetPercentage: bs.Percentage,
@@ -329,17 +340,25 @@ func (l *Loop) executeToolsWithCallbacks(ctx context.Context, calls []provider.T
 
 		// Phase 3: Execute
 		result := l.registry.Execute(ctx, tc.Name, tc.Input)
+
+		// Truncate oversized tool results to prevent context bloat.
+		// Keeps head + tail so errors at the bottom are preserved.
+		content := result.Content
+		if len(content) > oversizeThreshold {
+			content = truncateForContext(content, oversizeThreshold)
+		}
+
 		blocks = append(blocks, provider.ContentBlock{
 			Type:          "tool_result",
 			ToolUseID:     tc.ID,
-			ResultContent: result.Content,
+			ResultContent: content,
 			IsError:       result.IsError,
 		})
 		if l.streamCB != nil {
 			l.streamCB(StreamEvent{
 				Type:       StreamToolComplete,
 				ToolName:   tc.Name,
-				ToolResult: result.Content,
+				ToolResult: content,
 				IsError:    result.IsError,
 			})
 		}
@@ -349,8 +368,8 @@ func (l *Loop) executeToolsWithCallbacks(ctx context.Context, calls []provider.T
 		// the agent loop advances, which would kill in-flight hooks.
 		if l.hooks != nil {
 			hookRunner := l.hooks
-			name, input, content, isErr := tc.Name, tc.Input, result.Content, result.IsError
-			go hookRunner.PostToolUse(context.Background(), name, input, content, isErr)
+			name, input, hookContent, isErr := tc.Name, tc.Input, content, result.IsError
+			go hookRunner.PostToolUse(context.Background(), name, input, hookContent, isErr)
 		}
 	}
 	return provider.Message{Role: provider.RoleUser, Content: blocks}
@@ -467,6 +486,92 @@ func extractFileActivity(calls []provider.ToolCall) []FileActivity {
 		})
 	}
 	return activity
+}
+
+// classifyFailure examines tool results from a turn to determine
+// the dominant failure type. Returns FailNone if no failures detected.
+// Priority: syntax > hallucination > test_failure > tool_error.
+func classifyFailure(toolCalls []provider.ToolCall, toolResults []provider.ContentBlock) FailureType {
+	var hasToolError bool
+	for _, block := range toolResults {
+		if block.Type != "tool_result" || !block.IsError {
+			continue
+		}
+		content := strings.ToLower(block.ResultContent)
+
+		// Syntax/compile errors — highest priority, agent produced invalid code
+		if containsAnyCI(content, []string{
+			"syntax error", "parse error", "compile error",
+			"unexpected token", "expected ';'", "expected '}'",
+			"cannot find symbol", "undeclared", "undefined reference",
+		}) {
+			return FailSyntaxError
+		}
+
+		// Hallucination — referenced something that doesn't exist
+		if containsAnyCI(content, []string{
+			"no such file", "file not found", "does not exist",
+			"no such directory", "cannot find", "not found in module",
+			"undefined:", "has no field or method",
+		}) {
+			return FailHallucination
+		}
+
+		hasToolError = true
+	}
+
+	// Test failures — check non-error results too (bash exit 0 but FAIL in output)
+	for i, block := range toolResults {
+		if block.Type != "tool_result" {
+			continue
+		}
+		content := block.ResultContent
+		// Match the tool call to check if it was a test runner
+		toolName := ""
+		if i < len(toolCalls) {
+			toolName = toolCalls[i].Name
+		}
+		if toolName == "bash" || toolName == "" {
+			if containsAnyCI(strings.ToLower(content), []string{
+				"fail", "failed", "failures:", "--- fail",
+				"error:", "panic:", "assertion",
+				"exited with code", "exit status",
+			}) {
+				return FailTestFailure
+			}
+		}
+	}
+
+	if hasToolError {
+		return FailToolError
+	}
+	return FailNone
+}
+
+// containsAnyCI checks if s contains any of the substrings (s should be lowered).
+func containsAnyCI(s string, substrs []string) bool {
+	for _, sub := range substrs {
+		if strings.Contains(s, sub) {
+			return true
+		}
+	}
+	return false
+}
+
+// oversizeThreshold is the character count above which tool results
+// are truncated to head+tail. ~30K chars ≈ ~7.5K tokens.
+// Matches subagent.OversizeThreshold — defined here to avoid import cycle.
+const oversizeThreshold = 30000
+
+// truncateForContext keeps the first and last portions of a string,
+// inserting an omission marker in the middle. Errors tend to appear
+// at the bottom of tool output, so preserving the tail is critical.
+func truncateForContext(s string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s
+	}
+	half := maxLen / 2
+	return s[:half] + fmt.Sprintf("\n\n... (%d chars omitted) ...\n\n", len(s)-maxLen) + s[len(s)-half:]
 }
 
 // estimateMessageTokens estimates total tokens for a message slice.

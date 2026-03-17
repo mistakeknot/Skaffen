@@ -151,9 +151,16 @@ func (cs CompactionSummary) Format() string {
 
 // CompactStructured replaces the conversation history with a structured
 // summary message, preserving the most recent keepRecent messages.
+// The intent parameter biases field ordering — IntentDefault uses
+// the standard Format() ordering; other intents use FormatWithIntent().
 // Returns the message count before and after compaction.
-func (s *JSONLSession) CompactStructured(summary CompactionSummary, keepRecent int) (before, after int) {
-	formatted := summary.Format()
+func (s *JSONLSession) CompactStructured(summary CompactionSummary, keepRecent int, intent ...CompactIntent) (before, after int) {
+	var formatted string
+	if len(intent) > 0 && intent[0] != IntentDefault {
+		formatted = summary.FormatWithIntent(intent[0])
+	} else {
+		formatted = summary.Format()
+	}
 	if formatted == "" {
 		// Fall back to no-op if summary is completely empty.
 		s.mu.Lock()
