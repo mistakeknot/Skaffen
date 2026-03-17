@@ -143,6 +143,25 @@ func TestKeyHelpContainsMouseWheel(t *testing.T) {
 	}
 }
 
+func TestKeyHelpContainsSidebar(t *testing.T) {
+	kh := newKeyHelpModel()
+	view := kh.View(80)
+	if !strings.Contains(view, "sidebar") && !strings.Contains(view, "Sidebar") {
+		t.Fatal("help should mention sidebar toggle")
+	}
+	if !strings.Contains(view, "Ctrl+B") {
+		t.Fatal("help should mention Ctrl+B for sidebar")
+	}
+}
+
+func TestKeyHelpContainsPanelsCategory(t *testing.T) {
+	kh := newKeyHelpModel()
+	view := kh.View(80)
+	if !strings.Contains(view, "Panels") {
+		t.Fatal("help should have Panels category")
+	}
+}
+
 func TestKeyHelpContainsShellEscape(t *testing.T) {
 	kh := newKeyHelpModel()
 	view := kh.View(80)

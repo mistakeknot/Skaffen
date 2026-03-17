@@ -72,6 +72,24 @@ type subagentStatusMsg subagent.StatusUpdate
 // Sent by experiment tools via a callback registered at construction.
 type experimentStatusMsg experimentSlotData
 
+// gitStatusMsg carries git status output for the sidebar.
+type gitStatusMsg string
+
+// refreshGitStatus runs git status in the background and sends a gitStatusMsg.
+func refreshGitStatus(workDir string) tea.Cmd {
+	return func() tea.Msg {
+		g := git.New(workDir)
+		if !g.IsRepo() {
+			return gitStatusMsg("")
+		}
+		status, err := g.Status()
+		if err != nil {
+			return gitStatusMsg("")
+		}
+		return gitStatusMsg(status)
+	}
+}
+
 // Run starts the TUI REPL.
 func Run(cfg Config) error {
 	m := newAppModel(cfg)
@@ -229,6 +247,10 @@ type appModel struct {
 
 	// Tab bar for view switching
 	tabs tabbar.Model
+
+	// Sidebar panel (toggled with Ctrl+B)
+	sidebarOpen bool
+	sidebar     sidebarModel
 }
 
 func newAppModel(cfg Config) *appModel {
@@ -308,6 +330,7 @@ func newAppModel(cfg Config) *appModel {
 		sizeGuard:    minsize.New(40, 10),
 		tabs:         tb,
 		compactState: newCompactionState(),
+		sidebar:      newSidebarModel(30, 20),
 	}
 }
 
@@ -328,8 +351,20 @@ func (m *appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if vpHeight < 1 {
 			vpHeight = 1
 		}
-		m.viewport.SetSize(m.width, vpHeight)
-		m.md = markdown.New(m.width)
+		// Sidebar: split width when open and terminal wide enough
+		vpWidth := m.width
+		if m.sidebarOpen && m.width >= 80 {
+			sidebarWidth := m.width * 3 / 10
+			if sidebarWidth < 20 {
+				sidebarWidth = 20
+			}
+			vpWidth = m.width - sidebarWidth
+			m.sidebar.SetSize(sidebarWidth, vpHeight)
+		} else if m.sidebarOpen && m.width < 80 {
+			m.sidebarOpen = false // auto-hide when too narrow
+		}
+		m.viewport.SetSize(vpWidth, vpHeight)
+		m.md = markdown.New(vpWidth)
 		m.compact = compact.New(m.width)
 		m.status = newStatusBar(m.width)
 		m.crumbs = breadcrumb.New(m.width)
@@ -378,6 +413,11 @@ func (m *appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			} else {
 				m.viewport.AppendContent("\n" + lipgloss.NewStyle().Foreground(theme.Current().Semantic().Success.Color()).Render("Plan mode disabled — full tools available") + "\n")
 			}
+			break
+		}
+		// Sidebar toggle: Ctrl+B
+		if m.keybindings.MatchesAction(msg.String(), ActionSidebar) && !m.approving && !m.settingsOpen {
+			m.sidebarOpen = !m.sidebarOpen
 			break
 		}
 		// Stop logo animation on first real typed character.
@@ -664,6 +704,9 @@ func (m *appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case experimentStatusMsg:
 		m.expStatus = experimentSlotData(msg)
 
+	case gitStatusMsg:
+		m.sidebar.SetGitStatus(string(msg))
+
 	case tabbar.ChangedMsg:
 		// Tab changed — future: switch visible content view
 		_ = msg.Index
@@ -710,30 +753,50 @@ func (m *appModel) View() string {
 	if vpHeight < 1 {
 		vpHeight = 1
 	}
-	if m.viewport.Height() != vpHeight {
-		m.viewport.SetSize(m.width, vpHeight)
+
+	// Sidebar: compute widths when open
+	vpWidth := m.width
+	sidebarView := ""
+	if m.sidebarOpen && m.width >= 80 {
+		sidebarWidth := m.width * 3 / 10
+		if sidebarWidth < 20 {
+			sidebarWidth = 20
+		}
+		vpWidth = m.width - sidebarWidth
+		m.sidebar.SetSize(sidebarWidth, vpHeight+2) // +2 for scroll hint + tabbar
+		sidebarView = m.sidebar.View()
+	}
+
+	if m.viewport.Height() != vpHeight || m.viewport.Width() != vpWidth {
+		m.viewport.SetSize(vpWidth, vpHeight)
 		vpView = m.viewport.View()
 	}
 
 	// Scroll indicator: shown when content extends beyond the visible area.
 	// Uses the viewport's themed indicator which shows "↓ N more lines".
-	scrollHint := m.viewport.ScrollIndicator(m.width)
+	scrollHint := m.viewport.ScrollIndicator(vpWidth)
 
 	// Thin rules between status sections — lighter than blank lines.
 	ruleStyle := lipgloss.NewStyle().Foreground(theme.Current().Semantic().Border.Color())
 	rule := ruleStyle.Render(strings.Repeat("─", m.width))
 	statusArea := lipgloss.JoinVertical(lipgloss.Left, rule, crumbView, rule, meterView, rule, statusView)
 
+	// Compose chat column (optionally with sidebar)
+	chatColumn := lipgloss.JoinVertical(lipgloss.Left, tabView, logoView, vpView, scrollHint)
+	if sidebarView != "" {
+		chatColumn = lipgloss.JoinHorizontal(lipgloss.Top, chatColumn, sidebarView)
+	}
+
 	if m.approving {
-		return lipgloss.JoinVertical(lipgloss.Left, tabView, logoView, vpView, scrollHint, m.approvalQ.View(), statusArea)
+		return lipgloss.JoinVertical(lipgloss.Left, chatColumn, m.approvalQ.View(), statusArea)
 	}
 
 	if m.settingsOpen {
-		return lipgloss.JoinVertical(lipgloss.Left, tabView, logoView, vpView, scrollHint, m.settingsOverlay.View(), statusArea)
+		return lipgloss.JoinVertical(lipgloss.Left, chatColumn, m.settingsOverlay.View(), statusArea)
 	}
 
-	promptView := m.prompt.View(m.width, m.running, m.spinner.View())
-	return lipgloss.JoinVertical(lipgloss.Left, tabView, logoView, vpView, scrollHint, promptView, statusArea)
+	promptView := m.prompt.View(vpWidth, m.running, m.spinner.View())
+	return lipgloss.JoinVertical(lipgloss.Left, chatColumn, promptView, statusArea)
 }
 
 // drainApproval sends false to a pending approval channel so the agent
@@ -763,9 +826,17 @@ func (m *appModel) handleStreamEvent(ev agent.StreamEvent) {
 			m.toolTimers = make(map[string]time.Time)
 		}
 		m.toolTimers[ev.ToolName] = time.Now()
+		// Track in sidebar
+		m.sidebar.AddToolCall(ev.ToolName, extractFilePath(ev.ToolName, ev.ToolParams), 0)
 	case agent.StreamToolComplete:
 		// Feed compaction state accumulator
 		m.compactState.observeToolComplete(ev)
+
+		// Track files in sidebar
+		if path := extractFilePath(ev.ToolName, ev.ToolParams); path != "" {
+			mutated := ev.ToolName == "write" || ev.ToolName == "edit"
+			m.sidebar.TrackFile(path, mutated)
+		}
 
 		// Compute elapsed time
 		elapsed := ""
@@ -799,6 +870,12 @@ func (m *appModel) handleStreamEvent(ev agent.StreamEvent) {
 		}
 		// Feed sparkline with input tokens per turn.
 		m.tokenSpark.Push(float64(ev.Usage.InputTokens))
+		// Update sidebar debug info
+		subCount := 0
+		if m.subagents != nil {
+			subCount = m.subagents.ActiveCount()
+		}
+		m.sidebar.SetDebugInfo(m.phase, m.turns, ev.Usage.InputTokens, subCount)
 		// Auto-compact when context exceeds 80%
 		if m.settings.AutoCompact && m.contextPct > 80 && m.session != nil {
 			result := m.execCompact()

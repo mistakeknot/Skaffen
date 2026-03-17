@@ -73,6 +73,21 @@ func TestSubagentTracker_MultipleBlocks(t *testing.T) {
 	}
 }
 
+func TestSubagentTracker_ActiveCount(t *testing.T) {
+	tracker := newSubagentTracker()
+	if tracker.ActiveCount() != 0 {
+		t.Error("expected 0 active when empty")
+	}
+	tracker.update(subagent.StatusUpdate{ID: "sub-1", Description: "task 1", Status: subagent.StatusRunning, Turn: 1, MaxTurns: 10})
+	if tracker.ActiveCount() != 1 {
+		t.Errorf("expected 1 active, got %d", tracker.ActiveCount())
+	}
+	tracker.update(subagent.StatusUpdate{ID: "sub-1", Description: "task 1", Status: subagent.StatusDone, TokensUsed: 500})
+	if tracker.ActiveCount() != 0 {
+		t.Errorf("expected 0 active after done, got %d", tracker.ActiveCount())
+	}
+}
+
 func TestFormatTokens(t *testing.T) {
 	tests := []struct {
 		n    int

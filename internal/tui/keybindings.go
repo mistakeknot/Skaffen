@@ -24,8 +24,10 @@ const (
 	ActionHalfPageUp  = "half_page_up"
 	ActionHalfPageDown = "half_page_down"
 	ActionStop        = "stop"
-	ActionPlanMode    = "plan_mode"
-	ActionQuit        = "quit"
+	ActionPlanMode     = "plan_mode"
+	ActionSidebar      = "sidebar"
+	ActionSidebarNext  = "sidebar_next"
+	ActionQuit         = "quit"
 )
 
 // Keybindings maps actions to one or more key strings.
@@ -55,6 +57,8 @@ func DefaultKeybindings() *Keybindings {
 			ActionHalfPageDown: {"ctrl+d"},
 			ActionStop:         {"esc"},
 			ActionPlanMode:     {"shift+tab"},
+			ActionSidebar:      {"ctrl+b"},
+			ActionSidebarNext:  {"tab"},
 			ActionQuit:         {"ctrl+c"},
 		},
 	}

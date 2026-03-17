@@ -146,6 +146,17 @@ func (t *subagentTracker) View(width int) string {
 	return strings.Join(lines, "\n")
 }
 
+// ActiveCount returns the number of subagents currently running.
+func (t *subagentTracker) ActiveCount() int {
+	count := 0
+	for _, b := range t.blocks {
+		if b.status == subagent.StatusRunning {
+			count++
+		}
+	}
+	return count
+}
+
 // formatTokens returns a human-readable token count (e.g., "1.2k", "45k").
 func formatTokens(n int) string {
 	if n < 1000 {

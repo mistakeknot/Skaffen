@@ -56,6 +56,12 @@ func newKeyHelpModel() keyHelpModel {
 				},
 			},
 			{
+				Name: "Panels",
+				Bindings: []keyBinding{
+					{"Ctrl+B", "Toggle sidebar"},
+				},
+			},
+			{
 				Name: "Session",
 				Bindings: []keyBinding{
 					{"Esc", "Stop current agent run"},

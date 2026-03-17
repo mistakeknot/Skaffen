@@ -141,6 +141,17 @@ func TestLoadKeybindings_InvalidJSON(t *testing.T) {
 	}
 }
 
+func TestDefaultKeybindings_IncludesSidebar(t *testing.T) {
+	kb := DefaultKeybindings()
+	keys := kb.Bindings[ActionSidebar]
+	if len(keys) == 0 {
+		t.Fatal("expected ActionSidebar to have default bindings")
+	}
+	if keys[0] != "ctrl+b" {
+		t.Errorf("expected ctrl+b, got %s", keys[0])
+	}
+}
+
 func TestKeysForAction(t *testing.T) {
 	kb := DefaultKeybindings()
 	got := kb.KeysForAction(ActionNewline)
