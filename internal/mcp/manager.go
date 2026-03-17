@@ -287,3 +287,30 @@ func (m *Manager) ToolCount() int {
 	}
 	return count
 }
+
+// CallTool calls a named MCP tool by searching all connected servers.
+// Returns an error if no server exposes the tool or the call fails.
+// This is the direct-call path for internal consumers (e.g. repomap)
+// that need MCP data without going through the agent tool registry.
+func (m *Manager) CallTool(ctx context.Context, toolName string, arguments map[string]any) (CallResult, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	if m.shutdown {
+		return CallResult{}, fmt.Errorf("mcp manager is shut down")
+	}
+
+	for key, h := range m.handles {
+		for _, ti := range h.tools {
+			if ti.Name == toolName {
+				caller := &handleCaller{manager: m, key: key, name: toolName}
+				m.mu.RUnlock() // release before call to avoid deadlock with respawn
+				result, err := caller.CallTool(ctx, toolName, arguments)
+				m.mu.RLock() // re-acquire for deferred unlock
+				return result, err
+			}
+		}
+	}
+
+	return CallResult{}, fmt.Errorf("mcp tool %q not found in any connected server", toolName)
+}

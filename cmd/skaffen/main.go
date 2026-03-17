@@ -304,9 +304,21 @@ func runPrint() error {
 	tool.RegisterQualityHistory(reg, sigStore)
 
 	// Build priompt sections: stable context-files + dynamic repomap
+	// Wire intermap MCP as edge source (degrades to go/ast if unavailable)
+	var repomapOpts []repomap.Option
+	if mcpMgr != nil {
+		repomapOpts = append(repomapOpts, repomap.WithEdgeFetcher(&repomap.MCPEdgeFetcher{
+			Caller: &mcpToolCallerAdapter{mgr: mcpMgr},
+		}))
+	}
+	// Wire git-diff personalization (conversation files added later by session)
+	repomapOpts = append(repomapOpts, repomap.WithPersonalization(func() ([]string, []string) {
+		return gitDiffFiles(cfg.WorkDir())
+	}))
+
 	sections := []priompt.Element{
 		{Name: "context-files", Content: systemPrompt, Priority: 85, Stable: true},
-		repomap.NewElement(cfg.WorkDir()),
+		repomap.NewElement(cfg.WorkDir(), repomapOpts...),
 	}
 
 	if *flagSession != "" {
@@ -525,9 +537,20 @@ func runTUI() error {
 	tool.RegisterQualityHistory(reg, sigStore)
 
 	// Build priompt sections: stable context-files + dynamic repomap
+	// Wire intermap MCP + git-diff personalization (same as print mode)
+	var tuiRepomapOpts []repomap.Option
+	if mcpMgr != nil {
+		tuiRepomapOpts = append(tuiRepomapOpts, repomap.WithEdgeFetcher(&repomap.MCPEdgeFetcher{
+			Caller: &mcpToolCallerAdapter{mgr: mcpMgr},
+		}))
+	}
+	tuiRepomapOpts = append(tuiRepomapOpts, repomap.WithPersonalization(func() ([]string, []string) {
+		return gitDiffFiles(cfg.WorkDir())
+	}))
+
 	tuiSections := []priompt.Element{
 		{Name: "context-files", Content: systemPrompt, Priority: 85, Stable: true},
-		repomap.NewElement(cfg.WorkDir()),
+		repomap.NewElement(cfg.WorkDir(), tuiRepomapOpts...),
 	}
 
 	var tuiSession *session.JSONLSession
@@ -797,4 +820,39 @@ func (b *agentloopToolBridge) Schema() json.RawMessage         { return b.inner.
 func (b *agentloopToolBridge) Execute(ctx context.Context, params json.RawMessage) tool.ToolResult {
 	r := b.inner.Execute(ctx, params)
 	return tool.ToolResult{Content: r.Content, IsError: r.IsError}
+}
+
+// mcpToolCallerAdapter bridges mcp.Manager.CallTool to repomap.ToolCaller.
+// The repomap package doesn't import mcp (avoiding circular deps), so this
+// adapter lives in main.go where both packages are available.
+type mcpToolCallerAdapter struct {
+	mgr *mcp.Manager
+}
+
+func (a *mcpToolCallerAdapter) CallTool(ctx context.Context, name string, args map[string]any) ([]byte, error) {
+	result, err := a.mgr.CallTool(ctx, name, args)
+	if err != nil {
+		return nil, err
+	}
+	if result.IsError {
+		return nil, fmt.Errorf("mcp tool %s: %s", name, result.Content)
+	}
+	return []byte(result.Content), nil
+}
+
+// gitDiffFiles returns files in the git working set (unstaged + staged).
+// Returns nil, nil on any error (graceful degradation).
+func gitDiffFiles(workDir string) (chatFiles []string, diffFiles []string) {
+	cmd := exec.Command("git", "diff", "--name-only", "HEAD")
+	cmd.Dir = workDir
+	out, err := cmd.Output()
+	if err != nil {
+		return nil, nil
+	}
+	for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
+		if line != "" {
+			diffFiles = append(diffFiles, line)
+		}
+	}
+	return nil, diffFiles // chatFiles requires session context — wired later
 }

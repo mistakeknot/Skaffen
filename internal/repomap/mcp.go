@@ -1,8 +1,50 @@
 package repomap
 
 import (
+	"context"
 	"encoding/json"
+	"time"
 )
+
+// ToolCaller abstracts MCP tool invocation so repomap doesn't import
+// the mcp package directly (avoiding circular imports).
+type ToolCaller interface {
+	CallTool(ctx context.Context, name string, args map[string]any) ([]byte, error)
+}
+
+// MCPEdgeFetcher implements EdgeFetcher by calling the intermap
+// reference_edges MCP tool via a ToolCaller.
+type MCPEdgeFetcher struct {
+	Caller    ToolCaller
+	MaxFiles  int
+}
+
+// FetchEdges calls the reference_edges MCP tool and parses the response.
+// Returns nil, nil, nil if the caller is nil (graceful degradation).
+func (f *MCPEdgeFetcher) FetchEdges(projectRoot string) ([]TagDef, []RefEdge, error) {
+	if f.Caller == nil {
+		return nil, nil, nil
+	}
+
+	maxFiles := f.MaxFiles
+	if maxFiles <= 0 {
+		maxFiles = 500
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	data, err := f.Caller.CallTool(ctx, "reference_edges", map[string]any{
+		"project":   projectRoot,
+		"language":  "auto",
+		"max_files": maxFiles,
+	})
+	if err != nil {
+		return nil, nil, nil // degrade silently
+	}
+
+	return ParseMCPResponse(data)
+}
 
 // EdgeFetcher provides cross-file reference edges from an external source
 // (e.g. intermap MCP's reference_edges tool). Implementations should return
