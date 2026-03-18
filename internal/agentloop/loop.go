@@ -7,19 +7,19 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mistakeknot/Skaffen/internal/provider"
 	"github.com/mistakeknot/Masaq/priompt"
+	"github.com/mistakeknot/Skaffen/internal/provider"
 )
 
 // Loop executes a universal Decide->Act agent loop without phase concepts.
 type Loop struct {
-	provider  provider.Provider
-	registry  *Registry
-	router    Router
-	session   Session
-	emitter   Emitter
-	streamCB  StreamCallback
-	approver  ToolApprover
+	provider       provider.Provider
+	registry       *Registry
+	router         Router
+	session        Session
+	emitter        Emitter
+	streamCB       StreamCallback
+	approver       ToolApprover
 	hooks          HookRunner // lifecycle hooks (nil = no hooks)
 	maxTurns       int
 	sessionID      string
@@ -195,25 +195,25 @@ func (l *Loop) RunWithContent(ctx context.Context, content []provider.ContentBlo
 
 		bs := l.router.BudgetState()
 		ev := Evidence{
-			Timestamp:        time.Now().UTC().Format(time.RFC3339),
-			SessionID:        l.sessionID,
-			Phase:            config.Hints.Phase,
-			TurnNumber:       turn,
-			ToolCalls:        toolNames,
-			FileActivity:     extractFileActivity(collected.ToolCalls),
+			Timestamp:           time.Now().UTC().Format(time.RFC3339),
+			SessionID:           l.sessionID,
+			Phase:               config.Hints.Phase,
+			TurnNumber:          turn,
+			ToolCalls:           toolNames,
+			FileActivity:        extractFileActivity(collected.ToolCalls),
 			TokensIn:            collected.Usage.InputTokens,
 			TokensOut:           collected.Usage.OutputTokens,
 			CacheCreationTokens: collected.Usage.CacheCreationInputTokens,
 			CacheReadTokens:     collected.Usage.CacheReadInputTokens,
 			StopReason:          collected.StopReason,
-			DurationMs:       turnDuration.Milliseconds(),
-			Outcome:          outcome,
-			Failure:          failure,
-			BudgetSpent:      bs.Spent,
-			BudgetMax:        bs.Max,
-			BudgetPercentage: bs.Percentage,
-			Model:            model,
-			ModelReason:      modelReason,
+			DurationMs:          turnDuration.Milliseconds(),
+			Outcome:             outcome,
+			Failure:             failure,
+			BudgetSpent:         bs.Spent,
+			BudgetMax:           bs.Max,
+			BudgetPercentage:    bs.Percentage,
+			Model:               model,
+			ModelReason:         modelReason,
 		}
 		if rr, ok := l.session.(RenderReporter); ok {
 			ev.PromptTokens = rr.PromptTokens()
@@ -488,68 +488,84 @@ func extractFileActivity(calls []provider.ToolCall) []FileActivity {
 	return activity
 }
 
+// Pre-allocated pattern slices — avoids per-call slice literal allocations.
+// All patterns must be lowercase ASCII.
+var (
+	syntaxPatterns = []string{
+		"syntax error", "parse error", "compile error",
+		"unexpected token", "expected ';'", "expected '}'",
+		"cannot find symbol", "undeclared", "undefined reference",
+	}
+	hallucinationPatterns = []string{
+		"no such file", "file not found", "does not exist",
+		"no such directory", "cannot find", "not found in module",
+		"undefined:", "has no field or method",
+	}
+	testFailurePatterns = []string{
+		"fail", "failed", "failures:", "--- fail",
+		"error:", "panic:", "assertion",
+		"exited with code", "exit status",
+	}
+)
+
 // classifyFailure examines tool results from a turn to determine
 // the dominant failure type. Returns FailNone if no failures detected.
 // Priority: syntax > hallucination > test_failure > tool_error.
+//
+// Single-pass: each block's content is lowered once and checked against
+// all pattern sets in one iteration. The lowered string is reused for
+// both the error-result and test-failure checks, halving allocations
+// vs the original two-pass approach.
 func classifyFailure(toolCalls []provider.ToolCall, toolResults []provider.ContentBlock) FailureType {
-	var hasToolError bool
-	for _, block := range toolResults {
-		if block.Type != "tool_result" || !block.IsError {
-			continue
-		}
-		content := strings.ToLower(block.ResultContent)
+	var hasToolError, hasTestFailure bool
 
-		// Syntax/compile errors — highest priority, agent produced invalid code
-		if containsAnyCI(content, []string{
-			"syntax error", "parse error", "compile error",
-			"unexpected token", "expected ';'", "expected '}'",
-			"cannot find symbol", "undeclared", "undefined reference",
-		}) {
-			return FailSyntaxError
-		}
-
-		// Hallucination — referenced something that doesn't exist
-		if containsAnyCI(content, []string{
-			"no such file", "file not found", "does not exist",
-			"no such directory", "cannot find", "not found in module",
-			"undefined:", "has no field or method",
-		}) {
-			return FailHallucination
-		}
-
-		hasToolError = true
-	}
-
-	// Test failures — check non-error results too (bash exit 0 but FAIL in output)
 	for i, block := range toolResults {
 		if block.Type != "tool_result" {
 			continue
 		}
-		content := block.ResultContent
-		// Match the tool call to check if it was a test runner
-		toolName := ""
-		if i < len(toolCalls) {
-			toolName = toolCalls[i].Name
+
+		// Lower content once per block — reused for all pattern checks.
+		lowered := strings.ToLower(block.ResultContent)
+
+		if block.IsError {
+			// Syntax/compile errors — highest priority, return immediately
+			if containsAny(lowered, syntaxPatterns) {
+				return FailSyntaxError
+			}
+			// Hallucination — second priority, return immediately
+			if containsAny(lowered, hallucinationPatterns) {
+				return FailHallucination
+			}
+			hasToolError = true
 		}
-		if toolName == "bash" || toolName == "" {
-			if containsAnyCI(strings.ToLower(content), []string{
-				"fail", "failed", "failures:", "--- fail",
-				"error:", "panic:", "assertion",
-				"exited with code", "exit status",
-			}) {
-				return FailTestFailure
+
+		// Test failures — check all tool_result blocks (bash exit 0 but FAIL in output)
+		if !hasTestFailure {
+			toolName := ""
+			if i < len(toolCalls) {
+				toolName = toolCalls[i].Name
+			}
+			if toolName == "bash" || toolName == "" {
+				if containsAny(lowered, testFailurePatterns) {
+					hasTestFailure = true
+				}
 			}
 		}
 	}
 
+	// Priority: syntax > hallucination (returned above) > test_failure > tool_error
+	if hasTestFailure {
+		return FailTestFailure
+	}
 	if hasToolError {
 		return FailToolError
 	}
 	return FailNone
 }
 
-// containsAnyCI checks if s contains any of the substrings (s should be lowered).
-func containsAnyCI(s string, substrs []string) bool {
+// containsAny checks if s contains any of the substrings.
+// Both s and substrs must already be lowercased.
+func containsAny(s string, substrs []string) bool {
 	for _, sub := range substrs {
 		if strings.Contains(s, sub) {
 			return true
