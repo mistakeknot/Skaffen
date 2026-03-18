@@ -1,14 +1,32 @@
 package session
 
 import (
+	"container/heap"
 	"strings"
 
 	"github.com/mistakeknot/Skaffen/internal/provider"
 )
 
+// scoreHeap is a min-heap of ScoredMessage used for TopK selection.
+// The minimum-scored element sits at index 0, so we can efficiently
+// evict the weakest candidate when the heap exceeds size K.
+type scoreHeap []ScoredMessage
+
+func (h scoreHeap) Len() int           { return len(h) }
+func (h scoreHeap) Less(i, j int) bool { return h[i].Score < h[j].Score } // min-heap
+func (h scoreHeap) Swap(i, j int)      { h[i], h[j] = h[j], h[i] }
+func (h *scoreHeap) Push(x any)        { *h = append(*h, x.(ScoredMessage)) }
+func (h *scoreHeap) Pop() any {
+	old := *h
+	n := len(old)
+	x := old[n-1]
+	*h = old[:n-1]
+	return x
+}
+
 // ScoredMessage pairs a message with a relevance score for compaction.
 type ScoredMessage struct {
-	Index   int     // original position in the message slice
+	Index   int // original position in the message slice
 	Message provider.Message
 	Score   float64 // higher = more relevant, should be retained
 }
@@ -42,6 +60,9 @@ func ScoreMessages(messages []provider.Message, activeFiles []string) []ScoredMe
 
 // TopK returns the indices of the top-K highest-scored messages, preserving
 // original order. If K >= len(scored), returns all indices in order.
+//
+// Uses a min-heap of size K for O(n log k) selection instead of O(n*k)
+// partial selection sort. When K << N this is substantially faster.
 func TopK(scored []ScoredMessage, k int) []int {
 	if k >= len(scored) {
 		indices := make([]int, len(scored))
@@ -51,19 +72,30 @@ func TopK(scored []ScoredMessage, k int) []int {
 		return indices
 	}
 
-	// Find the k-th highest score using a simple selection
-	scores := make([]float64, len(scored))
-	for i, s := range scored {
-		scores[i] = s.Score
+	// Fill the first k elements directly, then heapify — avoids k allocations
+	// from heap.Push interface boxing.
+	h := make(scoreHeap, k)
+	copy(h, scored[:k])
+	heap.Init(&h)
+
+	// Scan remaining elements; replace heap root when we find a higher score.
+	for i := k; i < len(scored); i++ {
+		if scored[i].Score > h[0].Score {
+			h[0] = scored[i]
+			heap.Fix(&h, 0)
+		}
 	}
 
-	// Sort scores descending to find threshold
-	threshold := kthLargest(scores, k)
+	// Mark selected indices in a bitset for O(1) lookup
+	selected := make([]bool, len(scored))
+	for _, s := range h {
+		selected[s.Index] = true
+	}
 
-	// Collect indices of messages at or above threshold, in original order
-	var indices []int
-	for i, s := range scored {
-		if s.Score >= threshold && len(indices) < k {
+	// Collect in original order
+	indices := make([]int, 0, k)
+	for i := range scored {
+		if selected[i] {
 			indices = append(indices, i)
 		}
 	}
@@ -167,24 +199,4 @@ func containsAny(s string, substrs []string) bool {
 		}
 	}
 	return false
-}
-
-// kthLargest returns the k-th largest value from a slice (1-indexed).
-// Modifies the input slice.
-func kthLargest(vals []float64, k int) float64 {
-	if k <= 0 || k > len(vals) {
-		return 0
-	}
-	// Simple approach: partial sort
-	// For small k relative to len, this is fine
-	for i := 0; i < k; i++ {
-		maxIdx := i
-		for j := i + 1; j < len(vals); j++ {
-			if vals[j] > vals[maxIdx] {
-				maxIdx = j
-			}
-		}
-		vals[i], vals[maxIdx] = vals[maxIdx], vals[i]
-	}
-	return vals[k-1]
 }
