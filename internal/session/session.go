@@ -96,6 +96,9 @@ func (s *JSONLSession) SystemPrompt(phase tool.Phase, _ int) string {
 	if phase == tool.PhaseAct {
 		prompt += faultLocalizationGuidance
 	}
+	if phase == tool.PhaseReflect {
+		prompt += reflectPhaseGuidance
+	}
 	return prompt
 }
 
@@ -140,6 +143,36 @@ You MUST follow a fix-test-retry loop. Do NOT stop after a single fix attempt.
 - If you run out of retries, submit your best attempt — a partial fix that passes some tests is better than no fix.
 - Each retry should learn from the previous failure. Do not repeat the same fix that already failed.
 - **Do NOT modify test files.** Only change source/implementation code. Test files (files in test directories, files named test_*.py, *_test.py, *_test.go, *.test.ts, etc.) exist to verify your fix — if a test fails, fix the source code, not the test. Modifying tests masks bugs and causes patch conflicts.`
+
+const reflectPhaseGuidance = `
+
+## Reflect: Verify and Validate
+
+Your task in the Reflect phase is to verify the changes made in Act. Follow this sequence:
+
+### 1. Review the diff
+Run ` + "`git diff`" + ` to see exactly what changed. Check for:
+- Unintended modifications (extra files, debug prints, commented-out code)
+- Test file modifications (revert any changes to test files — only source code should change)
+- Consistency (naming, style, patterns match the surrounding code)
+
+### 2. Run the relevant tests
+Identify and run the test suite most relevant to your changes:
+- Look for test files in the same directory or a tests/ subdirectory
+- Run the most targeted test first (specific test function > test file > full suite)
+- Read the FULL output — errors are typically at the bottom
+
+### 3. Classify the result
+- **All tests pass** → your fix is correct. Verify the diff is clean, then you are done.
+- **Tests fail on your changes** → return to the source code and fix the issue. Do NOT modify test files. You have up to 3 edit attempts in Reflect.
+- **Tests fail on unrelated code** → note the pre-existing failure and focus on whether YOUR changes are correct.
+- **Tests cannot run** (import error, missing dep) → this is an environment issue, not a code issue. Submit your best patch.
+
+### 4. Final check
+Before declaring done, confirm:
+- Your changes address the original issue/prompt
+- No test files were modified
+- The diff contains only intentional changes`
 
 // formatQualityHistory reads recent quality signals and formats a compact summary.
 func formatQualityHistory(sr SignalReader) string {
