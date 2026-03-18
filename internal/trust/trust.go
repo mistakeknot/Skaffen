@@ -2,6 +2,7 @@ package trust
 
 import (
 	"path/filepath"
+	"strings"
 	"sync"
 )
 
@@ -9,7 +10,7 @@ import (
 type Decision int
 
 const (
-	Allow  Decision = iota
+	Allow Decision = iota
 	Prompt
 	Block
 )
@@ -60,7 +61,14 @@ type Evaluator struct {
 	session          map[string]Decision
 	sessionCount     map[string]int // per-pattern Learn call count
 	overrides        []Override
+	exactOverrides   map[string]Decision // O(1) lookup for patterns without glob chars
+	globOverrides    []Override          // only patterns containing *, ?, [, {
 	promoteThreshold int
+}
+
+// isGlobPattern returns true if the pattern contains glob metacharacters.
+func isGlobPattern(pattern string) bool {
+	return strings.ContainsAny(pattern, "*?[{")
 }
 
 // NewEvaluator creates an Evaluator. Pass nil for built-in rules only.
@@ -69,6 +77,7 @@ func NewEvaluator(cfg *Config) *Evaluator {
 	e := &Evaluator{
 		session:          make(map[string]Decision),
 		sessionCount:     make(map[string]int),
+		exactOverrides:   make(map[string]Decision),
 		promoteThreshold: threshold,
 	}
 	if cfg != nil {
@@ -76,8 +85,23 @@ func NewEvaluator(cfg *Config) *Evaluator {
 		if cfg.PromoteThreshold > 0 {
 			e.promoteThreshold = cfg.PromoteThreshold
 		}
+		e.rebuildPartitions()
 	}
 	return e
+}
+
+// rebuildPartitions splits overrides into exact-match map and glob-only slice.
+// Must be called with mu held (or during init before concurrent access).
+func (e *Evaluator) rebuildPartitions() {
+	e.exactOverrides = make(map[string]Decision, len(e.overrides))
+	e.globOverrides = e.globOverrides[:0]
+	for _, o := range e.overrides {
+		if isGlobPattern(o.Pattern) {
+			e.globOverrides = append(e.globOverrides, o)
+		} else {
+			e.exactOverrides[o.Pattern] = o.Decision
+		}
+	}
 }
 
 // PromoteThreshold returns the current promotion threshold for external access.
@@ -97,8 +121,13 @@ func (e *Evaluator) Evaluate(toolName, paramsJSON string) Decision {
 		return d
 	}
 
-	// Tier 2: learned overrides (glob match)
-	for _, o := range e.overrides {
+	// Tier 2a: learned overrides — exact match (O(1) map lookup)
+	if d, ok := e.exactOverrides[key]; ok {
+		return d
+	}
+
+	// Tier 2b: learned overrides — glob match (linear scan, glob patterns only)
+	for _, o := range e.globOverrides {
 		if matchGlob(o.Pattern, key) {
 			return o.Decision
 		}
@@ -120,12 +149,14 @@ func (e *Evaluator) Learn(pattern string, decision Decision, scope Scope) {
 		e.sessionCount[pattern]++
 		if e.sessionCount[pattern] >= e.promoteThreshold {
 			// Auto-promote: move from session to learned overrides
-			e.overrides = append(e.overrides, Override{
+			o := Override{
 				Pattern:  pattern,
 				Decision: decision,
 				Scope:    ScopeGlobal,
 				Count:    e.sessionCount[pattern],
-			})
+			}
+			e.overrides = append(e.overrides, o)
+			e.addToPartition(o)
 			delete(e.session, pattern)
 			delete(e.sessionCount, pattern)
 		}
@@ -137,15 +168,31 @@ func (e *Evaluator) Learn(pattern string, decision Decision, scope Scope) {
 		if e.overrides[i].Pattern == pattern {
 			e.overrides[i].Count++
 			e.overrides[i].Decision = decision
+			// Update partition if decision changed
+			if !isGlobPattern(pattern) {
+				e.exactOverrides[pattern] = decision
+			}
 			return
 		}
 	}
-	e.overrides = append(e.overrides, Override{
+	o := Override{
 		Pattern:  pattern,
 		Decision: decision,
 		Scope:    scope,
 		Count:    1,
-	})
+	}
+	e.overrides = append(e.overrides, o)
+	e.addToPartition(o)
+}
+
+// addToPartition adds an override to the appropriate partition.
+// Must be called with mu held.
+func (e *Evaluator) addToPartition(o Override) {
+	if isGlobPattern(o.Pattern) {
+		e.globOverrides = append(e.globOverrides, o)
+	} else {
+		e.exactOverrides[o.Pattern] = o.Decision
+	}
 }
 
 // SessionCount returns the confidence count for a session-scoped pattern.
@@ -171,6 +218,7 @@ func (e *Evaluator) Revoke(pattern string) bool {
 	for i, o := range e.overrides {
 		if o.Pattern == pattern {
 			e.overrides = append(e.overrides[:i], e.overrides[i+1:]...)
+			e.rebuildPartitions()
 			return true
 		}
 	}
