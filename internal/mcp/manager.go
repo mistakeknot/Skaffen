@@ -45,17 +45,99 @@ func NewManager(config map[string]PluginConfig, registry *tool.Registry, sb *san
 	}
 }
 
+// connResult holds the outcome of a parallel server connection attempt.
+type connResult struct {
+	pluginName string
+	serverName string
+	client     *Client
+	tools      []ToolInfo
+	phases     []string
+	err        error
+}
+
 // LoadAll connects to all configured MCP servers and registers their tools.
+// Server connections and tool discovery run in parallel for faster startup.
+// Registration into the tool registry is serialized (registry is not thread-safe).
 // Servers that fail to connect are skipped with a warning (graceful degradation).
 func (m *Manager) LoadAll(ctx context.Context) error {
+	// Count total servers for channel sizing.
+	var total int
+	for _, pc := range m.config {
+		total += len(pc.Servers)
+	}
+
+	if total == 0 {
+		return nil
+	}
+
+	// Connect all servers in parallel — this is the slow part (subprocess spawn + handshake).
+	results := make(chan connResult, total)
+	var wg sync.WaitGroup
+	wg.Add(total)
+
 	for pluginName, pc := range m.config {
 		for serverName, sc := range pc.Servers {
-			if err := m.connectAndRegister(ctx, pluginName, serverName, sc, pc.Phases); err != nil {
-				fmt.Fprintf(os.Stderr, "skaffen: warning: plugin %q server %q: %v (skipping)\n",
-					pluginName, serverName, err)
-			}
+			go func(pn, sn string, sc ServerConfig, phases []string) {
+				defer wg.Done()
+				client, err := NewClient(ctx, sc.Command, sc.Args, sc.Env, m.sandbox)
+				if err != nil {
+					results <- connResult{pluginName: pn, serverName: sn, err: fmt.Errorf("connect: %w", err)}
+					return
+				}
+				tools, err := client.ListTools(ctx)
+				if err != nil {
+					client.Close()
+					results <- connResult{pluginName: pn, serverName: sn, err: fmt.Errorf("list tools: %w", err)}
+					return
+				}
+				results <- connResult{pluginName: pn, serverName: sn, client: client, tools: tools, phases: phases}
+			}(pluginName, serverName, sc, pc.Phases)
 		}
 	}
+
+	// Close channel once all goroutines complete.
+	go func() {
+		wg.Wait()
+		close(results)
+	}()
+
+	// Register results serially (tool registry is not thread-safe).
+	for cr := range results {
+		if cr.err != nil {
+			fmt.Fprintf(os.Stderr, "skaffen: warning: plugin %q server %q: %v (skipping)\n",
+				cr.pluginName, cr.serverName, cr.err)
+			continue
+		}
+
+		key := cr.pluginName + "_" + cr.serverName
+		handle := &serverHandle{
+			plugin: cr.pluginName,
+			server: cr.serverName,
+			client: cr.client,
+			tools:  cr.tools,
+			spawns: 1,
+		}
+
+		m.mu.Lock()
+		m.handles[key] = handle
+		m.mu.Unlock()
+
+		// Convert string phases to tool.Phase for registration
+		toolPhases := make([]tool.Phase, len(cr.phases))
+		for i, p := range cr.phases {
+			toolPhases[i] = tool.Phase(p)
+		}
+
+		for _, ti := range cr.tools {
+			mcpTool := NewMCPTool(cr.pluginName, cr.serverName, ti, &handleCaller{
+				manager: m,
+				key:     key,
+				name:    ti.Name,
+			})
+			m.registry.RegisterForPhases(mcpTool, toolPhases)
+		}
+	}
+
 	return nil
 }
 
