@@ -42,9 +42,9 @@ type JSONLSession struct {
 	prompt       string
 	maxTurns     int
 	messages     []provider.Message
-	signalReader SignalReader         // optional, for Orient quality history
-	inspiration  InspirationProvider  // optional, for Orient inspiration
-	taskDesc     string               // task description for inspiration lookup
+	signalReader SignalReader        // optional, for Orient quality history
+	inspiration  InspirationProvider // optional, for Orient inspiration
+	taskDesc     string              // task description for inspiration lookup
 	mu           sync.Mutex
 }
 
@@ -138,7 +138,8 @@ You MUST follow a fix-test-retry loop. Do NOT stop after a single fix attempt.
 **Critical rules:**
 - NEVER declare the task complete without running the tests and seeing them pass.
 - If you run out of retries, submit your best attempt — a partial fix that passes some tests is better than no fix.
-- Each retry should learn from the previous failure. Do not repeat the same fix that already failed.`
+- Each retry should learn from the previous failure. Do not repeat the same fix that already failed.
+- **Do NOT modify test files.** Only change source/implementation code. Test files (files in test directories, files named test_*.py, *_test.py, *_test.go, *.test.ts, etc.) exist to verify your fix — if a test fails, fix the source code, not the test. Modifying tests masks bugs and causes patch conflicts.`
 
 // formatQualityHistory reads recent quality signals and formats a compact summary.
 func formatQualityHistory(sr SignalReader) string {
