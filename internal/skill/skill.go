@@ -127,6 +127,9 @@ func LoadBody(d *Def) (string, error) {
 }
 
 // parseFrontmatter extracts YAML between --- delimiters.
+// It hand-parses simple scalar fields to avoid yaml.Unmarshal's reflection
+// overhead. Only falls back to yaml.Unmarshal when triggers (a YAML list) are
+// present.
 func parseFrontmatter(data []byte) (frontmatter, error) {
 	// Find opening ---
 	if !bytes.HasPrefix(bytes.TrimLeft(data, " \t\n\r"), []byte("---")) {
@@ -145,10 +148,94 @@ func parseFrontmatter(data []byte) (frontmatter, error) {
 
 	yamlBytes := rest[:idx]
 
+	// Hand-parse all fields line by line to avoid yaml.Unmarshal's reflection
+	// overhead. Falls back to full yaml.Unmarshal only for complex YAML syntax
+	// (flow sequences/mappings) that the hand-parser cannot validate.
 	var fm frontmatter
-	if err := yaml.Unmarshal(yamlBytes, &fm); err != nil {
-		return frontmatter{}, fmt.Errorf("parse frontmatter: %w", err)
+	needFullParse := false
+	inTriggers := false
+	lines := bytes.Split(yamlBytes, []byte("\n"))
+	for _, line := range lines {
+		// Skip empty lines and comments.
+		if len(line) == 0 || line[0] == '#' {
+			continue
+		}
+
+		// Indented lines: collect trigger list items (  - "value").
+		if line[0] == ' ' || line[0] == '\t' {
+			if inTriggers {
+				item := bytes.TrimSpace(line)
+				if len(item) > 1 && item[0] == '-' {
+					val := string(bytes.TrimSpace(item[1:]))
+					// Strip surrounding quotes.
+					if len(val) >= 2 {
+						if (val[0] == '"' && val[len(val)-1] == '"') ||
+							(val[0] == '\'' && val[len(val)-1] == '\'') {
+							val = val[1 : len(val)-1]
+						}
+					}
+					fm.Triggers = append(fm.Triggers, val)
+				}
+			}
+			continue
+		}
+
+		// Top-level key: stop collecting triggers.
+		inTriggers = false
+
+		colonIdx := bytes.IndexByte(line, ':')
+		if colonIdx < 0 {
+			continue
+		}
+		key := string(bytes.TrimSpace(line[:colonIdx]))
+		val := string(bytes.TrimSpace(line[colonIdx+1:]))
+
+		// Detect complex YAML values (flow sequences/mappings) that our
+		// hand-parser cannot validate — fall back to yaml.Unmarshal.
+		if len(val) > 0 && (val[0] == '[' || val[0] == '{') {
+			needFullParse = true
+			break
+		}
+
+		// Strip surrounding quotes from values (single or double).
+		if len(val) >= 2 {
+			if (val[0] == '"' && val[len(val)-1] == '"') ||
+				(val[0] == '\'' && val[len(val)-1] == '\'') {
+				val = val[1 : len(val)-1]
+			}
+		}
+
+		switch key {
+		case "name":
+			fm.Name = val
+		case "description":
+			fm.Description = val
+		case "args":
+			fm.Args = val
+		case "model":
+			fm.Model = val
+		case "user_invocable":
+			switch val {
+			case "true":
+				v := true
+				fm.UserInvocable = &v
+			case "false":
+				v := false
+				fm.UserInvocable = &v
+			}
+		case "triggers":
+			inTriggers = true
+		}
 	}
+
+	// Fall back to full yaml.Unmarshal for complex syntax.
+	if needFullParse {
+		fm = frontmatter{}
+		if err := yaml.Unmarshal(yamlBytes, &fm); err != nil {
+			return frontmatter{}, fmt.Errorf("parse frontmatter: %w", err)
+		}
+	}
+
 	return fm, nil
 }
 
