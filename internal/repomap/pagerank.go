@@ -1,5 +1,7 @@
 package repomap
 
+import "sort"
+
 // Graph holds a sparse weighted directed graph for personalized PageRank.
 type Graph struct {
 	edges map[uint32]map[uint32]float64
@@ -45,11 +47,12 @@ func (g *Graph) Rank(alpha, tol float64, personalize map[uint32]float64,
 		return
 	}
 
-	// Build a stable node list and index.
+	// Build a sorted stable node list and index.
 	nodeList := make([]uint32, 0, n)
 	for id := range g.nodes {
 		nodeList = append(nodeList, id)
 	}
+	sort.Slice(nodeList, func(i, j int) bool { return nodeList[i] < nodeList[j] })
 	idx := make(map[uint32]int, n)
 	for i, id := range nodeList {
 		idx[id] = i
@@ -86,6 +89,48 @@ func (g *Graph) Rank(alpha, tol float64, personalize map[uint32]float64,
 		}
 	}
 
+	// Flatten edges into CSR (Compressed Sparse Row) format for cache-friendly
+	// iteration without map lookups in the hot loop. Weights are pre-divided
+	// by the source's total outbound weight.
+	//
+	// Count total edges.
+	totalEdges := 0
+	for _, dsts := range g.edges {
+		totalEdges += len(dsts)
+	}
+	csrRowPtr := make([]int, n+1)
+	csrCol := make([]int, totalEdges)
+	csrWeight := make([]float64, totalEdges)
+
+	// First pass: count edges per source node.
+	for src, dsts := range g.edges {
+		csrRowPtr[idx[src]+1] = len(dsts)
+	}
+	// Prefix sum to get row pointers.
+	for i := 1; i <= n; i++ {
+		csrRowPtr[i] += csrRowPtr[i-1]
+	}
+	// Second pass: fill column indices and pre-divided weights.
+	offset := make([]int, n) // tracks fill position per row
+	for src, dsts := range g.edges {
+		si := idx[src]
+		ow := outWeight[si]
+		for dst, w := range dsts {
+			pos := csrRowPtr[si] + offset[si]
+			csrCol[pos] = idx[dst]
+			csrWeight[pos] = w / ow
+			offset[si]++
+		}
+	}
+
+	// Pre-compute list of dangling node indices (no outbound edges).
+	var danglingNodes []int
+	for i := range nodeList {
+		if outWeight[i] == 0 {
+			danglingNodes = append(danglingNodes, i)
+		}
+	}
+
 	// Initialize uniform ranks.
 	rank := make([]float64, n)
 	for i := range rank {
@@ -94,28 +139,29 @@ func (g *Graph) Rank(alpha, tol float64, personalize map[uint32]float64,
 	newRank := make([]float64, n)
 
 	for iter := 0; iter < 100; iter++ {
-		// Sum rank mass on dangling nodes (no outbound edges).
+		// Sum rank mass on dangling nodes.
 		var danglingSum float64
-		for i := range nodeList {
-			if outWeight[i] == 0 {
-				danglingSum += rank[i]
-			}
+		for _, i := range danglingNodes {
+			danglingSum += rank[i]
 		}
 
 		// Teleport + dangling redistribution via personalization vector.
-		for i := range newRank {
-			newRank[i] = (1-alpha)*teleport[i] + alpha*danglingSum*teleport[i]
+		alphaDangling := alpha * danglingSum
+		oneMinusAlpha := 1 - alpha
+		for i, t := range teleport {
+			newRank[i] = oneMinusAlpha*t + alphaDangling*t
 		}
 
-		// Propagate rank along edges.
-		for src, dsts := range g.edges {
-			si := idx[src]
-			if outWeight[si] == 0 {
+		// Propagate rank along edges using CSR format.
+		for si := 0; si < n; si++ {
+			start := csrRowPtr[si]
+			end := csrRowPtr[si+1]
+			if start == end {
 				continue
 			}
-			for dst, w := range dsts {
-				di := idx[dst]
-				newRank[di] += alpha * rank[si] * w / outWeight[si]
+			contribution := alpha * rank[si]
+			for e := start; e < end; e++ {
+				newRank[csrCol[e]] += contribution * csrWeight[e]
 			}
 		}
 
