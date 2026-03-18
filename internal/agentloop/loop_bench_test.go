@@ -312,14 +312,19 @@ func BenchmarkEstimateTokens200Messages(b *testing.B) {
 
 // BenchmarkEstimateTokensCached50Messages benchmarks cached estimation with 50 messages,
 // simulating steady-state where only 2 new messages are appended per call.
+// Cache is primed outside the timing loop — only the incremental 2-message
+// computation is measured.
 func BenchmarkEstimateTokensCached50Messages(b *testing.B) {
 	msgs := makeConversationMessages(50)
+	l := &Loop{}
+	// Prime cache with first 48 messages
+	primedTotal := l.estimateMessageTokensCached(msgs[:48])
+	primedLen := len(l.tokenCache) // 48
 	b.ResetTimer()
 	for b.Loop() {
-		l := &Loop{}
-		// Prime cache with first 48 messages (simulates prior turns)
-		l.estimateMessageTokensCached(msgs[:48])
-		// Steady-state call: only 2 new messages
+		// Restore cache to primed state (zero-alloc: just shrink + restore total)
+		l.tokenCache = l.tokenCache[:primedLen]
+		l.tokenCacheTotal = primedTotal
 		l.estimateMessageTokensCached(msgs)
 	}
 }
@@ -328,12 +333,14 @@ func BenchmarkEstimateTokensCached50Messages(b *testing.B) {
 // simulating steady-state where only 2 new messages are appended per call.
 func BenchmarkEstimateTokensCached200Messages(b *testing.B) {
 	msgs := makeConversationMessages(200)
+	l := &Loop{}
+	// Prime cache with first 198 messages
+	primedTotal := l.estimateMessageTokensCached(msgs[:198])
+	primedLen := len(l.tokenCache) // 198
 	b.ResetTimer()
 	for b.Loop() {
-		l := &Loop{}
-		// Prime cache with first 198 messages
-		l.estimateMessageTokensCached(msgs[:198])
-		// Steady-state call: only 2 new messages
+		l.tokenCache = l.tokenCache[:primedLen]
+		l.tokenCacheTotal = primedTotal
 		l.estimateMessageTokensCached(msgs)
 	}
 }

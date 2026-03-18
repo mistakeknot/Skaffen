@@ -642,7 +642,18 @@ func countMessageTokens(h *priompt.CharHeuristic, m provider.Message) int {
 			total += h.Count(b.Text)
 		case "tool_use":
 			total += h.Count(b.Name)
-			total += h.Count(string(b.Input))
+			// Avoid string([]byte) allocation — len(Input)/Ratio gives the same result.
+			if n := len(b.Input); n > 0 {
+				r := h.Ratio
+				if r <= 0 {
+					r = 4
+				}
+				est := n / r
+				if est < 1 {
+					est = 1
+				}
+				total += est
+			}
 		case "tool_result":
 			total += h.Count(b.ResultContent)
 		case "image":
