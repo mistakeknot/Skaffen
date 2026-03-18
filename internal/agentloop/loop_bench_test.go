@@ -1,6 +1,8 @@
 package agentloop
 
 import (
+	"encoding/json"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -184,4 +186,154 @@ func TestClassifyFailureBenchmarkInputs(t *testing.T) {
 			t.Errorf("expected FailTestFailure, got %s", got)
 		}
 	})
+}
+
+// makeFileActivityCalls creates a realistic mix of tool calls for benchmarking
+// extractFileActivity. fileOpPct controls what fraction are file operations
+// (read/write/edit); the rest are non-file tools (bash, grep, glob, etc.).
+func makeFileActivityCalls(n int, fileOpPct float64) []provider.ToolCall {
+	nonFileTools := []string{"bash", "grep", "glob", "web_search", "mcp_tool", "list_files"}
+	fileOps := []struct {
+		name string
+		key  string
+	}{
+		{"read", "file_path"},
+		{"write", "file_path"},
+		{"edit", "file_path"},
+	}
+
+	calls := make([]provider.ToolCall, n)
+	fileCount := int(float64(n) * fileOpPct)
+
+	for i := range calls {
+		if i < fileCount {
+			op := fileOps[i%len(fileOps)]
+			input, _ := json.Marshal(map[string]interface{}{
+				op.key:  fmt.Sprintf("/home/user/project/src/file_%d.go", i),
+				"limit": 100,
+			})
+			calls[i] = provider.ToolCall{
+				ID:    fmt.Sprintf("toolu_%04d", i),
+				Name:  op.name,
+				Input: input,
+			}
+		} else {
+			tool := nonFileTools[i%len(nonFileTools)]
+			input, _ := json.Marshal(map[string]interface{}{
+				"command":     fmt.Sprintf("go test ./pkg%d/...", i),
+				"description": "run tests",
+				"timeout":     30000,
+			})
+			calls[i] = provider.ToolCall{
+				ID:    fmt.Sprintf("toolu_%04d", i),
+				Name:  tool,
+				Input: input,
+			}
+		}
+	}
+	return calls
+}
+
+// BenchmarkExtractFileActivity50Calls benchmarks 50 tool calls with ~5% file ops.
+func BenchmarkExtractFileActivity50Calls(b *testing.B) {
+	calls := makeFileActivityCalls(50, 0.05)
+	b.ResetTimer()
+	for b.Loop() {
+		extractFileActivity(calls)
+	}
+}
+
+// BenchmarkExtractFileActivity100Calls benchmarks 100 tool calls with ~5% file ops.
+func BenchmarkExtractFileActivity100Calls(b *testing.B) {
+	calls := makeFileActivityCalls(100, 0.05)
+	b.ResetTimer()
+	for b.Loop() {
+		extractFileActivity(calls)
+	}
+}
+
+// --- estimateMessageTokens benchmarks ---
+
+// makeConversationMessages builds a realistic conversation of n messages
+// alternating user/assistant with varying content sizes.
+func makeConversationMessages(n int) []provider.Message {
+	msgs := make([]provider.Message, n)
+	for i := range msgs {
+		if i%2 == 0 {
+			// User message: text block (100-500 chars)
+			text := strings.Repeat("Please analyze the code in internal/agentloop/loop.go and suggest improvements. ", 3+(i%5))
+			msgs[i] = provider.Message{
+				Role: provider.RoleUser,
+				Content: []provider.ContentBlock{
+					{Type: "text", Text: text},
+				},
+			}
+		} else {
+			// Assistant message: text + tool_use blocks
+			text := strings.Repeat("I'll examine the file and provide suggestions based on the patterns I see. ", 4+(i%3))
+			blocks := []provider.ContentBlock{
+				{Type: "text", Text: text},
+			}
+			// Add 1-3 tool_use blocks
+			for j := 0; j < 1+(i%3); j++ {
+				blocks = append(blocks, provider.ContentBlock{
+					Type:  "tool_use",
+					ID:    "toolu_bench",
+					Name:  "read",
+					Input: []byte(`{"file_path":"/home/mk/projects/Demarch/os/Skaffen/internal/agentloop/loop.go"}`),
+				})
+			}
+			msgs[i] = provider.Message{
+				Role:    provider.RoleAssistant,
+				Content: blocks,
+			}
+		}
+	}
+	return msgs
+}
+
+// BenchmarkEstimateTokens50Messages benchmarks uncached token estimation for 50 messages.
+func BenchmarkEstimateTokens50Messages(b *testing.B) {
+	msgs := makeConversationMessages(50)
+	b.ResetTimer()
+	for b.Loop() {
+		estimateMessageTokens(msgs)
+	}
+}
+
+// BenchmarkEstimateTokens200Messages benchmarks uncached token estimation for 200 messages.
+func BenchmarkEstimateTokens200Messages(b *testing.B) {
+	msgs := makeConversationMessages(200)
+	b.ResetTimer()
+	for b.Loop() {
+		estimateMessageTokens(msgs)
+	}
+}
+
+// BenchmarkEstimateTokensCached50Messages benchmarks cached estimation with 50 messages,
+// simulating steady-state where only 2 new messages are appended per call.
+func BenchmarkEstimateTokensCached50Messages(b *testing.B) {
+	msgs := makeConversationMessages(50)
+	b.ResetTimer()
+	for b.Loop() {
+		l := &Loop{}
+		// Prime cache with first 48 messages (simulates prior turns)
+		l.estimateMessageTokensCached(msgs[:48])
+		// Steady-state call: only 2 new messages
+		l.estimateMessageTokensCached(msgs)
+	}
+}
+
+// BenchmarkEstimateTokensCached200Messages benchmarks cached estimation with 200 messages,
+// simulating steady-state where only 2 new messages are appended per call.
+func BenchmarkEstimateTokensCached200Messages(b *testing.B) {
+	msgs := makeConversationMessages(200)
+	b.ResetTimer()
+	for b.Loop() {
+		l := &Loop{}
+		// Prime cache with first 198 messages
+		l.estimateMessageTokensCached(msgs[:198])
+		// Steady-state call: only 2 new messages
+		l.estimateMessageTokensCached(msgs)
+	}
 }

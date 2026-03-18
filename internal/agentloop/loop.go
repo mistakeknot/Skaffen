@@ -24,6 +24,12 @@ type Loop struct {
 	maxTurns       int
 	sessionID      string
 	thinkingBudget int // extended thinking token budget; 0 = disabled
+
+	// tokenCache stores per-index token counts for estimateMessageTokens.
+	// Messages already in the conversation are immutable — only new messages
+	// appended at the tail need counting. Single-threaded per session, no mutex.
+	tokenCache      []int
+	tokenCacheTotal int
 }
 
 // LoopConfig configures a single Run invocation.
@@ -119,7 +125,7 @@ func (l *Loop) RunWithContent(ctx context.Context, content []provider.ContentBlo
 
 		windowSize := l.router.ContextWindow(model)
 		outputReserve := 8192
-		msgTokens := estimateMessageTokens(messages)
+		msgTokens := l.estimateMessageTokensCached(messages)
 		promptBudget := windowSize - outputReserve - msgTokens
 		if promptBudget < 0 {
 			promptBudget = 0
@@ -463,25 +469,28 @@ var filePathTools = map[string]string{
 	"edit":  "file_path",
 }
 
+// filePathParam is a minimal struct for extracting just the file_path field
+// from tool call JSON, avoiding a full map[string]interface{} unmarshal.
+type filePathParam struct {
+	FilePath string `json:"file_path"`
+}
+
 // extractFileActivity scans tool calls for file operations and returns
-// a FileActivity entry for each one.
+// a FileActivity entry for each one. Uses a pre-filter on tool name to
+// skip non-file tools entirely, and a targeted struct unmarshal to avoid
+// allocating a full parameter map.
 func extractFileActivity(calls []provider.ToolCall) []FileActivity {
 	var activity []FileActivity
 	for _, tc := range calls {
-		key, ok := filePathTools[tc.Name]
-		if !ok {
+		if _, ok := filePathTools[tc.Name]; !ok {
 			continue
 		}
-		var params map[string]interface{}
-		if err := json.Unmarshal(tc.Input, &params); err != nil {
-			continue
-		}
-		path, _ := params[key].(string)
-		if path == "" {
+		var p filePathParam
+		if err := json.Unmarshal(tc.Input, &p); err != nil || p.FilePath == "" {
 			continue
 		}
 		activity = append(activity, FileActivity{
-			Path:      path,
+			Path:      p.FilePath,
 			Operation: tc.Name,
 		})
 	}
@@ -591,22 +600,53 @@ func truncateForContext(s string, maxLen int) string {
 }
 
 // estimateMessageTokens estimates total tokens for a message slice.
+// Standalone version without caching — used by tests and one-off callers.
 func estimateMessageTokens(msgs []provider.Message) int {
 	h := priompt.CharHeuristic{Ratio: 4}
 	total := 0
 	for _, m := range msgs {
-		for _, b := range m.Content {
-			switch b.Type {
-			case "text":
-				total += h.Count(b.Text)
-			case "tool_use":
-				total += h.Count(b.Name)
-				total += h.Count(string(b.Input))
-			case "tool_result":
-				total += h.Count(b.ResultContent)
-			case "image":
-				total += 1600 // approximate token cost per image
-			}
+		total += countMessageTokens(&h, m)
+	}
+	return total
+}
+
+// estimateMessageTokensCached estimates total tokens using the loop's
+// per-index cache. Messages at indices < len(tokenCache) are assumed
+// unchanged (conversation messages are append-only). Only new tail
+// messages are counted, giving O(new) instead of O(all) per call.
+func (l *Loop) estimateMessageTokensCached(msgs []provider.Message) int {
+	cached := len(l.tokenCache)
+
+	// If the slice shrunk (shouldn't happen, but be safe), reset cache.
+	if cached > len(msgs) {
+		l.tokenCache = l.tokenCache[:0]
+		l.tokenCacheTotal = 0
+		cached = 0
+	}
+
+	h := priompt.CharHeuristic{Ratio: 4}
+	for i := cached; i < len(msgs); i++ {
+		tokens := countMessageTokens(&h, msgs[i])
+		l.tokenCache = append(l.tokenCache, tokens)
+		l.tokenCacheTotal += tokens
+	}
+	return l.tokenCacheTotal
+}
+
+// countMessageTokens counts tokens for a single message.
+func countMessageTokens(h *priompt.CharHeuristic, m provider.Message) int {
+	total := 0
+	for _, b := range m.Content {
+		switch b.Type {
+		case "text":
+			total += h.Count(b.Text)
+		case "tool_use":
+			total += h.Count(b.Name)
+			total += h.Count(string(b.Input))
+		case "tool_result":
+			total += h.Count(b.ResultContent)
+		case "image":
+			total += 1600 // approximate token cost per image
 		}
 	}
 	return total
