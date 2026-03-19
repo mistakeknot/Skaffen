@@ -252,6 +252,53 @@ func BenchmarkExtractFileActivity100Calls(b *testing.B) {
 	}
 }
 
+// --- convertToolDefs benchmarks ---
+
+// makeToolDefs creates n synthetic tool definitions with realistic schemas.
+func makeToolDefs(n int) []ToolDef {
+	defs := make([]ToolDef, n)
+	for i := range defs {
+		schema := fmt.Sprintf(`{"type":"object","properties":{"path":{"type":"string","description":"File path for tool_%d"},"limit":{"type":"integer","default":100}},"required":["path"]}`, i)
+		defs[i] = ToolDef{
+			Name:        fmt.Sprintf("tool_%d", i),
+			Description: fmt.Sprintf("Tool number %d that performs an operation on files in the workspace", i),
+			InputSchema: json.RawMessage(schema),
+		}
+	}
+	return defs
+}
+
+// BenchmarkConvertToolDefs50 benchmarks converting 50 tool definitions (uncached).
+func BenchmarkConvertToolDefs50(b *testing.B) {
+	defs := makeToolDefs(50)
+	b.ResetTimer()
+	for b.Loop() {
+		convertToolDefs(defs)
+	}
+}
+
+// BenchmarkConvertToolDefs200 benchmarks converting 200 tool definitions (uncached).
+func BenchmarkConvertToolDefs200(b *testing.B) {
+	defs := makeToolDefs(200)
+	b.ResetTimer()
+	for b.Loop() {
+		convertToolDefs(defs)
+	}
+}
+
+// BenchmarkConvertToolDefsCached200 benchmarks the cached path with 200 tool definitions.
+// After priming, subsequent calls should return in <100ns.
+func BenchmarkConvertToolDefsCached200(b *testing.B) {
+	defs := makeToolDefs(200)
+	l := &Loop{toolDefsCachedVer: -1}
+	// Prime the cache
+	l.convertToolDefsCached(defs)
+	b.ResetTimer()
+	for b.Loop() {
+		l.convertToolDefsCached(defs)
+	}
+}
+
 // --- estimateMessageTokens benchmarks ---
 
 // makeConversationMessages builds a realistic conversation of n messages

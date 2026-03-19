@@ -30,6 +30,14 @@ type Loop struct {
 	// appended at the tail need counting. Single-threaded per session, no mutex.
 	tokenCache      []int
 	tokenCacheTotal int
+
+	// cachedToolDefs caches the converted provider.ToolDef slice.
+	// Tool definitions rarely change between turns — recomputing the
+	// conversion (including json.RawMessage copies) every turn is wasteful.
+	// InvalidateToolDefs() increments toolDefsVersion to trigger a rebuild.
+	cachedToolDefs    []provider.ToolDef
+	toolDefsVersion   int // bumped by InvalidateToolDefs
+	toolDefsCachedVer int // version when cachedToolDefs was last computed (-1 = never)
 }
 
 // LoopConfig configures a single Run invocation.
@@ -68,12 +76,13 @@ func WithThinkingBudget(tokens int) Option { return func(l *Loop) { l.thinkingBu
 // New creates a Loop with the given provider, tool registry, and options.
 func New(p provider.Provider, reg *Registry, opts ...Option) *Loop {
 	l := &Loop{
-		provider: p,
-		registry: reg,
-		router:   &NoOpRouter{},
-		session:  &NoOpSession{},
-		emitter:  &NoOpEmitter{},
-		maxTurns: 100,
+		provider:          p,
+		registry:          reg,
+		router:            &NoOpRouter{},
+		session:           &NoOpSession{},
+		emitter:           &NoOpEmitter{},
+		maxTurns:          100,
+		toolDefsCachedVer: -1, // force first computation
 	}
 	for _, opt := range opts {
 		opt(l)
@@ -121,7 +130,7 @@ func (l *Loop) RunWithContent(ctx context.Context, content []provider.ContentBlo
 		// Orient: select model, get tools, compute prompt budget
 		model, modelReason := l.router.SelectModel(config.Hints)
 		tools := l.registry.Tools()
-		providerTools := convertToolDefs(tools)
+		providerTools := l.convertToolDefsCached(tools)
 
 		windowSize := l.router.ContextWindow(model)
 		outputReserve := 8192
@@ -460,6 +469,25 @@ func convertToolDefs(defs []ToolDef) []provider.ToolDef {
 		}
 	}
 	return out
+}
+
+// convertToolDefsCached returns the cached provider.ToolDef slice when the
+// tool set hasn't changed (version matches). On first call or after
+// InvalidateToolDefs(), it recomputes and caches the result.
+// Single-threaded per session — no mutex needed.
+func (l *Loop) convertToolDefsCached(defs []ToolDef) []provider.ToolDef {
+	if l.toolDefsCachedVer == l.toolDefsVersion {
+		return l.cachedToolDefs
+	}
+	l.cachedToolDefs = convertToolDefs(defs)
+	l.toolDefsCachedVer = l.toolDefsVersion
+	return l.cachedToolDefs
+}
+
+// InvalidateToolDefs forces the next convertToolDefsCached call to recompute.
+// Call this when tools are added, removed, or modified.
+func (l *Loop) InvalidateToolDefs() {
+	l.toolDefsVersion++
 }
 
 // filePathTools maps tool names to the JSON key containing a file path.
