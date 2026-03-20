@@ -24,9 +24,9 @@ import (
 	"github.com/mistakeknot/Skaffen/internal/agentloop"
 	"github.com/mistakeknot/Skaffen/internal/command"
 	"github.com/mistakeknot/Skaffen/internal/config"
-	"github.com/mistakeknot/Skaffen/internal/hooks"
 	"github.com/mistakeknot/Skaffen/internal/contextfiles"
 	"github.com/mistakeknot/Skaffen/internal/evidence"
+	"github.com/mistakeknot/Skaffen/internal/hooks"
 	"github.com/mistakeknot/Skaffen/internal/mcp"
 	"github.com/mistakeknot/Skaffen/internal/mutations"
 	"github.com/mistakeknot/Skaffen/internal/plugin"
@@ -44,29 +44,30 @@ import (
 	// Register providers via init()
 	_ "github.com/mistakeknot/Skaffen/internal/provider/anthropic"
 	_ "github.com/mistakeknot/Skaffen/internal/provider/claudecode"
+	_ "github.com/mistakeknot/Skaffen/internal/provider/tmuxagent"
 )
 
 var (
-	flagProvider = flag.String("provider", "", "LLM provider: claude-code (default), anthropic")
-	flagModel    = flag.String("model", "", "Model override")
-	flagPhase    = flag.String("phase", "act", "OODARC phase (orient, decide, act, reflect, compound)")
-	flagPrompt   = flag.String("p", "", "Prompt text (reads stdin if empty)")
-	flagMaxTurns = flag.Int("max-turns", 100, "Maximum agent loop turns")
-	flagSystem   = flag.String("system", "", "System prompt")
-	flagSession  = flag.String("session", "", "Session ID for persistence (creates ~/.skaffen/sessions/<id>.jsonl)")
-	flagBudget   = flag.Int("budget", 0, "Per-session token budget (0 = unlimited)")
-	flagMode     = flag.String("mode", "tui", "Execution mode: tui (default), print")
-	flagResume    = flag.Bool("c", false, "Resume last session")
-	flagResumeID  = flag.String("r", "", "Resume specific session by ID")
-	flagPlugins   = flag.String("plugins", "", "Path to plugins.toml (overrides config hierarchy)")
-	flagColorMode = flag.String("color-mode", "", "Color mode: dark, light (default: auto-detect)")
-	flagTheme     = flag.String("theme", "", "Theme: tokyonight, catppuccin (default: Tokyo Night)")
-	flagPlanMode  = flag.Bool("plan-mode", false, "Start in read-only plan mode")
-	flagYolo      = flag.Bool("yolo", false, "Disable all sandbox enforcement (alias for --dangerously-disable-sandbox)")
-	flagNoSandbox = flag.Bool("dangerously-disable-sandbox", false, "Disable all sandbox enforcement")
+	flagProvider    = flag.String("provider", "", "LLM provider: claude-code (default), anthropic")
+	flagModel       = flag.String("model", "", "Model override")
+	flagPhase       = flag.String("phase", "act", "OODARC phase (orient, decide, act, reflect, compound)")
+	flagPrompt      = flag.String("p", "", "Prompt text (reads stdin if empty)")
+	flagMaxTurns    = flag.Int("max-turns", 100, "Maximum agent loop turns")
+	flagSystem      = flag.String("system", "", "System prompt")
+	flagSession     = flag.String("session", "", "Session ID for persistence (creates ~/.skaffen/sessions/<id>.jsonl)")
+	flagBudget      = flag.Int("budget", 0, "Per-session token budget (0 = unlimited)")
+	flagMode        = flag.String("mode", "tui", "Execution mode: tui (default), print")
+	flagResume      = flag.Bool("c", false, "Resume last session")
+	flagResumeID    = flag.String("r", "", "Resume specific session by ID")
+	flagPlugins     = flag.String("plugins", "", "Path to plugins.toml (overrides config hierarchy)")
+	flagColorMode   = flag.String("color-mode", "", "Color mode: dark, light (default: auto-detect)")
+	flagTheme       = flag.String("theme", "", "Theme: tokyonight, catppuccin (default: Tokyo Night)")
+	flagPlanMode    = flag.Bool("plan-mode", false, "Start in read-only plan mode")
+	flagYolo        = flag.Bool("yolo", false, "Disable all sandbox enforcement (alias for --dangerously-disable-sandbox)")
+	flagNoSandbox   = flag.Bool("dangerously-disable-sandbox", false, "Disable all sandbox enforcement")
 	flagSandboxMode = flag.String("sandbox", "default", "Sandbox mode: default, strict")
-	flagIterate   = flag.Int("iterate", 0, "Max iterate-on-failure cycles (0 = single-shot, print mode only)")
-	flagTestCmd   = flag.String("test-cmd", "", "Shell command to run tests between iterate cycles (required with --iterate)")
+	flagIterate     = flag.Int("iterate", 0, "Max iterate-on-failure cycles (0 = single-shot, print mode only)")
+	flagTestCmd     = flag.String("test-cmd", "", "Shell command to run tests between iterate cycles (required with --iterate)")
 )
 
 func main() {
@@ -619,17 +620,17 @@ func runTUI() error {
 	// Run TUI — pass subagent wiring info so it can create the runner
 	// and connect StatusCB to program.Send.
 	return tui.Run(tui.Config{
-		Agent:          a,
-		Trust:          trustEval,
-		Session:        tuiSession,
-		SessionID:      sessionID,
-		Verbose:        false,
-		WorkDir:        cfg.WorkDir(),
-		SkaffenVer:     skaffenVersion(),
-		MasaqVer:       masaqVersion(),
-		CustomCommands: customCmds,
-		Skills:         skills,
-		HistoryPath:    cfg.HistoryPath(),
+		Agent:            a,
+		Trust:            trustEval,
+		Session:          tuiSession,
+		SessionID:        sessionID,
+		Verbose:          false,
+		WorkDir:          cfg.WorkDir(),
+		SkaffenVer:       skaffenVersion(),
+		MasaqVer:         masaqVersion(),
+		CustomCommands:   customCmds,
+		Skills:           skills,
+		HistoryPath:      cfg.HistoryPath(),
 		SandboxLabel:     sandboxLabel(sb),
 		KeybindingsPaths: cfg.KeybindingsPaths(),
 		SubagentInit: &tui.SubagentInit{
@@ -814,9 +815,9 @@ type agentloopToolBridge struct {
 	inner agentloop.Tool
 }
 
-func (b *agentloopToolBridge) Name() string                    { return b.inner.Name() }
-func (b *agentloopToolBridge) Description() string             { return b.inner.Description() }
-func (b *agentloopToolBridge) Schema() json.RawMessage         { return b.inner.Schema() }
+func (b *agentloopToolBridge) Name() string            { return b.inner.Name() }
+func (b *agentloopToolBridge) Description() string     { return b.inner.Description() }
+func (b *agentloopToolBridge) Schema() json.RawMessage { return b.inner.Schema() }
 func (b *agentloopToolBridge) Execute(ctx context.Context, params json.RawMessage) tool.ToolResult {
 	r := b.inner.Execute(ctx, params)
 	return tool.ToolResult{Content: r.Content, IsError: r.IsError}
