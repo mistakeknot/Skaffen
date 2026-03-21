@@ -289,6 +289,7 @@ func runPrint() error {
 	}
 
 	modelRouter := router.NewWithIC(routerCfg, ic, sessionID)
+	modelRouter.SetHardwareProfile(router.DetectHardware())
 
 	// Configure agent
 	opts := []agent.Option{
@@ -521,6 +522,7 @@ func runTUI() error {
 	}
 
 	modelRouter := router.NewWithIC(routerCfg, ic, sessionID)
+	modelRouter.SetHardwareProfile(router.DetectHardware())
 
 	phase := tool.Phase(*flagPhase)
 

@@ -31,9 +31,10 @@ type DefaultRouter struct {
 	cfg            *Config
 	budget         *BudgetTracker
 	complexity     *ComplexityClassifier
-	inputTokens    int                // set before SelectModel for complexity
+	hardware       *HardwareProfile    // detected hardware capabilities (nil = not probed)
+	inputTokens    int                 // set before SelectModel for complexity
 	lastOverride   *ComplexityOverride // last complexity result for evidence
-	overrides      map[string]string  // phase -> model, from ic route model
+	overrides      map[string]string   // phase -> model, from ic route model
 	ic             *ICClient
 	sessionID      string
 	runtimeModel   string // runtime override from /model command (empty = use defaults)
@@ -109,6 +110,12 @@ func (r *DefaultRouter) SelectModel(phase tool.Phase) (string, string) {
 		reason = "env-override"
 	}
 
+	// Hardware-aware downgrade: constrained machines use sonnet instead of opus
+	if r.hardware != nil && r.hardware.Tier == TierConstrained && model == ModelOpus {
+		model = ModelSonnet
+		reason = "hardware-constrained"
+	}
+
 	// Complexity override (shadow logs but doesn't change; enforce applies)
 	r.lastOverride = nil
 	if r.complexity != nil {
@@ -173,6 +180,18 @@ func (r *DefaultRouter) SetModelOverride(model string) {
 // ModelOverride returns the current runtime model override, or empty string if none.
 func (r *DefaultRouter) ModelOverride() string {
 	return r.runtimeModel
+}
+
+// SetHardwareProfile sets the detected hardware profile for routing decisions.
+// Call once at startup with DetectHardware(). On constrained hardware, the
+// router downgrades opus → sonnet to reduce latency and memory pressure.
+func (r *DefaultRouter) SetHardwareProfile(p HardwareProfile) {
+	r.hardware = &p
+}
+
+// HardwareInfo returns the detected hardware profile, or nil if not probed.
+func (r *DefaultRouter) HardwareInfo() *HardwareProfile {
+	return r.hardware
 }
 
 // SetThinkingBudget sets the extended thinking token budget.

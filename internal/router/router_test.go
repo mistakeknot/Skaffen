@@ -382,10 +382,66 @@ func TestBuildDecisionRecordWithComplexity(t *testing.T) {
 		Complexity: &ComplexityConfig{Mode: "shadow"},
 	})
 	r.sessionID = "test-session"
-	r.SetInputTokens(5000) // Will classify as C5
+	r.SetInputTokens(5000)       // Will classify as C5
 	r.SelectModel(tool.PhaseAct) // Populates lastOverride
 	rec := r.buildDecisionRecord(tool.PhaseAct, ModelSonnet, "phase-default")
 	if rec.Complexity != 5 {
 		t.Errorf("complexity = %d, want 5", rec.Complexity)
+	}
+}
+
+func TestHardwareConstrainedDowngradesOpus(t *testing.T) {
+	r := New(nil)
+	r.SetHardwareProfile(HardwareProfile{CPUCores: 1, MemoryMB: 2048, Tier: TierConstrained})
+
+	model, reason := r.SelectModel(tool.PhaseAct)
+	if model != ModelSonnet {
+		t.Errorf("constrained hardware: model = %q, want sonnet", model)
+	}
+	if reason != "hardware-constrained" {
+		t.Errorf("constrained hardware: reason = %q, want hardware-constrained", reason)
+	}
+}
+
+func TestHardwareStandardKeepsOpus(t *testing.T) {
+	r := New(nil)
+	r.SetHardwareProfile(HardwareProfile{CPUCores: 4, MemoryMB: 8192, Tier: TierStandard})
+
+	model, reason := r.SelectModel(tool.PhaseAct)
+	if model != ModelOpus {
+		t.Errorf("standard hardware: model = %q, want opus", model)
+	}
+	if reason != "phase-default" {
+		t.Errorf("standard hardware: reason = %q, want phase-default", reason)
+	}
+}
+
+func TestHardwareConstrainedNoEffectOnSonnet(t *testing.T) {
+	r := New(nil)
+	r.SetHardwareProfile(HardwareProfile{CPUCores: 1, MemoryMB: 2048, Tier: TierConstrained})
+	r.SetModelOverride("sonnet") // already sonnet — hardware should not further downgrade
+
+	model, _ := r.SelectModel(tool.PhaseAct)
+	if model != ModelSonnet {
+		t.Errorf("constrained + sonnet override: model = %q, want sonnet", model)
+	}
+}
+
+func TestHardwareInfoNil(t *testing.T) {
+	r := New(nil)
+	if r.HardwareInfo() != nil {
+		t.Error("expected nil hardware info before SetHardwareProfile")
+	}
+}
+
+func TestHardwareInfoSet(t *testing.T) {
+	r := New(nil)
+	r.SetHardwareProfile(HardwareProfile{CPUCores: 8, MemoryMB: 32768, Tier: TierCapable})
+	p := r.HardwareInfo()
+	if p == nil {
+		t.Fatal("expected non-nil hardware info")
+	}
+	if p.CPUCores != 8 || p.MemoryMB != 32768 || p.Tier != TierCapable {
+		t.Errorf("hardware = %+v, want 8 cores / 32768 MB / capable", *p)
 	}
 }
