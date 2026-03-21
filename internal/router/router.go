@@ -32,6 +32,8 @@ type DefaultRouter struct {
 	budget         *BudgetTracker
 	complexity     *ComplexityClassifier
 	hardware       *HardwareProfile    // detected hardware capabilities (nil = not probed)
+	shadows        []ShadowProfile     // shadow experiment profiles (nil = disabled)
+	lastShadows    []ShadowResult      // shadow results from last SelectModel call
 	inputTokens    int                 // set before SelectModel for complexity
 	lastOverride   *ComplexityOverride // last complexity result for evidence
 	overrides      map[string]string   // phase -> model, from ic route model
@@ -127,6 +129,9 @@ func (r *DefaultRouter) SelectModel(phase tool.Phase) (string, string) {
 		model, reason = r.budget.MaybeDegrade(model, reason)
 	}
 
+	// Shadow experiments: evaluate alternative profiles
+	r.lastShadows = r.EvaluateShadows(phase, model)
+
 	// Record routing decision to Intercore (fire-and-forget)
 	if r.ic != nil {
 		r.ic.RecordDecision(r.buildDecisionRecord(phase, model, reason))
@@ -192,6 +197,12 @@ func (r *DefaultRouter) SetHardwareProfile(p HardwareProfile) {
 // HardwareInfo returns the detected hardware profile, or nil if not probed.
 func (r *DefaultRouter) HardwareInfo() *HardwareProfile {
 	return r.hardware
+}
+
+// LastShadowResults returns the shadow experiment results from the last
+// SelectModel call. Empty if shadow experiments are not configured.
+func (r *DefaultRouter) LastShadowResults() []ShadowResult {
+	return r.lastShadows
 }
 
 // SetThinkingBudget sets the extended thinking token budget.
