@@ -9,13 +9,13 @@ import (
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/mistakeknot/Skaffen/internal/agent"
-	"github.com/mistakeknot/Skaffen/internal/provider"
-	"github.com/mistakeknot/Skaffen/internal/trust"
 	"github.com/mistakeknot/Masaq/question"
 	msettings "github.com/mistakeknot/Masaq/settings"
 	"github.com/mistakeknot/Masaq/spinner"
 	"github.com/mistakeknot/Masaq/tabbar"
+	"github.com/mistakeknot/Skaffen/internal/agent"
+	"github.com/mistakeknot/Skaffen/internal/provider"
+	"github.com/mistakeknot/Skaffen/internal/trust"
 )
 
 // --- helpers ---
@@ -97,7 +97,7 @@ func TestWindowResize(t *testing.T) {
 	}
 	// Status bar width is internal to statusbar.Model; verify it renders
 	// at the new width by checking output is non-empty.
-	updateStatusSlots(&app.status, "build", "opus", 0, 0, 0, false, "", experimentSlotData{})
+	updateStatusSlots(&app.status, "build", "opus", 0, 0, 0, false, "", experimentSlotData{}, nil, statusBarExtra{})
 	if app.status.View() == "" {
 		t.Error("status bar should render after resize")
 	}

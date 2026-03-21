@@ -7,7 +7,7 @@ import (
 
 func TestStatusBarRenders(t *testing.T) {
 	sb := newStatusBar(120)
-	updateStatusSlots(&sb, "act", "claude", 0.25, 30, 3, false, "", experimentSlotData{})
+	updateStatusSlots(&sb, "act", "claude", 0.25, 30, 3, false, "", experimentSlotData{}, nil, statusBarExtra{})
 	view := sb.View()
 	if view == "" {
 		t.Fatal("status bar should not be empty")
@@ -16,7 +16,7 @@ func TestStatusBarRenders(t *testing.T) {
 
 func TestStatusBarOmitsPhase(t *testing.T) {
 	sb := newStatusBar(120)
-	updateStatusSlots(&sb, "reflect", "claude", 0.0, 0, 0, false, "", experimentSlotData{})
+	updateStatusSlots(&sb, "reflect", "claude", 0.0, 0, 0, false, "", experimentSlotData{}, nil, statusBarExtra{})
 	view := sb.View()
 	// Phase is shown in the breadcrumb, not the status bar
 	if strings.Contains(view, "reflect") {
@@ -26,7 +26,7 @@ func TestStatusBarOmitsPhase(t *testing.T) {
 
 func TestStatusBarContainsModel(t *testing.T) {
 	sb := newStatusBar(120)
-	updateStatusSlots(&sb, "act", "opus", 0.0, 0, 0, false, "", experimentSlotData{})
+	updateStatusSlots(&sb, "act", "opus", 0.0, 0, 0, false, "", experimentSlotData{}, nil, statusBarExtra{})
 	view := sb.View()
 	if !strings.Contains(view, "opus") {
 		t.Fatal("status bar should contain model name")
@@ -35,7 +35,7 @@ func TestStatusBarContainsModel(t *testing.T) {
 
 func TestStatusBarCostFormatting(t *testing.T) {
 	sb := newStatusBar(120)
-	updateStatusSlots(&sb, "act", "claude", 1.50, 0, 0, false, "", experimentSlotData{})
+	updateStatusSlots(&sb, "act", "claude", 1.50, 0, 0, false, "", experimentSlotData{}, nil, statusBarExtra{})
 	view := sb.View()
 	if !strings.Contains(view, "$1.50") {
 		t.Fatal("status bar should format cost as $X.XX")
@@ -44,7 +44,7 @@ func TestStatusBarCostFormatting(t *testing.T) {
 
 func TestStatusBarTurns(t *testing.T) {
 	sb := newStatusBar(120)
-	updateStatusSlots(&sb, "act", "claude", 0, 0, 7, false, "", experimentSlotData{})
+	updateStatusSlots(&sb, "act", "claude", 0, 0, 7, false, "", experimentSlotData{}, nil, statusBarExtra{})
 	view := sb.View()
 	if !strings.Contains(view, "7 turns") {
 		t.Fatal("status bar should show turn count")
@@ -62,7 +62,7 @@ func TestContextMeterShowsPercentage(t *testing.T) {
 
 func TestStatusBarSeparators(t *testing.T) {
 	sb := newStatusBar(120)
-	updateStatusSlots(&sb, "act", "claude", 0, 0, 0, false, "", experimentSlotData{})
+	updateStatusSlots(&sb, "act", "claude", 0, 0, 0, false, "", experimentSlotData{}, nil, statusBarExtra{})
 	view := sb.View()
 	if !strings.Contains(view, "│") {
 		t.Fatal("status bar should contain separators")
@@ -74,7 +74,7 @@ func TestStatusBarAllPhasesRender(t *testing.T) {
 	// even though phase is no longer displayed (it's in breadcrumb).
 	for _, phase := range phaseOrder {
 		sb := newStatusBar(120)
-		updateStatusSlots(&sb, phase, "claude", 0, 0, 0, false, "", experimentSlotData{})
+		updateStatusSlots(&sb, phase, "claude", 0, 0, 0, false, "", experimentSlotData{}, nil, statusBarExtra{})
 		view := sb.View()
 		if view == "" {
 			t.Errorf("status bar should render for phase %q", phase)
@@ -85,35 +85,35 @@ func TestStatusBarAllPhasesRender(t *testing.T) {
 func TestStatusBarCostThresholds(t *testing.T) {
 	sb := newStatusBar(120)
 	// These should not panic — we're testing that different cost ranges render
-	updateStatusSlots(&sb, "act", "claude", 0.10, 0, 0, false, "", experimentSlotData{})
+	updateStatusSlots(&sb, "act", "claude", 0.10, 0, 0, false, "", experimentSlotData{}, nil, statusBarExtra{})
 	sb.View()
-	updateStatusSlots(&sb, "act", "claude", 0.75, 0, 0, false, "", experimentSlotData{})
+	updateStatusSlots(&sb, "act", "claude", 0.75, 0, 0, false, "", experimentSlotData{}, nil, statusBarExtra{})
 	sb.View()
-	updateStatusSlots(&sb, "act", "claude", 3.00, 0, 0, false, "", experimentSlotData{})
+	updateStatusSlots(&sb, "act", "claude", 3.00, 0, 0, false, "", experimentSlotData{}, nil, statusBarExtra{})
 	sb.View()
 }
 
 func TestStatusBarContextThresholds(t *testing.T) {
 	sb := newStatusBar(120)
 	// These should not panic — testing different context ranges render
-	updateStatusSlots(&sb, "act", "claude", 0, 25, 0, false, "", experimentSlotData{})
+	updateStatusSlots(&sb, "act", "claude", 0, 25, 0, false, "", experimentSlotData{}, nil, statusBarExtra{})
 	sb.View()
-	updateStatusSlots(&sb, "act", "claude", 0, 65, 0, false, "", experimentSlotData{})
+	updateStatusSlots(&sb, "act", "claude", 0, 65, 0, false, "", experimentSlotData{}, nil, statusBarExtra{})
 	sb.View()
-	updateStatusSlots(&sb, "act", "claude", 0, 90, 0, false, "", experimentSlotData{})
+	updateStatusSlots(&sb, "act", "claude", 0, 90, 0, false, "", experimentSlotData{}, nil, statusBarExtra{})
 	sb.View()
 }
 
 func TestStatusBarZeroWidth(t *testing.T) {
 	sb := newStatusBar(0)
-	updateStatusSlots(&sb, "act", "claude", 0, 0, 0, false, "", experimentSlotData{})
+	updateStatusSlots(&sb, "act", "claude", 0, 0, 0, false, "", experimentSlotData{}, nil, statusBarExtra{})
 	// Should not panic
 	_ = sb.View()
 }
 
 func TestStatusBarPlanMode(t *testing.T) {
 	sb := newStatusBar(120)
-	updateStatusSlots(&sb, "act", "claude", 0, 0, 0, true, "", experimentSlotData{})
+	updateStatusSlots(&sb, "act", "claude", 0, 0, 0, true, "", experimentSlotData{}, nil, statusBarExtra{})
 	view := sb.View()
 	if !strings.Contains(view, "PLAN") {
 		t.Errorf("plan mode badge missing from status bar: %q", view)
@@ -122,10 +122,69 @@ func TestStatusBarPlanMode(t *testing.T) {
 
 func TestStatusBarPlanModeOff(t *testing.T) {
 	sb := newStatusBar(120)
-	updateStatusSlots(&sb, "act", "claude", 0, 0, 0, false, "", experimentSlotData{})
+	updateStatusSlots(&sb, "act", "claude", 0, 0, 0, false, "", experimentSlotData{}, nil, statusBarExtra{})
 	view := sb.View()
 	if strings.Contains(view, "PLAN") {
 		t.Errorf("PLAN badge should not appear when plan mode off: %q", view)
+	}
+}
+
+func TestStatusBarCustomItems(t *testing.T) {
+	sb := newStatusBar(120)
+	items := []StatusBarItem{ItemModel, ItemTurns} // cost hidden
+	updateStatusSlots(&sb, "act", "opus", 1.50, 0, 3, false, "", experimentSlotData{}, items, statusBarExtra{})
+	view := sb.View()
+	if !strings.Contains(view, "opus") {
+		t.Error("custom items: model should be visible")
+	}
+	if !strings.Contains(view, "3 turns") {
+		t.Error("custom items: turns should be visible")
+	}
+	if strings.Contains(view, "$1.50") {
+		t.Error("custom items: cost should be hidden")
+	}
+}
+
+func TestStatusBarExtraSession(t *testing.T) {
+	sb := newStatusBar(120)
+	items := []StatusBarItem{ItemModel, ItemSession}
+	extra := statusBarExtra{SessionName: "my-session"}
+	updateStatusSlots(&sb, "act", "opus", 0, 0, 0, false, "", experimentSlotData{}, items, extra)
+	view := sb.View()
+	if !strings.Contains(view, "my-session") {
+		t.Errorf("session name missing from status bar: %q", view)
+	}
+}
+
+func TestStatusBarExtraBranch(t *testing.T) {
+	sb := newStatusBar(120)
+	items := []StatusBarItem{ItemModel, ItemBranch}
+	extra := statusBarExtra{GitBranch: "feat/foo"}
+	updateStatusSlots(&sb, "act", "opus", 0, 0, 0, false, "", experimentSlotData{}, items, extra)
+	view := sb.View()
+	if !strings.Contains(view, "feat/foo") {
+		t.Errorf("branch name missing from status bar: %q", view)
+	}
+}
+
+func TestStatusBarExtraFiles(t *testing.T) {
+	sb := newStatusBar(120)
+	items := []StatusBarItem{ItemModel, ItemFiles}
+	extra := statusBarExtra{FilesChanged: 5}
+	updateStatusSlots(&sb, "act", "opus", 0, 0, 0, false, "", experimentSlotData{}, items, extra)
+	view := sb.View()
+	if !strings.Contains(view, "5 files") {
+		t.Errorf("file count missing from status bar: %q", view)
+	}
+}
+
+func TestStatusBarDefaultItems(t *testing.T) {
+	items := DefaultStatusBarItems()
+	if len(items) != 3 {
+		t.Fatalf("expected 3 default items, got %d", len(items))
+	}
+	if items[0] != ItemModel || items[1] != ItemCost || items[2] != ItemTurns {
+		t.Errorf("unexpected defaults: %v", items)
 	}
 }
 

@@ -19,11 +19,11 @@ const contextMaxTokens = 200_000
 func newStatusBar(width int) statusbar.Model {
 	sb := statusbar.New(width)
 	sb.SetSlots([]statusbar.Slot{
-		{Label: "", Value: "build"},  // phase (no label, colored)
-		{Label: "", Value: "opus"},   // model
-		{Label: "", Value: "$0.00"},  // cost
-		{Label: "", Value: "0%"},     // context
-		{Label: "", Value: "0 turns"},// turns
+		{Label: "", Value: "build"},   // phase (no label, colored)
+		{Label: "", Value: "opus"},    // model
+		{Label: "", Value: "$0.00"},   // cost
+		{Label: "", Value: "0%"},      // context
+		{Label: "", Value: "0 turns"}, // turns
 	})
 	return sb
 }
@@ -86,11 +86,41 @@ func tokenSparklineWidth(termWidth int) int {
 	return w
 }
 
+// StatusBarItem identifies a configurable status bar element.
+type StatusBarItem string
+
+const (
+	ItemModel   StatusBarItem = "model"
+	ItemCost    StatusBarItem = "cost"
+	ItemTurns   StatusBarItem = "turns"
+	ItemSession StatusBarItem = "session"
+	ItemBranch  StatusBarItem = "branch"
+	ItemFiles   StatusBarItem = "files"
+)
+
+// DefaultStatusBarItems returns the default visible items.
+func DefaultStatusBarItems() []StatusBarItem {
+	return []StatusBarItem{ItemModel, ItemCost, ItemTurns}
+}
+
+// AllStatusBarItems returns all available items for documentation/config.
+func AllStatusBarItems() []StatusBarItem {
+	return []StatusBarItem{ItemModel, ItemCost, ItemTurns, ItemSession, ItemBranch, ItemFiles}
+}
+
+// statusBarExtra holds optional data for extended status bar items.
+type statusBarExtra struct {
+	SessionName  string
+	GitBranch    string
+	FilesChanged int
+}
+
 // updateStatusSlots refreshes status bar slots with current agent state.
 // Phase is shown in the breadcrumb, not here — the status bar shows runtime state.
 // planMode adds a "PLAN" badge; sandboxLabel adds a trailing badge.
 // exp shows experiment progress when an autoresearch campaign is active.
-func updateStatusSlots(sb *statusbar.Model, phase, model string, cost, contextPct float64, turns int, planMode bool, sandboxLabel string, exp experimentSlotData) {
+// items controls which elements are shown; nil means default (model, cost, turns).
+func updateStatusSlots(sb *statusbar.Model, phase, model string, cost, contextPct float64, turns int, planMode bool, sandboxLabel string, exp experimentSlotData, items []StatusBarItem, extra statusBarExtra) {
 	c := theme.Current().Semantic()
 
 	var slots []statusbar.Slot
@@ -100,13 +130,34 @@ func updateStatusSlots(sb *statusbar.Model, phase, model string, cost, contextPc
 		slots = append(slots, statusbar.Slot{Label: "", Value: "PLAN", Color: c.Info.Color()})
 	}
 
-	slots = append(slots,
-		statusbar.Slot{Label: "", Value: model, Color: c.FgDim.Color()},
-		statusbar.Slot{Label: "", Value: fmt.Sprintf("$%.2f", cost), Color: costColor(cost)},
-		statusbar.Slot{Label: "", Value: fmt.Sprintf("%d turns", turns), Color: c.Fg.Color()},
-	)
+	if items == nil {
+		items = DefaultStatusBarItems()
+	}
 
-	// Experiment progress slot
+	for _, item := range items {
+		switch item {
+		case ItemModel:
+			slots = append(slots, statusbar.Slot{Label: "", Value: model, Color: c.FgDim.Color()})
+		case ItemCost:
+			slots = append(slots, statusbar.Slot{Label: "", Value: fmt.Sprintf("$%.2f", cost), Color: costColor(cost)})
+		case ItemTurns:
+			slots = append(slots, statusbar.Slot{Label: "", Value: fmt.Sprintf("%d turns", turns), Color: c.Fg.Color()})
+		case ItemSession:
+			if extra.SessionName != "" {
+				slots = append(slots, statusbar.Slot{Label: "", Value: extra.SessionName, Color: c.FgDim.Color()})
+			}
+		case ItemBranch:
+			if extra.GitBranch != "" {
+				slots = append(slots, statusbar.Slot{Label: "", Value: extra.GitBranch, Color: c.Info.Color()})
+			}
+		case ItemFiles:
+			if extra.FilesChanged > 0 {
+				slots = append(slots, statusbar.Slot{Label: "", Value: fmt.Sprintf("%d files", extra.FilesChanged), Color: c.Primary.Color()})
+			}
+		}
+	}
+
+	// Experiment progress slot (always shown when active, not configurable)
 	if exp.Active {
 		expValue := fmt.Sprintf("exp: %d/%d %+.1f%s", exp.Count, exp.Max, exp.Delta, exp.Unit)
 		slots = append(slots, statusbar.Slot{Label: "", Value: expValue, Color: expColor(exp.Delta)})
@@ -180,4 +231,3 @@ func costColor(cost float64) lipgloss.Color {
 		return c.FgDim.Color() // muted — low spend, unobtrusive
 	}
 }
-

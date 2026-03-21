@@ -13,14 +13,6 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/mistakeknot/Skaffen/internal/agent"
-	"github.com/mistakeknot/Skaffen/internal/command"
-	"github.com/mistakeknot/Skaffen/internal/git"
-	"github.com/mistakeknot/Skaffen/internal/skill"
-	"github.com/mistakeknot/Skaffen/internal/provider"
-	"github.com/mistakeknot/Skaffen/internal/session"
-	"github.com/mistakeknot/Skaffen/internal/subagent"
-	"github.com/mistakeknot/Skaffen/internal/trust"
 	"github.com/mistakeknot/Masaq/breadcrumb"
 	"github.com/mistakeknot/Masaq/compact"
 	"github.com/mistakeknot/Masaq/diff"
@@ -36,24 +28,32 @@ import (
 	"github.com/mistakeknot/Masaq/tabbar"
 	"github.com/mistakeknot/Masaq/theme"
 	"github.com/mistakeknot/Masaq/viewport"
+	"github.com/mistakeknot/Skaffen/internal/agent"
+	"github.com/mistakeknot/Skaffen/internal/command"
+	"github.com/mistakeknot/Skaffen/internal/git"
+	"github.com/mistakeknot/Skaffen/internal/provider"
+	"github.com/mistakeknot/Skaffen/internal/session"
+	"github.com/mistakeknot/Skaffen/internal/skill"
+	"github.com/mistakeknot/Skaffen/internal/subagent"
+	"github.com/mistakeknot/Skaffen/internal/trust"
 )
 
 // Config holds TUI configuration.
 type Config struct {
-	Agent      *agent.Agent
-	Trust      *trust.Evaluator
-	Session    *session.JSONLSession // for context compaction
-	SessionID  string
-	Verbose    bool
-	WorkDir        string
-	SkaffenVer     string
-	MasaqVer       string
-	CustomCommands map[string]command.Def
-	Skills         map[string]skill.Def
-	HistoryPath    string
-	SubagentInit   *SubagentInit // nil = subagents disabled
-	SandboxLabel     string         // "sandbox", "strict", "YOLO", or ""
-	KeybindingsPaths []string       // paths to keybindings.json files (user + project)
+	Agent            *agent.Agent
+	Trust            *trust.Evaluator
+	Session          *session.JSONLSession // for context compaction
+	SessionID        string
+	Verbose          bool
+	WorkDir          string
+	SkaffenVer       string
+	MasaqVer         string
+	CustomCommands   map[string]command.Def
+	Skills           map[string]skill.Def
+	HistoryPath      string
+	SubagentInit     *SubagentInit // nil = subagents disabled
+	SandboxLabel     string        // "sandbox", "strict", "YOLO", or ""
+	KeybindingsPaths []string      // paths to keybindings.json files (user + project)
 }
 
 // SubagentInit carries the components needed to wire the subagent runner
@@ -188,6 +188,8 @@ type appModel struct {
 	modelName     string
 	sandboxLabel  string             // status bar label: "sandbox", "strict", "YOLO", or ""
 	expStatus     experimentSlotData // autoresearch experiment progress
+	statusItems   []StatusBarItem    // configurable status bar items (nil = default)
+	statusExtra   statusBarExtra     // data for extended status bar items
 	keybindings   *Keybindings
 	running       bool
 
@@ -216,8 +218,8 @@ type appModel struct {
 	spinner spinner.Model
 
 	// Context meter and token sparkline
-	contextMeter  meter.Model
-	tokenSpark    sparkline.Model
+	contextMeter meter.Model
+	tokenSpark   sparkline.Model
 
 	// Prompt history persistence
 	historyStore *historyStore
@@ -319,10 +321,10 @@ func newAppModel(cfg Config) *appModel {
 		phase:        "act",
 		modelName:    "opus",
 		logo:         newLogoModel(skVer, mqVer),
-		customCmds:    cfg.CustomCommands,
-		skills:        cfg.Skills,
-		sandboxLabel:  cfg.SandboxLabel,
-		keybindings:   kb,
+		customCmds:   cfg.CustomCommands,
+		skills:       cfg.Skills,
+		sandboxLabel: cfg.SandboxLabel,
+		keybindings:  kb,
 		historyStore: hs,
 		pinner:       skill.NewPinner(cfg.Skills),
 		contextMeter: newContextMeter(80),
@@ -737,7 +739,7 @@ func (m *appModel) View() string {
 
 	// Update status slots with current state.
 	planMode := m.agent != nil && m.agent.PlanMode()
-	updateStatusSlots(&m.status, m.phase, m.modelName, m.totalCost, m.contextPct, m.turns, planMode, m.sandboxLabel, m.expStatus)
+	updateStatusSlots(&m.status, m.phase, m.modelName, m.totalCost, m.contextPct, m.turns, planMode, m.sandboxLabel, m.expStatus, m.statusItems, m.statusExtra)
 	statusView := m.status.View()
 	crumbView := m.crumbs.View()
 
