@@ -5,25 +5,27 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/mistakeknot/Skaffen/internal/observer"
+	"github.com/mistakeknot/Alwe/pkg/observer"
+	"github.com/mistakeknot/Zaka/pkg/adapter"
+
 	"github.com/mistakeknot/Skaffen/internal/provider"
 )
 
 // Provider implements provider.Provider by steering a CLI agent in tmux
 // and observing its output via CASS.
 type Provider struct {
-	adapter  AgentAdapter
-	observer *observer.CassObserver
-	session  *TmuxSession
-	workDir  string
+	agentAdapter adapter.AgentAdapter
+	observer     *observer.CassObserver
+	session      *TmuxSession
+	workDir      string
 }
 
 // Option configures the Provider.
 type Option func(*Provider)
 
 // WithAdapter sets the agent adapter.
-func WithAdapter(a AgentAdapter) Option {
-	return func(p *Provider) { p.adapter = a }
+func WithAdapter(a adapter.AgentAdapter) Option {
+	return func(p *Provider) { p.agentAdapter = a }
 }
 
 // WithWorkDir sets the working directory.
@@ -37,10 +39,10 @@ func New(opts ...Option) (*Provider, error) {
 	for _, opt := range opts {
 		opt(p)
 	}
-	if p.adapter == nil {
+	if p.agentAdapter == nil {
 		// Default to Claude Code adapter.
-		p.adapter = GetAdapter("claude-code")
-		if p.adapter == nil {
+		p.agentAdapter = adapter.Get("claude-code")
+		if p.agentAdapter == nil {
 			return nil, fmt.Errorf("no adapter registered for claude-code")
 		}
 	}
@@ -59,7 +61,7 @@ func New(opts ...Option) (*Provider, error) {
 
 // Name returns the provider name.
 func (p *Provider) Name() string {
-	return "tmux-" + p.adapter.Name()
+	return "tmux-" + p.agentAdapter.Name()
 }
 
 // Stream spawns (or reuses) a tmux session, sends the prompt, and streams
@@ -72,11 +74,11 @@ func (p *Provider) Stream(ctx context.Context, messages []provider.Message, tool
 
 	// Spawn session if we don't have one.
 	if p.session == nil || !p.session.IsAlive(ctx) {
-		cfg := AgentConfig{
+		cfg := adapter.Config{
 			Model:          config.Model,
 			PermissionMode: "bypassPermissions",
 		}
-		sess, err := Spawn(ctx, p.adapter, p.workDir, cfg)
+		sess, err := Spawn(ctx, p.agentAdapter, p.workDir, cfg)
 		if err != nil {
 			return nil, fmt.Errorf("spawn agent: %w", err)
 		}
@@ -93,7 +95,7 @@ func (p *Provider) Stream(ctx context.Context, messages []provider.Message, tool
 
 	events := make(chan provider.StreamEvent, 16)
 
-	if p.observer != nil && p.adapter.CassConnector() != "" {
+	if p.observer != nil && p.agentAdapter.CassConnector() != "" {
 		// Tier 1: use CASS observer for structured output.
 		go p.observeViaCass(ctx, events)
 	} else {
@@ -109,7 +111,7 @@ func (p *Provider) observeViaCass(ctx context.Context, events chan<- provider.St
 	defer close(events)
 
 	// Find the session file to tail.
-	sessionPath, err := FindLatestSession(p.session.Name)
+	sessionPath, err := adapter.FindLatestSession()
 	if err != nil {
 		// Fall back to screen scraping.
 		p.observeViaScreen(ctx, events)

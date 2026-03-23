@@ -6,26 +6,28 @@ import (
 	"os/exec"
 	"strings"
 	"time"
+
+	"github.com/mistakeknot/Zaka/pkg/adapter"
 )
 
 // TmuxSession manages a single tmux session running a CLI agent.
 type TmuxSession struct {
 	Name    string // tmux session name
-	Adapter AgentAdapter
+	Adapter adapter.AgentAdapter
 	WorkDir string
 	pid     int // tmux server pid (for cleanup)
 }
 
 // Spawn creates a new tmux session and starts the agent inside it.
-func Spawn(ctx context.Context, adapter AgentAdapter, workDir string, cfg AgentConfig) (*TmuxSession, error) {
+func Spawn(ctx context.Context, a adapter.AgentAdapter, workDir string, cfg adapter.Config) (*TmuxSession, error) {
 	name := cfg.SessionName
 	if name == "" {
-		name = fmt.Sprintf("skaffen-%s-%d", adapter.Name(), time.Now().UnixMilli())
+		name = fmt.Sprintf("skaffen-%s-%d", a.Name(), time.Now().UnixMilli())
 	}
 
-	bin, args := adapter.SpawnCmd(workDir, cfg)
+	bin, args := a.SpawnCmd(workDir, cfg)
 	if bin == "" {
-		return nil, fmt.Errorf("adapter %s returned empty spawn command", adapter.Name())
+		return nil, fmt.Errorf("adapter %s returned empty spawn command", a.Name())
 	}
 
 	// Build the full command string for tmux new-session.
@@ -45,25 +47,25 @@ func Spawn(ctx context.Context, adapter AgentAdapter, workDir string, cfg AgentC
 
 	return &TmuxSession{
 		Name:    name,
-		Adapter: adapter,
+		Adapter: a,
 		WorkDir: workDir,
 	}, nil
 }
 
 // Resume resumes an existing agent session in a new tmux session.
-func Resume(ctx context.Context, adapter AgentAdapter, sessionID string, workDir string, cfg AgentConfig) (*TmuxSession, error) {
-	if !adapter.SupportsResume() {
-		return nil, fmt.Errorf("adapter %s does not support session resume", adapter.Name())
+func Resume(ctx context.Context, a adapter.AgentAdapter, sessionID string, workDir string, cfg adapter.Config) (*TmuxSession, error) {
+	if !a.SupportsResume() {
+		return nil, fmt.Errorf("adapter %s does not support session resume", a.Name())
 	}
 
 	name := cfg.SessionName
 	if name == "" {
-		name = fmt.Sprintf("skaffen-%s-%d", adapter.Name(), time.Now().UnixMilli())
+		name = fmt.Sprintf("skaffen-%s-%d", a.Name(), time.Now().UnixMilli())
 	}
 
-	bin, args := adapter.ResumeCmd(sessionID, workDir, cfg)
+	bin, args := a.ResumeCmd(sessionID, workDir, cfg)
 	if bin == "" {
-		return nil, fmt.Errorf("adapter %s returned empty resume command", adapter.Name())
+		return nil, fmt.Errorf("adapter %s returned empty resume command", a.Name())
 	}
 
 	tmuxArgs := []string{
@@ -81,7 +83,7 @@ func Resume(ctx context.Context, adapter AgentAdapter, sessionID string, workDir
 
 	return &TmuxSession{
 		Name:    name,
-		Adapter: adapter,
+		Adapter: a,
 		WorkDir: workDir,
 	}, nil
 }
