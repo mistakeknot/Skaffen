@@ -123,7 +123,10 @@ func (r *Runner) runOne(ctx context.Context, task SubagentTask) SubagentResult {
 	reg := agentloop.NewRegistry()
 
 	router := &agentloop.NoOpRouter{}
-	if st.Model != "" {
+	if task.Model != "" {
+		// Routing override from ic route dispatch takes precedence
+		router.Model = task.Model
+	} else if st.Model != "" {
 		router.Model = st.Model
 	} else if dm := r.registry.DefaultModel(); dm != "" {
 		router.Model = dm

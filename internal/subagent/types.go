@@ -10,15 +10,15 @@ import (
 
 // SubagentType defines a type of subagent (e.g., "explore", "general").
 type SubagentType struct {
-	Name         string   `toml:"name"`
-	Description  string   `toml:"description"`
-	Tools        []string `toml:"tools"`         // tool whitelist (empty = all)
-	SystemPrompt string   `toml:"system_prompt"` // template with {{.TaskPrompt}}, {{.InjectedContext}}
-	MaxTurns     int      `toml:"max_turns"`     // 0 = default (25)
-	TokenBudget  int      `toml:"token_budget"`  // 0 = inherit from parent
-	ReadOnly     bool     `toml:"read_only"`     // skip Intercore reservation
-	Model           string   `toml:"model"`            // empty = inherit from parent
-	Timeout         Duration `toml:"timeout"`          // 0 = default (120s)
+	Name            string   `toml:"name"`
+	Description     string   `toml:"description"`
+	Tools           []string `toml:"tools"`             // tool whitelist (empty = all)
+	SystemPrompt    string   `toml:"system_prompt"`     // template with {{.TaskPrompt}}, {{.InjectedContext}}
+	MaxTurns        int      `toml:"max_turns"`         // 0 = default (25)
+	TokenBudget     int      `toml:"token_budget"`      // 0 = inherit from parent
+	ReadOnly        bool     `toml:"read_only"`         // skip Intercore reservation
+	Model           string   `toml:"model"`             // empty = inherit from parent
+	Timeout         Duration `toml:"timeout"`           // 0 = default (120s)
 	ContextTokenCap int      `toml:"context_token_cap"` // 0 = DefaultContextTokenCap
 }
 
@@ -79,6 +79,7 @@ type SubagentTask struct {
 	InjectedContext string   // optional context from parent
 	BeadDescription string   // optional bead description for domain awareness
 	FilePatterns    []string // glob patterns for Intercore reservation (write-capable only)
+	Model           string   // model override from routing (empty = use registry default)
 }
 
 // SubagentResult is the output of a completed subagent.

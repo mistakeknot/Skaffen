@@ -4,7 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
+	"os"
+	"os/exec"
 	"strings"
+	"time"
 
 	"github.com/mistakeknot/Skaffen/internal/agentloop"
 )
@@ -112,6 +116,9 @@ func (t *AgentTool) Execute(ctx context.Context, params json.RawMessage) agentlo
 	// Build injected context from context array.
 	injected := strings.Join(input.Context, "\n\n")
 
+	// Consult ic route dispatch for model override (200ms timeout, graceful fallback)
+	routedModel := consultRouting(ctx, input.SubagentType)
+
 	task := SubagentTask{
 		Type:            input.SubagentType,
 		Prompt:          input.Prompt,
@@ -119,6 +126,7 @@ func (t *AgentTool) Execute(ctx context.Context, params json.RawMessage) agentlo
 		InjectedContext: injected,
 		BeadDescription: input.BeadDescription,
 		FilePatterns:    input.FilePatterns,
+		Model:           routedModel,
 	}
 
 	results, err := t.runner.Run(ctx, []SubagentTask{task})
@@ -137,8 +145,54 @@ func (t *AgentTool) Execute(ctx context.Context, params json.RawMessage) agentlo
 		}
 	}
 
-	content := fmt.Sprintf("Subagent %q completed (%d turns, %d tokens):\n\n%s",
-		r.Description, r.Turns, r.Usage.InputTokens+r.Usage.OutputTokens, r.Response)
+	// Routing annotation for parent LLM visibility
+	routeInfo := ""
+	if routedModel != "" {
+		routeInfo = fmt.Sprintf("[routed: %s→%s] ", input.SubagentType, routedModel)
+	}
+
+	content := fmt.Sprintf("%sSubagent %q completed (%d turns, %d tokens):\n\n%s",
+		routeInfo, r.Description, r.Turns, r.Usage.InputTokens+r.Usage.OutputTokens, r.Response)
 
 	return agentloop.ToolResult{Content: content, IsError: false}
+}
+
+// consultRouting calls `ic route dispatch --type=<subagentType> --phase=<phase> --json`
+// with a 200ms timeout. Returns the resolved model, or empty string on any failure
+// (binary not found, timeout, parse error) — the caller falls back to LLM's original choice.
+func consultRouting(ctx context.Context, subagentType string) string {
+	icPath := os.Getenv("IC_PATH")
+	if icPath == "" {
+		var err error
+		icPath, err = exec.LookPath("ic")
+		if err != nil {
+			return ""
+		}
+	}
+
+	routeCtx, cancel := context.WithTimeout(ctx, 200*time.Millisecond)
+	defer cancel()
+
+	args := []string{"route", "dispatch", "--type=" + subagentType, "--json"}
+	if phase := os.Getenv("CLAVAIN_PHASE"); phase != "" {
+		args = append(args, "--phase="+phase)
+	}
+
+	cmd := exec.CommandContext(routeCtx, icPath, args...)
+	out, err := cmd.Output()
+	if err != nil {
+		slog.Debug("ic route dispatch fallback", "type", subagentType, "error", err)
+		return ""
+	}
+
+	var result struct {
+		Type  string `json:"type"`
+		Model string `json:"model"`
+	}
+	if err := json.Unmarshal(out, &result); err != nil {
+		slog.Debug("ic route dispatch parse error", "type", subagentType, "error", err)
+		return ""
+	}
+
+	return result.Model
 }
