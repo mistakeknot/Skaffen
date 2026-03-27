@@ -1,6 +1,6 @@
 # Brainstorm: Better Visibility into Claude Code Provider Activity
 
-**Bead:** Demarch-0ed
+**Bead:** Sylveste-0ed
 **Date:** 2026-03-12
 **Context:** When using `claude -p` as the underlying model (the claudecode provider), the TUI shows no tool call activity — the user sees streaming text but tool calls are invisible.
 

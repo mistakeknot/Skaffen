@@ -2,7 +2,7 @@
 
 ## Core Bet: Go for Agent Runtimes
 
-Go compiles in 1-5 seconds (vs 3+ minutes for Rust), produces single binaries, and is already Demarch's systems language (14+ modules). The tradeoff: no algebraic types, less compile-time safety. We compensate with interface-heavy design and comprehensive tests (355+).
+Go compiles in 1-5 seconds (vs 3+ minutes for Rust), produces single binaries, and is already Sylveste's systems language (14+ modules). The tradeoff: no algebraic types, less compile-time safety. We compensate with interface-heavy design and comprehensive tests (355+).
 
 ## Design Principles
 
@@ -26,7 +26,7 @@ Core components (Provider, Router, Session, Emitter, Tool) are interfaces inject
 - **No official Anthropic Go SDK.** We implement the Messages API directly (~300 lines). More control, less drift risk from SDK changes.
 - **Subprocess for intercore.** The `ic` CLI bridge adds ~5ms per event vs native Go integration. Acceptable until intercore ships `pkg/client`.
 - **MCP tools are slower than built-ins.** JSON-RPC over stdio adds latency. The tradeoff is plugin compatibility with the entire Interverse ecosystem.
-- **TUI depends on Masaq.** Shared component library means coordinated releases. The benefit is consistency across all Demarch TUI tools.
+- **TUI depends on Masaq.** Shared component library means coordinated releases. The benefit is consistency across all Sylveste TUI tools.
 
 ## Non-Goals
 

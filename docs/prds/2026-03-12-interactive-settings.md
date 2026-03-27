@@ -1,6 +1,6 @@
 # PRD: Interactive /settings TUI Overlay
 
-**Bead:** Demarch-uhq
+**Bead:** Sylveste-uhq
 **Brainstorm:** [docs/brainstorms/2026-03-12-interactive-settings.md](../brainstorms/2026-03-12-interactive-settings.md)
 
 ## Problem

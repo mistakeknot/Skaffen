@@ -1,6 +1,6 @@
 # Plan: Shell Escape (! prefix)
 
-**Bead:** Demarch-6i0.8
+**Bead:** Sylveste-6i0.8
 **PRD:** [docs/prds/2026-03-12-shell-escape.md](../prds/2026-03-12-shell-escape.md)
 **Stage:** planned
 

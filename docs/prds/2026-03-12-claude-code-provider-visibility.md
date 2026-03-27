@@ -1,6 +1,6 @@
 # PRD: Claude Code Provider Tool Visibility
 
-**Bead:** Demarch-0ed
+**Bead:** Sylveste-0ed
 **Date:** 2026-03-12
 **Status:** draft
 **Brainstorm:** [docs/brainstorms/2026-03-12-claude-code-provider-visibility.md](../brainstorms/2026-03-12-claude-code-provider-visibility.md)

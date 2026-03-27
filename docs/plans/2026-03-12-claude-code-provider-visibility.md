@@ -1,6 +1,6 @@
 # Plan: Claude Code Provider Tool Visibility
 
-**Bead:** Demarch-0ed
+**Bead:** Sylveste-0ed
 **PRD:** [docs/prds/2026-03-12-claude-code-provider-visibility.md](../prds/2026-03-12-claude-code-provider-visibility.md)
 **Stage:** executed
 

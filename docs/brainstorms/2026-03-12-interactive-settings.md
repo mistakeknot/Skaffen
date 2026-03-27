@@ -1,6 +1,6 @@
 # Brainstorm: Interactive /settings TUI Overlay
 
-**Bead:** Demarch-uhq
+**Bead:** Sylveste-uhq
 **Date:** 2026-03-12
 
 ## Problem

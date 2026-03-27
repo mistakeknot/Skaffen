@@ -327,7 +327,7 @@ func makeConversationMessages(n int) []provider.Message {
 					Type:  "tool_use",
 					ID:    "toolu_bench",
 					Name:  "read",
-					Input: []byte(`{"file_path":"/home/mk/projects/Demarch/os/Skaffen/internal/agentloop/loop.go"}`),
+					Input: []byte(`{"file_path":"/home/mk/projects/Sylveste/os/Skaffen/internal/agentloop/loop.go"}`),
 				})
 			}
 			msgs[i] = provider.Message{

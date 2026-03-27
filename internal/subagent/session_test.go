@@ -57,10 +57,10 @@ func TestScopedSession_BeadDescription(t *testing.T) {
 	s := NewScopedSession(ScopedSessionConfig{
 		PromptTemplate:  "Working on: {{.BeadDescription}}\n\n{{.TaskPrompt}}",
 		TaskPrompt:      "fix the bug",
-		BeadDescription: "Demarch-p23: ScopedSession context isolation",
+		BeadDescription: "Sylveste-p23: ScopedSession context isolation",
 	})
 	prompt := s.SystemPrompt(agentloop.PromptHints{})
-	if !strings.Contains(prompt, "Demarch-p23") {
+	if !strings.Contains(prompt, "Sylveste-p23") {
 		t.Error("prompt should contain bead description")
 	}
 	if !strings.Contains(prompt, "fix the bug") {

@@ -1,6 +1,6 @@
 # Skaffen
 
-Sovereign AI agent runtime implementing the OODARC (Observe-Orient-Decide-Act-Reflect-Compound) workflow. Go application, part of the Demarch monorepo (`os/Skaffen/`).
+Sovereign AI agent runtime implementing the OODARC (Observe-Orient-Decide-Act-Reflect-Compound) workflow. Go application, part of the Sylveste monorepo (`os/Skaffen/`).
 
 ## Quick Reference
 
@@ -13,11 +13,11 @@ Sovereign AI agent runtime implementing the OODARC (Observe-Orient-Decide-Act-Re
 
 ## Beads Tracking
 
-Skaffen uses the **Demarch monorepo beads tracker** at `/home/mk/projects/Demarch/.beads/` (prefix `Demarch-`). Run `bd` commands from the monorepo root, not from `os/Skaffen/`.
+Skaffen uses the **Sylveste monorepo beads tracker** at `/home/mk/projects/Sylveste/.beads/` (prefix `Sylveste-`). Run `bd` commands from the monorepo root, not from `os/Skaffen/`.
 
 ## Git
 
-Skaffen has its own git repo (`os/Skaffen/.git`), separate from the Demarch monorepo. Commit Skaffen changes from `os/Skaffen/`, not from the monorepo root.
+Skaffen has its own git repo (`os/Skaffen/.git`), separate from the Sylveste monorepo. Commit Skaffen changes from `os/Skaffen/`, not from the monorepo root.
 
 ## Structure
 
@@ -58,4 +58,4 @@ internal/
 
 - `AGENTS.md` — architecture deep-dive, testing patterns, module relationships
 - `PHILOSOPHY.md` — design principles and tradeoffs
-- Demarch PRD: `docs/prds/2026-03-11-skaffen-go-rewrite.md` (at monorepo root)
+- Sylveste PRD: `docs/prds/2026-03-11-skaffen-go-rewrite.md` (at monorepo root)

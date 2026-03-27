@@ -1,6 +1,6 @@
 # Plan: Interactive /settings TUI Overlay
 
-**Bead:** Demarch-uhq
+**Bead:** Sylveste-uhq
 **PRD:** [docs/prds/2026-03-12-interactive-settings.md](../prds/2026-03-12-interactive-settings.md)
 **Stage:** planned
 
