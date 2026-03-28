@@ -645,8 +645,11 @@ func resolveProvider(workDir string) (provider.Provider, error) {
 		if err != nil {
 			return nil, fmt.Errorf("cloud fallback provider: %w", err)
 		}
-		log.Printf("skaffen: local provider with %s fallback", cloudName)
-		return local.NewFallback(lp, cloud), nil
+		log.Printf("skaffen: local provider with %s fallback (C1-C2 local, C3+ cloud, tools→cloud)", cloudName)
+		return local.NewFallbackWithConfig(lp, cloud, local.FallbackConfig{
+			MaxComplexityTier: 2,    // C1/C2 → local, C3+ → cloud
+			SkipWithTools:     true, // local models can't call tools
+		}), nil
 	}
 
 	if name == "anthropic" {
