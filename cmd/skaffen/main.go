@@ -31,6 +31,7 @@ import (
 	"github.com/mistakeknot/Skaffen/internal/mutations"
 	"github.com/mistakeknot/Skaffen/internal/plugin"
 	"github.com/mistakeknot/Skaffen/internal/provider"
+	"github.com/mistakeknot/Skaffen/internal/provider/local"
 	"github.com/mistakeknot/Skaffen/internal/repomap"
 	"github.com/mistakeknot/Skaffen/internal/router"
 	"github.com/mistakeknot/Skaffen/internal/sandbox"
@@ -233,25 +234,8 @@ func runPrint() error {
 		return fmt.Errorf("no prompt provided (use -p or pipe to stdin)")
 	}
 
-	// Resolve provider: auto-detect if not specified
-	providerName := *flagProvider
-	if providerName == "" {
-		if os.Getenv("ANTHROPIC_API_KEY") != "" {
-			providerName = "anthropic"
-		} else {
-			providerName = "claude-code" // default — works with Claude Max OAuth
-		}
-	}
-
-	pcfg := provider.ProviderConfig{}
-	if providerName == "anthropic" {
-		pcfg.APIKey = os.Getenv("ANTHROPIC_API_KEY")
-		if pcfg.APIKey == "" {
-			return fmt.Errorf("ANTHROPIC_API_KEY not set (omit --provider to use Claude Max via claude-code)")
-		}
-	}
-
-	p, err := provider.New(providerName, pcfg)
+	// Resolve provider (auto-detect, with local→cloud fallback)
+	p, err := resolveProvider("")
 	if err != nil {
 		return fmt.Errorf("provider: %w", err)
 	}
@@ -465,26 +449,10 @@ func runTestCmd(ctx context.Context, cmdStr string) (string, error) {
 func runTUI() error {
 	ic := checkIntercore()
 
-	// Resolve provider (same logic as runPrint)
-	providerName := *flagProvider
-	if providerName == "" {
-		if os.Getenv("ANTHROPIC_API_KEY") != "" {
-			providerName = "anthropic"
-		} else {
-			providerName = "claude-code"
-		}
-	}
-
 	wd, _ := os.Getwd()
-	pcfg := provider.ProviderConfig{WorkDir: wd}
-	if providerName == "anthropic" {
-		pcfg.APIKey = os.Getenv("ANTHROPIC_API_KEY")
-		if pcfg.APIKey == "" {
-			return fmt.Errorf("ANTHROPIC_API_KEY not set")
-		}
-	}
 
-	p, err := provider.New(providerName, pcfg)
+	// Resolve provider (auto-detect, with local→cloud fallback)
+	p, err := resolveProvider(wd)
 	if err != nil {
 		return fmt.Errorf("provider: %w", err)
 	}
@@ -643,6 +611,52 @@ func runTUI() error {
 			Reservation: subagent.NewReservationBridge(cfg.WorkDir()),
 		},
 	})
+}
+
+// resolveProvider creates a provider from flags and environment.
+// When "local" is requested, wraps it in a FallbackProvider that falls back to
+// the best available cloud provider (anthropic if key present, else claude-code).
+func resolveProvider(workDir string) (provider.Provider, error) {
+	name := *flagProvider
+	if name == "" {
+		if os.Getenv("ANTHROPIC_API_KEY") != "" {
+			name = "anthropic"
+		} else {
+			name = "claude-code"
+		}
+	}
+
+	pcfg := provider.ProviderConfig{WorkDir: workDir}
+
+	if name == "local" {
+		// Build the local provider
+		lp, err := provider.New("local", pcfg)
+		if err != nil {
+			return nil, fmt.Errorf("local provider: %w", err)
+		}
+		// Build a cloud fallback
+		cloudName := "claude-code"
+		cloudCfg := provider.ProviderConfig{WorkDir: workDir}
+		if apiKey := os.Getenv("ANTHROPIC_API_KEY"); apiKey != "" {
+			cloudName = "anthropic"
+			cloudCfg.APIKey = apiKey
+		}
+		cloud, err := provider.New(cloudName, cloudCfg)
+		if err != nil {
+			return nil, fmt.Errorf("cloud fallback provider: %w", err)
+		}
+		log.Printf("skaffen: local provider with %s fallback", cloudName)
+		return local.NewFallback(lp, cloud), nil
+	}
+
+	if name == "anthropic" {
+		pcfg.APIKey = os.Getenv("ANTHROPIC_API_KEY")
+		if pcfg.APIKey == "" {
+			return nil, fmt.Errorf("ANTHROPIC_API_KEY not set (omit --provider to use Claude Max via claude-code)")
+		}
+	}
+
+	return provider.New(name, pcfg)
 }
 
 // checkIntercore detects the ic (Intercore CLI) for evidence and routing integration.
