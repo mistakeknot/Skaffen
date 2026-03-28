@@ -44,11 +44,12 @@ import (
 	// Register providers via init()
 	_ "github.com/mistakeknot/Skaffen/internal/provider/anthropic"
 	_ "github.com/mistakeknot/Skaffen/internal/provider/claudecode"
+	_ "github.com/mistakeknot/Skaffen/internal/provider/local"
 	_ "github.com/mistakeknot/Skaffen/internal/provider/tmuxagent"
 )
 
 var (
-	flagProvider    = flag.String("provider", "", "LLM provider: claude-code (default), anthropic")
+	flagProvider    = flag.String("provider", "", "LLM provider: claude-code (default), anthropic, local")
 	flagModel       = flag.String("model", "", "Model override")
 	flagPhase       = flag.String("phase", "act", "OODARC phase (orient, decide, act, reflect, compound)")
 	flagPrompt      = flag.String("p", "", "Prompt text (reads stdin if empty)")
