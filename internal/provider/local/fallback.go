@@ -60,6 +60,13 @@ func NewFallbackWithConfig(local, cloud provider.Provider, cfg FallbackConfig) *
 
 func (f *FallbackProvider) Name() string { return "local+fallback" }
 
+// SetOnCascade replaces the cascade observer callback.
+// This allows wiring the observer after construction (e.g., when sessionID
+// is not yet available at provider creation time).
+func (f *FallbackProvider) SetOnCascade(fn func(CascadeEvent)) {
+	f.cfg.OnCascade = fn
+}
+
 func (f *FallbackProvider) Stream(ctx context.Context, messages []provider.Message, tools []provider.ToolDef, config provider.Config) (*provider.StreamResponse, error) {
 	complexity := estimateComplexity(messages)
 

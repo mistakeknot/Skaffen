@@ -325,6 +325,16 @@ func runPrint() error {
 	emitter := evidence.New(cfg.EvidenceDir(), sessionID)
 	opts = append(opts, agent.WithEmitter(emitter), agent.WithSessionID(sessionID))
 
+	// Cascade evidence — routing decisions for Interspect shadow→enforce
+	if fp, ok := p.(*local.FallbackProvider); ok {
+		cascadeEmitter := evidence.NewCascade(cfg.UserDir(), sessionID)
+		fp.SetOnCascade(func(evt local.CascadeEvent) {
+			log.Printf("[cascade] decision=%s confidence=%.3f complexity=C%d fallback=%s tried=%v",
+				evt.Decision, evt.Confidence, evt.Complexity, evt.FallbackTo, evt.ModelsTried)
+			cascadeEmitter.Emit(evt)
+		})
+	}
+
 	opts = append(opts, agent.WithSignalStore(sigStore), agent.WithEvidenceDir(cfg.EvidenceDir()))
 
 	// Lifecycle hooks — only gate in headless mode (no trust evaluator)
@@ -543,6 +553,16 @@ func runTUI() error {
 	emitter := evidence.New(cfg.EvidenceDir(), sessionID)
 	opts = append(opts, agent.WithEmitter(emitter), agent.WithSessionID(sessionID))
 
+	// Cascade evidence — routing decisions for Interspect shadow→enforce
+	if fp, ok := p.(*local.FallbackProvider); ok {
+		cascadeEmitter := evidence.NewCascade(cfg.UserDir(), sessionID)
+		fp.SetOnCascade(func(evt local.CascadeEvent) {
+			log.Printf("[cascade] decision=%s confidence=%.3f complexity=C%d fallback=%s tried=%v",
+				evt.Decision, evt.Confidence, evt.Complexity, evt.FallbackTo, evt.ModelsTried)
+			cascadeEmitter.Emit(evt)
+		})
+	}
+
 	opts = append(opts, agent.WithSignalStore(sigStore), agent.WithEvidenceDir(cfg.EvidenceDir()))
 
 	// Trust evaluator
@@ -649,10 +669,7 @@ func resolveProvider(workDir string) (provider.Provider, error) {
 		return local.NewFallbackWithConfig(lp, cloud, local.FallbackConfig{
 			MaxComplexityTier: 2,    // C1/C2 → local, C3+ → cloud
 			SkipWithTools:     true, // local models can't call tools
-			OnCascade: func(evt local.CascadeEvent) {
-				log.Printf("[cascade] decision=%s confidence=%.3f complexity=C%d fallback=%s tried=%v",
-					evt.Decision, evt.Confidence, evt.Complexity, evt.FallbackTo, evt.ModelsTried)
-			},
+			// OnCascade wired later via SetOnCascade with CascadeEmitter (JSONL + intercore)
 			SelectCloudModel: func(tier int) string {
 				switch {
 				case tier >= 4:

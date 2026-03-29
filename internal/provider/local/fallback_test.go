@@ -313,6 +313,34 @@ func TestOnCascadeCalledOnComplexitySkip(t *testing.T) {
 	}
 }
 
+func TestSetOnCascadeReplacesCallback(t *testing.T) {
+	originalCalled := false
+	replacementCalled := false
+
+	f := NewFallbackWithConfig(
+		&mockProvider{name: "local", err: &CascadeError{Decision: "cloud", Confidence: 0.5, ModelsTried: []string{"qwen-9b"}}},
+		&mockProvider{name: "anthropic", resp: provider.NewMockStream("cloud", provider.Usage{})},
+		FallbackConfig{
+			OnCascade: func(evt CascadeEvent) { originalCalled = true },
+		},
+	)
+
+	// Replace the callback before any Stream call
+	f.SetOnCascade(func(evt CascadeEvent) { replacementCalled = true })
+
+	msgs := []provider.Message{{Role: provider.RoleUser, Content: []provider.ContentBlock{{Type: "text", Text: "test"}}}}
+	_, err := f.Stream(context.Background(), msgs, nil, provider.Config{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if originalCalled {
+		t.Error("original OnCascade should NOT be called after SetOnCascade")
+	}
+	if !replacementCalled {
+		t.Error("replacement OnCascade should be called")
+	}
+}
+
 func TestSelectCloudModelOverridesConfig(t *testing.T) {
 	var capturedModel string
 	cloud := &modelCapturingProvider{
