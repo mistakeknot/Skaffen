@@ -649,6 +649,20 @@ func resolveProvider(workDir string) (provider.Provider, error) {
 		return local.NewFallbackWithConfig(lp, cloud, local.FallbackConfig{
 			MaxComplexityTier: 2,    // C1/C2 → local, C3+ → cloud
 			SkipWithTools:     true, // local models can't call tools
+			OnCascade: func(evt local.CascadeEvent) {
+				log.Printf("[cascade] decision=%s confidence=%.3f complexity=C%d fallback=%s tried=%v",
+					evt.Decision, evt.Confidence, evt.Complexity, evt.FallbackTo, evt.ModelsTried)
+			},
+			SelectCloudModel: func(tier int) string {
+				switch {
+				case tier >= 4:
+					return "claude-opus-4-6"
+				case tier >= 3:
+					return "claude-sonnet-4-6"
+				default:
+					return "" // pass through original model
+				}
+			},
 		}), nil
 	}
 

@@ -3,6 +3,7 @@ package local
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -203,6 +204,21 @@ func TestCascadeCloudFallback(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "cloud") {
 		t.Errorf("error should mention cloud fallback: %v", err)
+	}
+	// Verify CascadeError carries structured metadata
+	var cascadeErr *CascadeError
+	if !errors.As(err, &cascadeErr) {
+		t.Fatal("expected *CascadeError, got different type")
+	}
+	if cascadeErr.Confidence != 0.42 {
+		t.Errorf("confidence = %v, want 0.42", cascadeErr.Confidence)
+	}
+	if len(cascadeErr.ModelsTried) != 2 {
+		t.Errorf("models_tried = %v, want 2 models", cascadeErr.ModelsTried)
+	}
+	// Verify errors.Is still works
+	if !errors.Is(err, ErrCloudFallback) {
+		t.Error("errors.Is(err, ErrCloudFallback) should be true")
 	}
 }
 

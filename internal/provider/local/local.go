@@ -267,6 +267,20 @@ func processOpenAIStream(body io.ReadCloser, events chan<- provider.StreamEvent,
 	}
 }
 
+// CascadeError carries structured metadata from interfere's cascade routing.
+// Unwrap returns ErrCloudFallback so errors.Is() works.
+type CascadeError struct {
+	Decision    string   `json:"decision"`     // "cloud"
+	Confidence  float64  `json:"confidence"`   // avg confidence from probe
+	ModelsTried []string `json:"models_tried"` // models probed before fallback
+}
+
+func (e *CascadeError) Error() string {
+	return fmt.Sprintf("interfere: cascade routed to cloud: confidence=%.3f, tried=%v", e.Confidence, e.ModelsTried)
+}
+
+func (e *CascadeError) Unwrap() error { return ErrCloudFallback }
+
 // parseCascadeFallback reads a JSON response indicating cloud fallback.
 func parseCascadeFallback(body io.Reader) error {
 	data, _ := io.ReadAll(io.LimitReader(body, 4096))
@@ -277,7 +291,11 @@ func parseCascadeFallback(body io.Reader) error {
 		ModelsTried []string `json:"models_tried"`
 	}
 	if err := json.Unmarshal(data, &resp); err == nil && resp.Cascade == "cloud_fallback" {
-		return fmt.Errorf("%w: confidence=%.3f, tried=%v", ErrCloudFallback, resp.Confidence, resp.ModelsTried)
+		return &CascadeError{
+			Decision:    "cloud",
+			Confidence:  resp.Confidence,
+			ModelsTried: resp.ModelsTried,
+		}
 	}
 	return fmt.Errorf("%w: unexpected JSON response: %s", ErrUnavailable, string(data))
 }

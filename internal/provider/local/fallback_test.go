@@ -241,6 +241,106 @@ func TestEstimateComplexity(t *testing.T) {
 	}
 }
 
+func TestOnCascadeCalledOnFallback(t *testing.T) {
+	var captured CascadeEvent
+	f := NewFallbackWithConfig(
+		&mockProvider{name: "local", err: &CascadeError{Decision: "cloud", Confidence: 0.35, ModelsTried: []string{"qwen-9b"}}},
+		&mockProvider{name: "anthropic", resp: provider.NewMockStream("cloud", provider.Usage{})},
+		FallbackConfig{
+			OnCascade: func(evt CascadeEvent) { captured = evt },
+		},
+	)
+
+	msgs := []provider.Message{{Role: provider.RoleUser, Content: []provider.ContentBlock{{Type: "text", Text: "Hi"}}}}
+	_, err := f.Stream(context.Background(), msgs, nil, provider.Config{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if captured.Decision != "cloud" {
+		t.Errorf("decision = %q, want %q", captured.Decision, "cloud")
+	}
+	if captured.Confidence != 0.35 {
+		t.Errorf("confidence = %v, want 0.35", captured.Confidence)
+	}
+	if captured.FallbackTo != "anthropic" {
+		t.Errorf("fallback_to = %q, want %q", captured.FallbackTo, "anthropic")
+	}
+}
+
+func TestOnCascadeNotCalledOnLocalSuccess(t *testing.T) {
+	called := false
+	f := NewFallbackWithConfig(
+		&mockProvider{name: "local", resp: provider.NewMockStream("local", provider.Usage{})},
+		&mockProvider{name: "cloud", resp: provider.NewMockStream("cloud", provider.Usage{})},
+		FallbackConfig{
+			OnCascade: func(evt CascadeEvent) { called = true },
+		},
+	)
+
+	msgs := []provider.Message{{Role: provider.RoleUser, Content: []provider.ContentBlock{{Type: "text", Text: "Hi"}}}}
+	_, err := f.Stream(context.Background(), msgs, nil, provider.Config{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if called {
+		t.Error("OnCascade should NOT be called when local succeeds")
+	}
+}
+
+func TestOnCascadeCalledOnComplexitySkip(t *testing.T) {
+	var captured CascadeEvent
+	bigText := make([]byte, 20000) // C5
+	for i := range bigText {
+		bigText[i] = 'x'
+	}
+
+	f := NewFallbackWithConfig(
+		&mockProvider{name: "local", resp: provider.NewMockStream("local", provider.Usage{})},
+		&mockProvider{name: "cloud", resp: provider.NewMockStream("cloud", provider.Usage{})},
+		FallbackConfig{
+			MaxComplexityTier: 2,
+			OnCascade:         func(evt CascadeEvent) { captured = evt },
+		},
+	)
+
+	msgs := []provider.Message{{Role: provider.RoleUser, Content: []provider.ContentBlock{{Type: "text", Text: string(bigText)}}}}
+	_, _ = f.Stream(context.Background(), msgs, nil, provider.Config{})
+	if captured.Decision != "skip_complexity" {
+		t.Errorf("decision = %q, want %q", captured.Decision, "skip_complexity")
+	}
+	if captured.Complexity != 5 {
+		t.Errorf("complexity = %d, want 5", captured.Complexity)
+	}
+}
+
+func TestSelectCloudModelOverridesConfig(t *testing.T) {
+	var capturedModel string
+	cloud := &modelCapturingProvider{
+		inner: &mockProvider{name: "cloud", resp: provider.NewMockStream("cloud", provider.Usage{})},
+		model: &capturedModel,
+	}
+
+	f := NewFallbackWithConfig(
+		&mockProvider{name: "local", err: fmt.Errorf("%w: down", ErrUnavailable)},
+		cloud,
+		FallbackConfig{
+			SelectCloudModel: func(tier int) string {
+				if tier >= 3 {
+					return "claude-opus-4-6"
+				}
+				return "claude-haiku-4-5-20251001"
+			},
+		},
+	)
+
+	// Small message → C1 → haiku
+	msgs := []provider.Message{{Role: provider.RoleUser, Content: []provider.ContentBlock{{Type: "text", Text: "Hi"}}}}
+	_, _ = f.Stream(context.Background(), msgs, nil, provider.Config{Model: "original"})
+	if capturedModel != "claude-haiku-4-5-20251001" {
+		t.Errorf("model = %q, want haiku for C1", capturedModel)
+	}
+}
+
 // trackingProvider wraps a provider and records whether Stream was called.
 type trackingProvider struct {
 	inner  provider.Provider
@@ -251,4 +351,16 @@ func (t *trackingProvider) Name() string { return t.inner.Name() }
 func (t *trackingProvider) Stream(ctx context.Context, msgs []provider.Message, tools []provider.ToolDef, cfg provider.Config) (*provider.StreamResponse, error) {
 	*t.called = true
 	return t.inner.Stream(ctx, msgs, tools, cfg)
+}
+
+// modelCapturingProvider records what model was passed in config.
+type modelCapturingProvider struct {
+	inner provider.Provider
+	model *string
+}
+
+func (m *modelCapturingProvider) Name() string { return m.inner.Name() }
+func (m *modelCapturingProvider) Stream(ctx context.Context, msgs []provider.Message, tools []provider.ToolDef, cfg provider.Config) (*provider.StreamResponse, error) {
+	*m.model = cfg.Model
+	return m.inner.Stream(ctx, msgs, tools, cfg)
 }

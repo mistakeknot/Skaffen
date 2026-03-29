@@ -9,6 +9,15 @@ import (
 	"github.com/mistakeknot/Skaffen/internal/provider"
 )
 
+// CascadeEvent records a cascade routing decision for evidence emission.
+type CascadeEvent struct {
+	Decision    string   `json:"decision"`     // "cloud", "skip_complexity", "skip_tools", "unavailable", "overloaded"
+	Confidence  float64  `json:"confidence"`   // avg confidence from probe (0 if not cascade)
+	ModelsTried []string `json:"models_tried"` // local models probed
+	Complexity  int      `json:"complexity"`   // estimated complexity tier
+	FallbackTo  string   `json:"fallback_to"`  // cloud provider name
+}
+
 // FallbackConfig controls when the FallbackProvider skips local inference.
 type FallbackConfig struct {
 	// MaxComplexityTier is the highest complexity tier eligible for local inference.
@@ -20,6 +29,14 @@ type FallbackConfig struct {
 	// SkipWithTools sends requests with tool definitions directly to cloud,
 	// since local models don't support tool calling natively.
 	SkipWithTools bool
+
+	// OnCascade is called on every fallback decision (local→cloud).
+	// Used for evidence emission to Interspect. Nil = no observation.
+	OnCascade func(CascadeEvent)
+
+	// SelectCloudModel returns the cloud model to use given a complexity tier.
+	// If nil or returns empty, the original config.Model is passed through.
+	SelectCloudModel func(complexityTier int) string
 }
 
 // FallbackProvider tries the local provider first, falling back to a cloud
@@ -44,19 +61,28 @@ func NewFallbackWithConfig(local, cloud provider.Provider, cfg FallbackConfig) *
 func (f *FallbackProvider) Name() string { return "local+fallback" }
 
 func (f *FallbackProvider) Stream(ctx context.Context, messages []provider.Message, tools []provider.ToolDef, config provider.Config) (*provider.StreamResponse, error) {
+	complexity := estimateComplexity(messages)
+
 	// Preemptive skip: tool-calling requests go to cloud (local models can't call tools)
 	if f.cfg.SkipWithTools && len(tools) > 0 {
 		log.Printf("[local→cloud] skipping local: %d tools defined", len(tools))
-		return f.cloud.Stream(ctx, messages, tools, config)
+		f.observe(CascadeEvent{
+			Decision:   "skip_tools",
+			Complexity: complexity,
+			FallbackTo: f.cloud.Name(),
+		})
+		return f.cloud.Stream(ctx, messages, tools, f.cloudConfig(config, complexity))
 	}
 
 	// Preemptive skip: high-complexity requests go directly to cloud
-	if f.cfg.MaxComplexityTier > 0 {
-		tier := estimateComplexity(messages)
-		if tier > f.cfg.MaxComplexityTier {
-			log.Printf("[local→cloud] skipping local: complexity C%d > max C%d", tier, f.cfg.MaxComplexityTier)
-			return f.cloud.Stream(ctx, messages, tools, config)
-		}
+	if f.cfg.MaxComplexityTier > 0 && complexity > f.cfg.MaxComplexityTier {
+		log.Printf("[local→cloud] skipping local: complexity C%d > max C%d", complexity, f.cfg.MaxComplexityTier)
+		f.observe(CascadeEvent{
+			Decision:   "skip_complexity",
+			Complexity: complexity,
+			FallbackTo: f.cloud.Name(),
+		})
+		return f.cloud.Stream(ctx, messages, tools, f.cloudConfig(config, complexity))
 	}
 
 	resp, err := f.local.Stream(ctx, messages, tools, config)
@@ -67,11 +93,46 @@ func (f *FallbackProvider) Stream(ctx context.Context, messages []provider.Messa
 	// Only fall back on known local-provider errors
 	if errors.Is(err, ErrCloudFallback) || errors.Is(err, ErrOverloaded) || errors.Is(err, ErrUnavailable) {
 		log.Printf("[local→cloud] falling back: %v", err)
-		return f.cloud.Stream(ctx, messages, tools, config)
+
+		// Extract cascade metadata if available
+		evt := CascadeEvent{
+			Complexity: complexity,
+			FallbackTo: f.cloud.Name(),
+		}
+		var cascadeErr *CascadeError
+		if errors.As(err, &cascadeErr) {
+			evt.Decision = cascadeErr.Decision
+			evt.Confidence = cascadeErr.Confidence
+			evt.ModelsTried = cascadeErr.ModelsTried
+		} else if errors.Is(err, ErrOverloaded) {
+			evt.Decision = "overloaded"
+		} else {
+			evt.Decision = "unavailable"
+		}
+		f.observe(evt)
+
+		return f.cloud.Stream(ctx, messages, tools, f.cloudConfig(config, complexity))
 	}
 
 	// Unknown error — don't fall back, propagate
 	return nil, err
+}
+
+// observe calls the cascade observer if configured.
+func (f *FallbackProvider) observe(evt CascadeEvent) {
+	if f.cfg.OnCascade != nil {
+		f.cfg.OnCascade(evt)
+	}
+}
+
+// cloudConfig optionally overrides config.Model using SelectCloudModel.
+func (f *FallbackProvider) cloudConfig(config provider.Config, complexity int) provider.Config {
+	if f.cfg.SelectCloudModel != nil {
+		if model := f.cfg.SelectCloudModel(complexity); model != "" {
+			config.Model = model
+		}
+	}
+	return config
 }
 
 // estimateComplexity returns a complexity tier (1-5) from message content size.
