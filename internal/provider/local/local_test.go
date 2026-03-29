@@ -259,3 +259,104 @@ func TestServerUnavailable(t *testing.T) {
 		t.Errorf("error should mention unavailable: %v", err)
 	}
 }
+
+func TestProbeHealthReady(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/health" {
+			http.NotFound(w, r)
+			return
+		}
+		json.NewEncoder(w).Encode(map[string]any{
+			"status": "ready",
+			"models": []string{"qwen-9b", "deepseek-v3"},
+		})
+	}))
+	defer srv.Close()
+
+	p := New(WithBaseURL(srv.URL))
+	status := p.ProbeHealth(context.Background())
+
+	if !status.Healthy {
+		t.Errorf("expected healthy, got status=%q", status.Status)
+	}
+	if status.Status != "ready" {
+		t.Errorf("Status = %q, want ready", status.Status)
+	}
+	if len(status.Models) != 2 {
+		t.Errorf("Models = %v, want 2 models", status.Models)
+	}
+}
+
+func TestProbeHealthDryRun(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		json.NewEncoder(w).Encode(map[string]any{"status": "dry_run", "models": []string{}})
+	}))
+	defer srv.Close()
+
+	p := New(WithBaseURL(srv.URL))
+	status := p.ProbeHealth(context.Background())
+
+	if !status.Healthy {
+		t.Errorf("dry_run should be healthy")
+	}
+}
+
+func TestProbeHealthDegraded(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		json.NewEncoder(w).Encode(map[string]any{"status": "degraded", "models": []string{}})
+	}))
+	defer srv.Close()
+
+	p := New(WithBaseURL(srv.URL))
+	status := p.ProbeHealth(context.Background())
+
+	if status.Healthy {
+		t.Errorf("degraded should not be healthy")
+	}
+	if status.Status != "degraded" {
+		t.Errorf("Status = %q, want degraded", status.Status)
+	}
+}
+
+func TestProbeHealthWorkerDown(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		json.NewEncoder(w).Encode(map[string]any{"status": "worker_down"})
+	}))
+	defer srv.Close()
+
+	p := New(WithBaseURL(srv.URL))
+	status := p.ProbeHealth(context.Background())
+
+	if status.Healthy {
+		t.Errorf("worker_down should not be healthy")
+	}
+}
+
+func TestProbeHealthUnreachable(t *testing.T) {
+	p := New(WithBaseURL("http://localhost:1")) // nothing listening
+	status := p.ProbeHealth(context.Background())
+
+	if status.Healthy {
+		t.Errorf("unreachable should not be healthy")
+	}
+	if status.Status != "unreachable" {
+		t.Errorf("Status = %q, want unreachable", status.Status)
+	}
+}
+
+func TestProbeHealthHTTPError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer srv.Close()
+
+	p := New(WithBaseURL(srv.URL))
+	status := p.ProbeHealth(context.Background())
+
+	if status.Healthy {
+		t.Errorf("HTTP 500 should not be healthy")
+	}
+	if status.Status != "http_500" {
+		t.Errorf("Status = %q, want http_500", status.Status)
+	}
+}

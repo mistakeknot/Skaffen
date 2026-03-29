@@ -2,7 +2,10 @@ package local
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/mistakeknot/Skaffen/internal/provider"
@@ -391,4 +394,100 @@ func (m *modelCapturingProvider) Name() string { return m.inner.Name() }
 func (m *modelCapturingProvider) Stream(ctx context.Context, msgs []provider.Message, tools []provider.ToolDef, cfg provider.Config) (*provider.StreamResponse, error) {
 	*m.model = cfg.Model
 	return m.inner.Stream(ctx, msgs, tools, cfg)
+}
+
+func TestCheckHealthUnhealthyBypassesLocal(t *testing.T) {
+	// Health endpoint returns worker_down
+	healthSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/health" {
+			json.NewEncoder(w).Encode(map[string]any{"status": "worker_down"})
+			return
+		}
+		t.Error("local Stream should NOT be called when unhealthy")
+		http.Error(w, "should not reach", 500)
+	}))
+	defer healthSrv.Close()
+
+	lp := New(WithBaseURL(healthSrv.URL))
+	cloudCalled := false
+	cloud := &trackingProvider{
+		inner:  &mockProvider{name: "cloud", resp: provider.NewMockStream("cloud", provider.Usage{})},
+		called: &cloudCalled,
+	}
+
+	f := NewFallbackWithConfig(lp, cloud, FallbackConfig{})
+
+	status := f.CheckHealth(context.Background())
+	if status.Healthy {
+		t.Fatal("worker_down should not be healthy")
+	}
+
+	msgs := []provider.Message{{Role: provider.RoleUser, Content: []provider.ContentBlock{{Type: "text", Text: "Hi"}}}}
+	_, err := f.Stream(context.Background(), msgs, nil, provider.Config{})
+	if err != nil {
+		t.Fatalf("Stream error: %v", err)
+	}
+	if !cloudCalled {
+		t.Error("cloud should be called when local is down")
+	}
+}
+
+func TestCheckHealthHealthyAllowsLocal(t *testing.T) {
+	// Health endpoint returns ready, /v1/chat/completions returns streaming response
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/health" {
+			json.NewEncoder(w).Encode(map[string]any{"status": "ready", "models": []string{"qwen-9b"}})
+			return
+		}
+		// /v1/chat/completions — return a simple SSE stream
+		w.Header().Set("Content-Type", "text/event-stream")
+		fmt.Fprintf(w, "data: {\"choices\":[{\"delta\":{\"content\":\"hi\"},\"finish_reason\":\"stop\"}]}\n\n")
+		fmt.Fprintf(w, "data: [DONE]\n\n")
+	}))
+	defer srv.Close()
+
+	lp := New(WithBaseURL(srv.URL))
+	cloudCalled := false
+	cloud := &trackingProvider{
+		inner:  &mockProvider{name: "cloud", resp: provider.NewMockStream("cloud", provider.Usage{})},
+		called: &cloudCalled,
+	}
+
+	f := NewFallbackWithConfig(lp, cloud, FallbackConfig{})
+
+	status := f.CheckHealth(context.Background())
+	if !status.Healthy {
+		t.Fatalf("ready should be healthy, got status=%q", status.Status)
+	}
+
+	msgs := []provider.Message{{Role: provider.RoleUser, Content: []provider.ContentBlock{{Type: "text", Text: "Hi"}}}}
+	_, err := f.Stream(context.Background(), msgs, nil, provider.Config{})
+	if err != nil {
+		t.Fatalf("Stream error: %v", err)
+	}
+	if cloudCalled {
+		t.Error("cloud should NOT be called when local is healthy")
+	}
+}
+
+func TestCheckHealthEmitsCascadeOnUnhealthy(t *testing.T) {
+	healthSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		json.NewEncoder(w).Encode(map[string]any{"status": "no_worker"})
+	}))
+	defer healthSrv.Close()
+
+	lp := New(WithBaseURL(healthSrv.URL))
+	var captured CascadeEvent
+	f := NewFallbackWithConfig(lp, &mockProvider{name: "cloud"}, FallbackConfig{
+		OnCascade: func(evt CascadeEvent) { captured = evt },
+	})
+
+	f.CheckHealth(context.Background())
+
+	if captured.Decision != "unavailable" {
+		t.Errorf("Decision = %q, want unavailable", captured.Decision)
+	}
+	if captured.FallbackTo != "cloud" {
+		t.Errorf("FallbackTo = %q, want cloud", captured.FallbackTo)
+	}
 }

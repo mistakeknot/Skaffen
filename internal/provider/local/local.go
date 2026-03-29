@@ -58,6 +58,47 @@ func New(opts ...Option) *LocalProvider {
 
 func (p *LocalProvider) Name() string { return "local" }
 
+// HealthStatus captures the result of a health probe to interfere.
+type HealthStatus struct {
+	Healthy bool     // true if status is "ready" or "dry_run"
+	Status  string   // raw status from /health (e.g., "ready", "degraded", "worker_down")
+	Models  []string // loaded model names
+}
+
+// ProbeHealth checks interfere's /health endpoint.
+// Returns a HealthStatus with Healthy=false on any error or non-ready status.
+func (p *LocalProvider) ProbeHealth(ctx context.Context) HealthStatus {
+	req, err := http.NewRequestWithContext(ctx, "GET", p.baseURL+"/health", nil)
+	if err != nil {
+		return HealthStatus{Status: "probe_error"}
+	}
+
+	resp, err := p.client.Do(req)
+	if err != nil {
+		return HealthStatus{Status: "unreachable"}
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return HealthStatus{Status: fmt.Sprintf("http_%d", resp.StatusCode)}
+	}
+
+	var health struct {
+		Status string   `json:"status"`
+		Models []string `json:"models"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&health); err != nil {
+		return HealthStatus{Status: "parse_error"}
+	}
+
+	healthy := health.Status == "ready" || health.Status == "dry_run"
+	return HealthStatus{
+		Healthy: healthy,
+		Status:  health.Status,
+		Models:  health.Models,
+	}
+}
+
 // openAIMessage is the message format for OpenAI-compatible APIs.
 type openAIMessage struct {
 	Role    string `json:"role"`

@@ -46,6 +46,10 @@ type FallbackProvider struct {
 	local provider.Provider
 	cloud provider.Provider
 	cfg   FallbackConfig
+
+	// localDown is set by CheckHealth when the local provider is unreachable.
+	// When true, Stream() goes directly to cloud with no per-request probe.
+	localDown bool
 }
 
 // NewFallback creates a FallbackProvider that tries local first, then cloud.
@@ -67,8 +71,35 @@ func (f *FallbackProvider) SetOnCascade(fn func(CascadeEvent)) {
 	f.cfg.OnCascade = fn
 }
 
+// CheckHealth probes the local provider's health endpoint.
+// If unhealthy, marks localDown so Stream() bypasses local entirely.
+// Returns the HealthStatus for logging/display.
+func (f *FallbackProvider) CheckHealth(ctx context.Context) HealthStatus {
+	lp, ok := f.local.(*LocalProvider)
+	if !ok {
+		return HealthStatus{Status: "not_local_provider"}
+	}
+
+	status := lp.ProbeHealth(ctx)
+	f.localDown = !status.Healthy
+
+	if !status.Healthy {
+		f.observe(CascadeEvent{
+			Decision:   "unavailable",
+			FallbackTo: f.cloud.Name(),
+		})
+	}
+
+	return status
+}
+
 func (f *FallbackProvider) Stream(ctx context.Context, messages []provider.Message, tools []provider.ToolDef, config provider.Config) (*provider.StreamResponse, error) {
 	complexity := estimateComplexity(messages)
+
+	// Health gate: if local was marked down by CheckHealth, go straight to cloud
+	if f.localDown {
+		return f.cloud.Stream(ctx, messages, tools, f.cloudConfig(config, complexity))
+	}
 
 	// Preemptive skip: tool-calling requests go to cloud (local models can't call tools)
 	if f.cfg.SkipWithTools && len(tools) > 0 {

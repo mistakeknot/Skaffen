@@ -333,6 +333,14 @@ func runPrint() error {
 				evt.Decision, evt.Confidence, evt.Complexity, evt.FallbackTo, evt.ModelsTried)
 			cascadeEmitter.Emit(evt)
 		})
+
+		// Health probe — check local provider once before session starts
+		healthStatus := fp.CheckHealth(ctx)
+		if healthStatus.Healthy {
+			log.Printf("skaffen: local provider healthy (status=%s, models=%v)", healthStatus.Status, healthStatus.Models)
+		} else {
+			log.Printf("skaffen: local provider unhealthy (status=%s), routing all requests to cloud", healthStatus.Status)
+		}
 	}
 
 	opts = append(opts, agent.WithSignalStore(sigStore), agent.WithEvidenceDir(cfg.EvidenceDir()))
@@ -561,6 +569,14 @@ func runTUI() error {
 				evt.Decision, evt.Confidence, evt.Complexity, evt.FallbackTo, evt.ModelsTried)
 			cascadeEmitter.Emit(evt)
 		})
+
+		// Health probe — check local provider once before session starts
+		healthStatus := fp.CheckHealth(context.Background())
+		if healthStatus.Healthy {
+			log.Printf("skaffen: local provider healthy (status=%s, models=%v)", healthStatus.Status, healthStatus.Models)
+		} else {
+			log.Printf("skaffen: local provider unhealthy (status=%s), routing all requests to cloud", healthStatus.Status)
+		}
 	}
 
 	opts = append(opts, agent.WithSignalStore(sigStore), agent.WithEvidenceDir(cfg.EvidenceDir()))
