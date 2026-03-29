@@ -53,6 +53,7 @@ type Config struct {
 	HistoryPath      string
 	SubagentInit     *SubagentInit // nil = subagents disabled
 	SandboxLabel     string        // "sandbox", "strict", "YOLO", or ""
+	ProviderMode     string        // "LOCAL", "CLOUD", "LOCAL+FB"
 	KeybindingsPaths []string      // paths to keybindings.json files (user + project)
 }
 
@@ -324,6 +325,7 @@ func newAppModel(cfg Config) *appModel {
 		customCmds:   cfg.CustomCommands,
 		skills:       cfg.Skills,
 		sandboxLabel: cfg.SandboxLabel,
+		statusExtra:  statusBarExtra{ProviderMode: cfg.ProviderMode},
 		keybindings:  kb,
 		historyStore: hs,
 		pinner:       skill.NewPinner(cfg.Skills),
@@ -657,7 +659,7 @@ func (m *appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// For pageable commands (e.g. /help), scroll to the top of the
 		// output so the user reads from the beginning and can scroll down.
 		if msg.ShowFromTop {
-			m.viewport.ScrollTo(topLine)
+			m.viewport.ScrollToLine(topLine)
 		}
 		if msg.Quit {
 			m.drainApproval()

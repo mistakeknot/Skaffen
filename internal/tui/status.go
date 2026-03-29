@@ -90,26 +90,28 @@ func tokenSparklineWidth(termWidth int) int {
 type StatusBarItem string
 
 const (
-	ItemModel   StatusBarItem = "model"
-	ItemCost    StatusBarItem = "cost"
-	ItemTurns   StatusBarItem = "turns"
-	ItemSession StatusBarItem = "session"
-	ItemBranch  StatusBarItem = "branch"
-	ItemFiles   StatusBarItem = "files"
+	ItemProvider StatusBarItem = "provider"
+	ItemModel    StatusBarItem = "model"
+	ItemCost     StatusBarItem = "cost"
+	ItemTurns    StatusBarItem = "turns"
+	ItemSession  StatusBarItem = "session"
+	ItemBranch   StatusBarItem = "branch"
+	ItemFiles    StatusBarItem = "files"
 )
 
 // DefaultStatusBarItems returns the default visible items.
 func DefaultStatusBarItems() []StatusBarItem {
-	return []StatusBarItem{ItemModel, ItemCost, ItemTurns}
+	return []StatusBarItem{ItemProvider, ItemModel, ItemCost, ItemTurns}
 }
 
 // AllStatusBarItems returns all available items for documentation/config.
 func AllStatusBarItems() []StatusBarItem {
-	return []StatusBarItem{ItemModel, ItemCost, ItemTurns, ItemSession, ItemBranch, ItemFiles}
+	return []StatusBarItem{ItemProvider, ItemModel, ItemCost, ItemTurns, ItemSession, ItemBranch, ItemFiles}
 }
 
 // statusBarExtra holds optional data for extended status bar items.
 type statusBarExtra struct {
+	ProviderMode string // "LOCAL", "CLOUD", "LOCAL+FB" (fallback mode)
 	SessionName  string
 	GitBranch    string
 	FilesChanged int
@@ -136,6 +138,10 @@ func updateStatusSlots(sb *statusbar.Model, phase, model string, cost, contextPc
 
 	for _, item := range items {
 		switch item {
+		case ItemProvider:
+			if extra.ProviderMode != "" {
+				slots = append(slots, statusbar.Slot{Label: "", Value: extra.ProviderMode, Color: providerColor(extra.ProviderMode)})
+			}
 		case ItemModel:
 			slots = append(slots, statusbar.Slot{Label: "", Value: model, Color: c.FgDim.Color()})
 		case ItemCost:
@@ -216,6 +222,21 @@ func renderMeterRow(m meter.Model, s sparkline.Model, width int) string {
 	// Truncate to terminal width if needed
 	_ = width
 	return row
+}
+
+// providerColor returns a color for the provider mode indicator.
+func providerColor(mode string) lipgloss.Color {
+	c := theme.Current().Semantic()
+	switch mode {
+	case "LOCAL":
+		return c.Success.Color() // green — running locally, no cost
+	case "CLOUD":
+		return c.FgDim.Color() // muted — standard cloud mode
+	case "LOCAL+FB":
+		return c.Warning.Color() // yellow — fallback mode, local is down
+	default:
+		return c.FgDim.Color()
+	}
 }
 
 // costColor returns a brand color based on accumulated cost.

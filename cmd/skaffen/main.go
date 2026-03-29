@@ -639,6 +639,7 @@ func runTUI() error {
 		Skills:           skills,
 		HistoryPath:      cfg.HistoryPath(),
 		SandboxLabel:     sandboxLabel(sb),
+		ProviderMode:     providerMode(p),
 		KeybindingsPaths: cfg.KeybindingsPaths(),
 		SubagentInit: &tui.SubagentInit{
 			AgentTool:   agentTool,
@@ -707,6 +708,17 @@ func resolveProvider(workDir string) (provider.Provider, error) {
 	}
 
 	return provider.New(name, pcfg)
+}
+
+// providerMode returns a display label for the active provider configuration.
+func providerMode(p provider.Provider) string {
+	if fp, ok := p.(*local.FallbackProvider); ok {
+		if fp.LocalDown() {
+			return "LOCAL+FB"
+		}
+		return "LOCAL"
+	}
+	return "CLOUD"
 }
 
 // checkIntercore detects the ic (Intercore CLI) for evidence and routing integration.

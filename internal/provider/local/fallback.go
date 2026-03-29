@@ -64,6 +64,9 @@ func NewFallbackWithConfig(local, cloud provider.Provider, cfg FallbackConfig) *
 
 func (f *FallbackProvider) Name() string { return "local+fallback" }
 
+// LocalDown returns whether the local provider was marked unhealthy by CheckHealth.
+func (f *FallbackProvider) LocalDown() bool { return f.localDown }
+
 // SetOnCascade replaces the cascade observer callback.
 // This allows wiring the observer after construction (e.g., when sessionID
 // is not yet available at provider creation time).

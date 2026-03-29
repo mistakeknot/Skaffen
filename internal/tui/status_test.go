@@ -180,10 +180,10 @@ func TestStatusBarExtraFiles(t *testing.T) {
 
 func TestStatusBarDefaultItems(t *testing.T) {
 	items := DefaultStatusBarItems()
-	if len(items) != 3 {
-		t.Fatalf("expected 3 default items, got %d", len(items))
+	if len(items) != 4 {
+		t.Fatalf("expected 4 default items, got %d", len(items))
 	}
-	if items[0] != ItemModel || items[1] != ItemCost || items[2] != ItemTurns {
+	if items[0] != ItemProvider || items[1] != ItemModel || items[2] != ItemCost || items[3] != ItemTurns {
 		t.Errorf("unexpected defaults: %v", items)
 	}
 }
