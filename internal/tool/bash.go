@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os/exec"
+	"strings"
 	"time"
 
 	"github.com/mistakeknot/Skaffen/internal/sandbox"
@@ -28,7 +29,7 @@ type bashParams struct {
 }
 
 func (t *BashTool) Name() string        { return "bash" }
-func (t *BashTool) Description() string  { return "Execute a bash command and return its output" }
+func (t *BashTool) Description() string { return "Execute a bash command and return its output" }
 func (t *BashTool) Schema() json.RawMessage {
 	return json.RawMessage(`{
 		"type": "object",
@@ -97,4 +98,65 @@ func (t *BashTool) Execute(ctx context.Context, params json.RawMessage) ToolResu
 		Content: fmt.Sprintf("exit code: %d\n%s", exitCode, output),
 		IsError: exitCode != 0,
 	}
+}
+
+// ConcurrencySafe classifies whether this bash invocation is safe to run
+// concurrently with other tool calls. Delegates to BashCommandSafe.
+func (t *BashTool) ConcurrencySafe(params json.RawMessage) bool {
+	var p bashParams
+	if err := json.Unmarshal(params, &p); err != nil {
+		return false
+	}
+	return BashCommandSafe(p.Command)
+}
+
+// PropagatesErrorToSiblings returns true — a bash error should cancel sibling
+// bash calls in the same parallel batch (implicit dependency chains).
+func (t *BashTool) PropagatesErrorToSiblings() bool { return true }
+
+// safeCommands is the known-safe command set for concurrency classification.
+// Conservative: unknown commands default to unsafe. Expand with evidence.
+// sed and awk are excluded — both can write (sed -i, awk '{print > "f"}').
+var safeCommands = map[string]bool{
+	"cat": true, "head": true, "tail": true, "less": true, "more": true,
+	"ls": true, "tree": true, "du": true, "df": true,
+	"wc": true, "sort": true, "uniq": true, "diff": true, "comm": true,
+	"grep": true, "rg": true, "ag": true,
+	"git":  false, // git subcommands need further parsing — see safeGitSubcommands
+	"stat": true, "file": true, "which": true, "type": true,
+	"echo": true, "printf": true, "date": true, "uname": true,
+	"id": true, "whoami": true, "hostname": true, "pwd": true,
+}
+
+// safeGitSubcommands are git subcommands that are read-only.
+var safeGitSubcommands = map[string]bool{
+	"log": true, "status": true, "diff": true, "show": true,
+	"branch": true, "tag": true, "rev-parse": true, "blame": true,
+	"shortlog": true, "describe": true, "ls-files": true, "ls-tree": true,
+}
+
+// shellMetachars are patterns that indicate compound or redirect commands.
+// Any command containing these is classified as unsafe regardless of first token.
+// Intentionally lexical — false negatives on quoted metacharacters are acceptable
+// because the conservative default (serial) loses only parallelism, not correctness.
+var shellMetachars = []string{"&&", "||", ";", "|", "$(", "`", ">", "<", "\n"}
+
+// BashCommandSafe reports whether a bash command string is safe for concurrent
+// execution. Conservative: unknown commands return false.
+func BashCommandSafe(command string) bool {
+	for _, meta := range shellMetachars {
+		if strings.Contains(command, meta) {
+			return false
+		}
+	}
+	fields := strings.Fields(strings.TrimSpace(command))
+	if len(fields) == 0 {
+		return false
+	}
+	first := fields[0]
+	if first == "git" && len(fields) > 1 {
+		return safeGitSubcommands[fields[1]]
+	}
+	safe, known := safeCommands[first]
+	return known && safe
 }

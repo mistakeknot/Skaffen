@@ -139,3 +139,5 @@ func buildGrepArgs(p grepParams, path string) []string {
 	args = append(args, p.Pattern, path)
 	return args
 }
+
+func (t *GrepTool) ConcurrencySafe(_ json.RawMessage) bool { return true }

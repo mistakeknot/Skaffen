@@ -26,6 +26,21 @@ type PhasedTool interface {
 	ExecuteWithPhase(ctx context.Context, phase Phase, params json.RawMessage) ToolResult
 }
 
+// ConcurrencyClassifier is optionally implemented by tools that can declare
+// whether a specific invocation is safe for concurrent execution.
+// Tools that do not implement this interface are assumed unsafe (serial).
+// ConcurrencySafe must be safe to call from any goroutine.
+type ConcurrencyClassifier interface {
+	ConcurrencySafe(params json.RawMessage) bool
+}
+
+// ErrorPropagator is optionally implemented by tools whose execution errors
+// should cancel sibling goroutines in a concurrent batch. Without this,
+// a tool error only affects that tool's result — siblings complete normally.
+type ErrorPropagator interface {
+	PropagatesErrorToSiblings() bool
+}
+
 // Phase represents an OODARC workflow phase.
 type Phase string
 

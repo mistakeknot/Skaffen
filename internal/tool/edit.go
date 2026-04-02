@@ -100,3 +100,5 @@ func pyCompileCheck(path string) string {
 	}
 	return ""
 }
+
+func (t *EditTool) ConcurrencySafe(_ json.RawMessage) bool { return false }

@@ -70,3 +70,5 @@ func (t *LsTool) Execute(ctx context.Context, params json.RawMessage) ToolResult
 
 	return ToolResult{Content: strings.TrimRight(b.String(), "\n")}
 }
+
+func (t *LsTool) ConcurrencySafe(_ json.RawMessage) bool { return true }

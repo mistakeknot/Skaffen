@@ -15,15 +15,15 @@ import (
 // Agent runs the OODARC loop. It wraps an agentloop.Loop with phase-aware
 // routing, tool gating, and the OODARC FSM.
 type Agent struct {
-	provider  provider.Provider
-	registry  *tool.Registry
-	router    Router
-	session   Session
-	emitter   Emitter
-	fsm       *phaseFSM
-	sessionID string // for evidence attribution
-	streamCB  StreamCallback
-	approver  ToolApprover
+	provider    provider.Provider
+	registry    *tool.Registry
+	router      Router
+	session     Session
+	emitter     Emitter
+	fsm         *phaseFSM
+	sessionID   string // for evidence attribution
+	streamCB    StreamCallback
+	approver    ToolApprover
 	hookExec    *hooks.Executor // lifecycle hooks (nil = disabled)
 	signalStore SignalStore     // quality signal persistence
 	evidenceDir string          // path to evidence JSONL directory
@@ -257,12 +257,36 @@ type toolBridge struct {
 	inner tool.Tool
 }
 
-func (b *toolBridge) Name() string           { return b.inner.Name() }
-func (b *toolBridge) Description() string    { return b.inner.Description() }
+func (b *toolBridge) Name() string            { return b.inner.Name() }
+func (b *toolBridge) Description() string     { return b.inner.Description() }
 func (b *toolBridge) Schema() json.RawMessage { return b.inner.Schema() }
 func (b *toolBridge) Execute(ctx context.Context, params json.RawMessage) agentloop.ToolResult {
 	r := b.inner.Execute(ctx, params)
 	return agentloop.ToolResult{Content: r.Content, IsError: r.IsError}
+}
+
+// ConcurrencySafe forwards to the inner tool's ConcurrencyClassifier.
+// MCP tools (identifiable by ServerName method) always return false — untrusted
+// plugins cannot self-declare concurrency safety. Built-in tools are trusted.
+// Any new capability interface added to tool/tool.go requires a corresponding
+// forwarding method here.
+func (b *toolBridge) ConcurrencySafe(params json.RawMessage) bool {
+	// MCP tools are untrusted — never allow concurrent execution
+	if _, isMCP := b.inner.(interface{ ServerName() string }); isMCP {
+		return false
+	}
+	if c, ok := b.inner.(tool.ConcurrencyClassifier); ok {
+		return c.ConcurrencySafe(params)
+	}
+	return false
+}
+
+// PropagatesErrorToSiblings forwards to the inner tool's ErrorPropagator.
+func (b *toolBridge) PropagatesErrorToSiblings() bool {
+	if p, ok := b.inner.(tool.ErrorPropagator); ok {
+		return p.PropagatesErrorToSiblings()
+	}
+	return false
 }
 
 // --- Adapters: bridge agent-layer interfaces to agentloop interfaces ---
@@ -319,30 +343,30 @@ type emitterAdapter struct {
 
 func (ea *emitterAdapter) Emit(ev agentloop.Evidence) error {
 	return ea.inner.Emit(Evidence{
-		Timestamp:          ev.Timestamp,
-		SessionID:          ev.SessionID,
-		Phase:              tool.Phase(ev.Phase),
-		TurnNumber:         ev.TurnNumber,
-		ToolCalls:          ev.ToolCalls,
-		FileActivity:       ev.FileActivity,
+		Timestamp:           ev.Timestamp,
+		SessionID:           ev.SessionID,
+		Phase:               tool.Phase(ev.Phase),
+		TurnNumber:          ev.TurnNumber,
+		ToolCalls:           ev.ToolCalls,
+		FileActivity:        ev.FileActivity,
 		TokensIn:            ev.TokensIn,
 		TokensOut:           ev.TokensOut,
 		CacheCreationTokens: ev.CacheCreationTokens,
 		CacheReadTokens:     ev.CacheReadTokens,
-		StopReason:         ev.StopReason,
-		DurationMs:         ev.DurationMs,
-		Outcome:            ev.Outcome,
-		BudgetSpent:        ev.BudgetSpent,
-		BudgetMax:          ev.BudgetMax,
-		BudgetPercentage:   ev.BudgetPercentage,
-		ComplexityTier:     ev.ComplexityTier,
-		ComplexityOverride: ev.ComplexityOverride,
-		PromptTokens:       ev.PromptTokens,
-		StableTokens:       ev.StableTokens,
-		ExcludedElements:   ev.ExcludedElements,
-		ExcludedStable:     ev.ExcludedStable,
-		Model:              ev.Model,
-		ModelReason:        ev.ModelReason,
+		StopReason:          ev.StopReason,
+		DurationMs:          ev.DurationMs,
+		Outcome:             ev.Outcome,
+		BudgetSpent:         ev.BudgetSpent,
+		BudgetMax:           ev.BudgetMax,
+		BudgetPercentage:    ev.BudgetPercentage,
+		ComplexityTier:      ev.ComplexityTier,
+		ComplexityOverride:  ev.ComplexityOverride,
+		PromptTokens:        ev.PromptTokens,
+		StableTokens:        ev.StableTokens,
+		ExcludedElements:    ev.ExcludedElements,
+		ExcludedStable:      ev.ExcludedStable,
+		Model:               ev.Model,
+		ModelReason:         ev.ModelReason,
 	})
 }
 

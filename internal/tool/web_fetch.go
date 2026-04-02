@@ -343,3 +343,5 @@ func isBlockElement(tag string) bool {
 	}
 	return false
 }
+
+func (t *WebFetchTool) ConcurrencySafe(_ json.RawMessage) bool { return true }

@@ -90,3 +90,5 @@ func (t *ReadTool) Execute(ctx context.Context, params json.RawMessage) ToolResu
 
 	return ToolResult{Content: b.String()}
 }
+
+func (t *ReadTool) ConcurrencySafe(_ json.RawMessage) bool { return true }

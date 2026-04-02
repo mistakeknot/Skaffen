@@ -142,3 +142,5 @@ func globRecursive(base, pattern string) ([]string, error) {
 
 	return matches, err
 }
+
+func (t *GlobTool) ConcurrencySafe(_ json.RawMessage) bool { return true }

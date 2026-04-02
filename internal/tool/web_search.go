@@ -376,3 +376,5 @@ func recencyToDate(recency string) string {
 	}
 	return time.Now().Add(-d).UTC().Format(time.RFC3339)
 }
+
+func (t *WebSearchTool) ConcurrencySafe(_ json.RawMessage) bool { return true }

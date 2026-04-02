@@ -56,3 +56,5 @@ func (t *WriteTool) Execute(ctx context.Context, params json.RawMessage) ToolRes
 
 	return ToolResult{Content: fmt.Sprintf("wrote %d bytes to %s", len(p.Content), p.FilePath)}
 }
+
+func (t *WriteTool) ConcurrencySafe(_ json.RawMessage) bool { return false }

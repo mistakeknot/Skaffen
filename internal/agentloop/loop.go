@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/mistakeknot/Masaq/priompt"
@@ -287,107 +288,249 @@ func buildAssistantMessage(c *provider.CollectedResponse) provider.Message {
 	return provider.Message{Role: provider.RoleAssistant, Content: blocks}
 }
 
-// executeToolsWithCallbacks executes tool calls with optional hook gating,
-// approval gating, and streaming callbacks.
-func (l *Loop) executeToolsWithCallbacks(ctx context.Context, calls []provider.ToolCall) provider.Message {
-	var blocks []provider.ContentBlock
-	for _, tc := range calls {
-		// Phase 1: Hook gating (if hooks configured)
-		if l.hooks != nil {
-			decision, _ := l.hooks.PreToolUse(ctx, tc.Name, tc.Input)
-			// Fail-open: error from PreToolUse is ignored (hooks package logs it)
-			if decision == "deny" {
-				blocks = append(blocks, provider.ContentBlock{
-					Type:          "tool_result",
-					ToolUseID:     tc.ID,
-					ResultContent: fmt.Sprintf("Tool call %q was denied by a hook.", tc.Name),
-					IsError:       true,
-				})
-				if l.streamCB != nil {
-					l.streamCB(StreamEvent{
-						Type:       StreamToolComplete,
-						ToolName:   tc.Name,
-						ToolResult: fmt.Sprintf("Denied by hook: %s", tc.Name),
-						IsError:    true,
-					})
-				}
-				continue
-			}
-			// "ask" escalates to approver — if no approver (headless), deny
-			if decision == "ask" && l.approver == nil {
-				blocks = append(blocks, provider.ContentBlock{
-					Type:          "tool_result",
-					ToolUseID:     tc.ID,
-					ResultContent: fmt.Sprintf("Tool call %q requires approval but no approver is available (headless mode).", tc.Name),
-					IsError:       true,
-				})
-				if l.streamCB != nil {
-					l.streamCB(StreamEvent{
-						Type:       StreamToolComplete,
-						ToolName:   tc.Name,
-						ToolResult: fmt.Sprintf("Denied (ask without approver): %s", tc.Name),
-						IsError:    true,
-					})
-				}
-				continue
-			}
-			// "allow" falls through — hooks can't override trust
-		}
+// --- Tool concurrency types ---
 
-		// Phase 2: Trust approval (always runs unless hook denied)
-		if l.approver != nil && !l.approver(tc.Name, tc.Input) {
-			blocks = append(blocks, provider.ContentBlock{
-				Type:          "tool_result",
-				ToolUseID:     tc.ID,
-				ResultContent: fmt.Sprintf("Tool call %q was denied by the user.", tc.Name),
-				IsError:       true,
-			})
-			if l.streamCB != nil {
-				l.streamCB(StreamEvent{
-					Type:       StreamToolComplete,
-					ToolName:   tc.Name,
-					ToolResult: fmt.Sprintf("Denied by user: %s", tc.Name),
-					IsError:    true,
-				})
+const maxParallelToolCalls = 10
+
+type toolBatch struct {
+	calls           []indexedCall
+	concurrencySafe bool
+}
+
+type indexedCall struct {
+	index int
+	call  provider.ToolCall
+}
+
+// indexedResult carries a tool result back from a goroutine via channel.
+type indexedResult struct {
+	index int
+	block provider.ContentBlock
+}
+
+// executeToolsWithCallbacks executes tool calls with three-phase concurrency:
+// Phase 1 (gate): hooks + approval run serially — ToolApprover is non-reentrant.
+// Phase 2 (execute): safe batches run in parallel; unsafe batches run serially.
+// Phase 3 (collect): stream events + PostToolUse hooks emitted in call order.
+func (l *Loop) executeToolsWithCallbacks(ctx context.Context, calls []provider.ToolCall) provider.Message {
+	totalResults := make([]provider.ContentBlock, len(calls))
+	batches := l.partitionToolCalls(calls)
+
+	for _, batch := range batches {
+		// === PHASE 1: Gate (serial) ===
+		// Must run on main goroutine — ToolApprover is non-reentrant (TUI blocking call).
+		approved := make([]indexedCall, 0, len(batch.calls))
+		for _, ic := range batch.calls {
+			block, ok := l.gateToolCall(ctx, ic.call)
+			if !ok {
+				totalResults[ic.index] = block
+				continue
 			}
+			approved = append(approved, ic)
+		}
+		if len(approved) == 0 {
 			continue
 		}
 
-		// Phase 3: Execute
-		result := l.registry.Execute(ctx, tc.Name, tc.Input)
+		// === PHASE 2: Execute ===
+		if batch.concurrencySafe && len(approved) > 1 {
+			l.executeBatchParallel(ctx, approved, totalResults)
+		} else {
+			l.executeBatchSerial(ctx, approved, totalResults)
+		}
 
-		// Truncate oversized tool results to prevent context bloat.
-		// Keeps head + tail so errors at the bottom are preserved.
+		// === PHASE 3: Collect (serial) — emit stream events + hooks in order ===
+		for _, ic := range approved {
+			block := totalResults[ic.index]
+			if l.streamCB != nil {
+				l.streamCB(StreamEvent{
+					Type: StreamToolComplete, ToolName: ic.call.Name,
+					ToolResult: block.ResultContent, IsError: block.IsError,
+				})
+			}
+			// PostToolUse hook (advisory, background).
+			// Fire-and-forget on context.Background() — must NOT call back into Loop fields.
+			if l.hooks != nil {
+				hookRunner := l.hooks
+				name, input, content, isErr := ic.call.Name, ic.call.Input, block.ResultContent, block.IsError
+				go hookRunner.PostToolUse(context.Background(), name, input, content, isErr)
+			}
+		}
+	}
+
+	return provider.Message{Role: provider.RoleUser, Content: totalResults}
+}
+
+// gateToolCall runs hook and approval gating for a single tool call.
+// Returns (block, false) if denied, (_, true) if approved.
+// Emits StreamToolStart + StreamToolComplete for denied calls to maintain TUI pairing.
+func (l *Loop) gateToolCall(ctx context.Context, tc provider.ToolCall) (provider.ContentBlock, bool) {
+	deny := func(reason string) (provider.ContentBlock, bool) {
+		block := provider.ContentBlock{
+			Type: "tool_result", ToolUseID: tc.ID,
+			ResultContent: reason, IsError: true,
+		}
+		if l.streamCB != nil {
+			l.streamCB(StreamEvent{Type: StreamToolStart, ToolName: tc.Name, ToolParams: string(tc.Input)})
+			l.streamCB(StreamEvent{Type: StreamToolComplete, ToolName: tc.Name, ToolResult: reason, IsError: true})
+		}
+		return block, false
+	}
+
+	if l.hooks != nil {
+		// Fail-open: error from PreToolUse is ignored (hooks package logs it).
+		decision, _ := l.hooks.PreToolUse(ctx, tc.Name, tc.Input)
+		if decision == "deny" {
+			return deny(fmt.Sprintf("Tool call %q was denied by a hook.", tc.Name))
+		}
+		if decision == "ask" && l.approver == nil {
+			return deny(fmt.Sprintf("Tool call %q requires approval but no approver is available.", tc.Name))
+		}
+	}
+	if l.approver != nil && !l.approver(tc.Name, tc.Input) {
+		return deny(fmt.Sprintf("Tool call %q was denied by the user.", tc.Name))
+	}
+	return provider.ContentBlock{}, true
+}
+
+// partitionToolCalls groups consecutive concurrency-safe calls into parallel
+// batches and unsafe calls into serial singletons.
+func (l *Loop) partitionToolCalls(calls []provider.ToolCall) []toolBatch {
+	if len(calls) == 0 {
+		return nil
+	}
+	// Duck-type check for ConcurrencySafe — agentloop does not import tool/.
+	type classifier interface {
+		ConcurrencySafe(params json.RawMessage) bool
+	}
+	var batches []toolBatch
+	for i, tc := range calls {
+		t, ok := l.registry.Get(tc.Name)
+		safe := false
+		if ok {
+			if c, ok := t.(classifier); ok {
+				safe = c.ConcurrencySafe(tc.Input)
+			}
+		}
+		ic := indexedCall{index: i, call: tc}
+		if safe && len(batches) > 0 && batches[len(batches)-1].concurrencySafe {
+			batches[len(batches)-1].calls = append(batches[len(batches)-1].calls, ic)
+		} else {
+			batches = append(batches, toolBatch{
+				calls:           []indexedCall{ic},
+				concurrencySafe: safe,
+			})
+		}
+	}
+	return batches
+}
+
+func (l *Loop) executeBatchSerial(ctx context.Context, calls []indexedCall, results []provider.ContentBlock) {
+	for _, ic := range calls {
+		// StreamToolStart is already emitted by collectWithCallbacks during stream collection.
+		result := l.registry.Execute(ctx, ic.call.Name, ic.call.Input)
 		content := result.Content
 		if len(content) > oversizeThreshold {
 			content = truncateForContext(content, oversizeThreshold)
 		}
-
-		blocks = append(blocks, provider.ContentBlock{
-			Type:          "tool_result",
-			ToolUseID:     tc.ID,
-			ResultContent: content,
-			IsError:       result.IsError,
-		})
-		if l.streamCB != nil {
-			l.streamCB(StreamEvent{
-				Type:       StreamToolComplete,
-				ToolName:   tc.Name,
-				ToolResult: content,
-				IsError:    result.IsError,
-			})
-		}
-
-		// Phase 4: PostToolUse hook (advisory, background)
-		// Uses context.Background() — parent ctx may be cancelled when
-		// the agent loop advances, which would kill in-flight hooks.
-		if l.hooks != nil {
-			hookRunner := l.hooks
-			name, input, hookContent, isErr := tc.Name, tc.Input, content, result.IsError
-			go hookRunner.PostToolUse(context.Background(), name, input, hookContent, isErr)
+		results[ic.index] = provider.ContentBlock{
+			Type: "tool_result", ToolUseID: ic.call.ID,
+			ResultContent: content, IsError: result.IsError,
 		}
 	}
-	return provider.Message{Role: provider.RoleUser, Content: blocks}
+}
+
+func (l *Loop) executeBatchParallel(ctx context.Context, calls []indexedCall, results []provider.ContentBlock) {
+	// StreamToolStart is already emitted by collectWithCallbacks during stream collection.
+
+	// Error-propagating tools share a cancellable context.
+	// Named "propagating" not "bash" — any ErrorPropagator tool shares this token.
+	propagatingCtx, propagatingCancel := context.WithCancel(ctx)
+	defer propagatingCancel()
+	var propagatingOnce sync.Once
+
+	// Duck-type check for ErrorPropagator — agentloop does not import tool/.
+	type errorPropagator interface {
+		PropagatesErrorToSiblings() bool
+	}
+
+	// Channel-based collection — avoids race detector issues with concurrent slice writes.
+	resultCh := make(chan indexedResult, len(calls))
+	sem := make(chan struct{}, maxParallelToolCalls)
+	var wg sync.WaitGroup
+
+	for _, ic := range calls {
+		ic := ic // capture loop variable
+
+		// Resolve context before launch — tool identity lookup is safe from main goroutine.
+		toolCtx := ctx
+		t, _ := l.registry.Get(ic.call.Name)
+		propagates := false
+		if ep, ok := t.(errorPropagator); ok {
+			propagates = ep.PropagatesErrorToSiblings()
+		}
+		if propagates {
+			toolCtx = propagatingCtx
+		}
+
+		wg.Add(1)
+		go func() {
+			sem <- struct{}{}        // acquire semaphore inside goroutine
+			defer func() { <-sem }() // release semaphore
+			defer wg.Done()
+
+			// Single-send architecture: compute result in executeOne, send once.
+			// Panic recovery wraps the entire computation so there is exactly one
+			// send to resultCh per goroutine — no dual-send deadlock risk.
+			resultCh <- l.executeOne(toolCtx, ic, propagates, &propagatingOnce, propagatingCancel)
+		}()
+	}
+
+	// Wait for all goroutines, then close channel
+	wg.Wait()
+	close(resultCh)
+
+	// Drain results into pre-allocated slots (ordering restored by index)
+	for ir := range resultCh {
+		results[ir.index] = ir.block
+	}
+}
+
+// executeOne runs a single tool and returns the result. Panic recovery is built-in —
+// a panicking tool produces an error result instead of crashing the process.
+// This function is the only send site for resultCh, ensuring exactly one write per goroutine.
+func (l *Loop) executeOne(ctx context.Context, ic indexedCall, propagates bool, propagatingOnce *sync.Once, propagatingCancel context.CancelFunc) (ir indexedResult) {
+	defer func() {
+		if r := recover(); r != nil {
+			ir = indexedResult{
+				index: ic.index,
+				block: provider.ContentBlock{
+					Type: "tool_result", ToolUseID: ic.call.ID,
+					ResultContent: fmt.Sprintf("tool panic: %v", r),
+					IsError:       true,
+				},
+			}
+		}
+	}()
+
+	result := l.registry.Execute(ctx, ic.call.Name, ic.call.Input)
+	content := result.Content
+	if len(content) > oversizeThreshold {
+		content = truncateForContext(content, oversizeThreshold)
+	}
+
+	// Error cascading for propagating tools
+	if result.IsError && propagates {
+		propagatingOnce.Do(func() { propagatingCancel() })
+	}
+
+	return indexedResult{
+		index: ic.index,
+		block: provider.ContentBlock{
+			Type: "tool_result", ToolUseID: ic.call.ID,
+			ResultContent: content, IsError: result.IsError,
+		},
+	}
 }
 
 // collectWithCallbacks iterates stream events one-by-one, emitting
