@@ -126,4 +126,7 @@ func TestStreamEventTypes(t *testing.T) {
 	if StreamPhaseChange != 4 {
 		t.Errorf("StreamPhaseChange = %d, want 4", StreamPhaseChange)
 	}
+	if StreamCompact != 5 {
+		t.Errorf("StreamCompact = %d, want 5", StreamCompact)
+	}
 }

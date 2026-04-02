@@ -411,6 +411,16 @@ func (s *JSONLSession) Fork() (*JSONLSession, string, error) {
 	return fork, newID, nil
 }
 
+// ReplaceMessages replaces the in-memory message history.
+// Used by auto-compact to sync session state after compaction.
+// Implements agentloop.MessageReplacer (optional interface).
+func (s *JSONLSession) ReplaceMessages(messages []provider.Message) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.messages = make([]provider.Message, len(messages))
+	copy(s.messages, messages)
+}
+
 // ID returns the session identifier.
 func (s *JSONLSession) ID() string { return s.id }
 

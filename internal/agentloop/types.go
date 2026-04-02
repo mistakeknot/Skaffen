@@ -51,6 +51,13 @@ type Emitter interface {
 	Emit(event Evidence) error
 }
 
+// MessageReplacer is an optional Session interface for sessions that support
+// direct message replacement. After auto-compaction modifies the in-loop
+// message slice, the loop syncs the session via this interface.
+type MessageReplacer interface {
+	ReplaceMessages(messages []provider.Message)
+}
+
 // RenderReporter provides prompt composition metadata for evidence emission.
 // Implemented by PriomptSession; checked via type assertion in the agent loop.
 type RenderReporter interface {
@@ -91,31 +98,31 @@ const (
 
 // Evidence captures one turn's structured data for the reflect step.
 type Evidence struct {
-	Timestamp          string         `json:"timestamp"`
-	SessionID          string         `json:"session_id,omitempty"`
-	Phase              string         `json:"phase"`
-	TurnNumber         int            `json:"turn"`
-	ToolCalls          []string       `json:"tool_calls,omitempty"`
-	FileActivity       []FileActivity `json:"file_activity,omitempty"`
-	TokensIn               int            `json:"tokens_in"`
-	TokensOut              int            `json:"tokens_out"`
-	CacheCreationTokens    int            `json:"cache_creation_tokens,omitempty"`
-	CacheReadTokens        int            `json:"cache_read_tokens,omitempty"`
-	StopReason         string         `json:"stop_reason"`
-	DurationMs         int64          `json:"duration_ms,omitempty"`
-	Outcome            string         `json:"outcome,omitempty"`
-	Failure            FailureType    `json:"failure_type,omitempty"`
-	BudgetSpent        int            `json:"budget_spent,omitempty"`
-	BudgetMax          int            `json:"budget_max,omitempty"`
-	BudgetPercentage   float64        `json:"budget_pct,omitempty"`
-	ComplexityTier     int            `json:"complexity_tier,omitempty"`
-	ComplexityOverride bool           `json:"complexity_override,omitempty"`
-	PromptTokens       int            `json:"prompt_tokens,omitempty"`
-	StableTokens       int            `json:"stable_tokens,omitempty"`
-	ExcludedElements   []string       `json:"excluded_elements,omitempty"`
-	ExcludedStable     []string       `json:"excluded_stable,omitempty"`
-	Model              string         `json:"model,omitempty"`
-	ModelReason        string         `json:"model_reason,omitempty"`
+	Timestamp           string         `json:"timestamp"`
+	SessionID           string         `json:"session_id,omitempty"`
+	Phase               string         `json:"phase"`
+	TurnNumber          int            `json:"turn"`
+	ToolCalls           []string       `json:"tool_calls,omitempty"`
+	FileActivity        []FileActivity `json:"file_activity,omitempty"`
+	TokensIn            int            `json:"tokens_in"`
+	TokensOut           int            `json:"tokens_out"`
+	CacheCreationTokens int            `json:"cache_creation_tokens,omitempty"`
+	CacheReadTokens     int            `json:"cache_read_tokens,omitempty"`
+	StopReason          string         `json:"stop_reason"`
+	DurationMs          int64          `json:"duration_ms,omitempty"`
+	Outcome             string         `json:"outcome,omitempty"`
+	Failure             FailureType    `json:"failure_type,omitempty"`
+	BudgetSpent         int            `json:"budget_spent,omitempty"`
+	BudgetMax           int            `json:"budget_max,omitempty"`
+	BudgetPercentage    float64        `json:"budget_pct,omitempty"`
+	ComplexityTier      int            `json:"complexity_tier,omitempty"`
+	ComplexityOverride  bool           `json:"complexity_override,omitempty"`
+	PromptTokens        int            `json:"prompt_tokens,omitempty"`
+	StableTokens        int            `json:"stable_tokens,omitempty"`
+	ExcludedElements    []string       `json:"excluded_elements,omitempty"`
+	ExcludedStable      []string       `json:"excluded_stable,omitempty"`
+	Model               string         `json:"model,omitempty"`
+	ModelReason         string         `json:"model_reason,omitempty"`
 }
 
 // ToolApprover is called before executing a tool call. It blocks until
@@ -132,6 +139,7 @@ const (
 	StreamToolComplete                        // A tool call has finished executing
 	StreamTurnComplete                        // The turn is complete (usage available)
 	StreamPhaseChange                         // The OODARC phase has changed
+	StreamCompact                             // Auto-compaction was applied
 )
 
 // StreamEvent carries real-time data from the agent loop to the TUI.
@@ -146,6 +154,12 @@ type StreamEvent struct {
 	Model      string // model name used for this turn/phase
 	Usage      provider.Usage
 	TurnNumber int
+
+	// Compaction fields (StreamCompact only)
+	TokensFreed    int // tokens recovered by compaction
+	MessagesBefore int // message count before compaction
+	MessagesAfter  int // message count after compaction
+	PercentUsed    int // context utilization after compaction (0–100)
 }
 
 // StreamCallback receives events during the agent loop.
@@ -192,9 +206,9 @@ func (r *NoOpRouter) ContextWindow(_ string) int { return 200000 }
 // NoOpSession discards all state.
 type NoOpSession struct{ Prompt string }
 
-func (s *NoOpSession) SystemPrompt(_ PromptHints) string     { return s.Prompt }
-func (s *NoOpSession) Save(_ Turn) error                     { return nil }
-func (s *NoOpSession) Messages() []provider.Message          { return nil }
+func (s *NoOpSession) SystemPrompt(_ PromptHints) string { return s.Prompt }
+func (s *NoOpSession) Save(_ Turn) error                 { return nil }
+func (s *NoOpSession) Messages() []provider.Message      { return nil }
 
 // NoOpEmitter discards all evidence.
 type NoOpEmitter struct{}

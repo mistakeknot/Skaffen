@@ -139,6 +139,7 @@ func (r *Runner) runOne(ctx context.Context, task SubagentTask) SubagentResult {
 		agentloop.WithEmitter(emitter),
 		agentloop.WithRouter(router),
 		agentloop.WithMaxTurns(st.MaxTurns),
+		agentloop.WithAutoCompact(agentloop.DefaultAutoCompactConfig()),
 		agentloop.WithSessionID(task.ID),
 		agentloop.WithStreamCallback(func(ev agentloop.StreamEvent) {
 			if ev.Type == agentloop.StreamTurnComplete {

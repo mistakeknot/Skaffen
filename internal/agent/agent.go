@@ -204,6 +204,7 @@ func (a *Agent) runWithContent(ctx context.Context, content []provider.ContentBl
 	if tb := a.ThinkingBudget(); tb > 0 {
 		loopOpts = append(loopOpts, agentloop.WithThinkingBudget(tb))
 	}
+	loopOpts = append(loopOpts, agentloop.WithAutoCompact(agentloop.DefaultAutoCompactConfig()))
 
 	loop := agentloop.New(a.provider, loopReg, loopOpts...)
 	if a.approver != nil {

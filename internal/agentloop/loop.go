@@ -39,6 +39,10 @@ type Loop struct {
 	cachedToolDefs    []provider.ToolDef
 	toolDefsVersion   int // bumped by InvalidateToolDefs
 	toolDefsCachedVer int // version when cachedToolDefs was last computed (-1 = never)
+
+	// Auto-compact: layered context window management.
+	autoCompactCfg   AutoCompactConfig
+	autoCompactState autoCompactState
 }
 
 // LoopConfig configures a single Run invocation.
@@ -73,6 +77,9 @@ func WithHooks(h HookRunner) Option { return func(l *Loop) { l.hooks = h } }
 
 // WithThinkingBudget sets the extended thinking token budget.
 func WithThinkingBudget(tokens int) Option { return func(l *Loop) { l.thinkingBudget = tokens } }
+
+// WithAutoCompact enables automatic context compaction with the given config.
+func WithAutoCompact(cfg AutoCompactConfig) Option { return func(l *Loop) { l.autoCompactCfg = cfg } }
 
 // New creates a Loop with the given provider, tool registry, and options.
 func New(p provider.Provider, reg *Registry, opts ...Option) *Loop {
@@ -136,6 +143,44 @@ func (l *Loop) RunWithContent(ctx context.Context, content []provider.ContentBlo
 		windowSize := l.router.ContextWindow(model)
 		outputReserve := 8192
 		msgTokens := l.estimateMessageTokensCached(messages)
+
+		// Auto-compact: check context pressure before each LLM call.
+		if l.autoCompactCfg.Enabled && !l.autoCompactState.tripped(l.autoCompactCfg.MaxConsecutiveFailures) {
+			pressure := calculateTokenPressure(msgTokens, windowSize, l.autoCompactCfg)
+			if pressure.NeedsCompaction {
+				msgsBefore := len(messages)
+				compacted, freed, applied := autoCompactMessages(
+					messages, pressure, l.autoCompactCfg,
+					estimateMessageTokens, // standalone estimator for compacted slice
+				)
+				if applied && freed > 0 {
+					messages = compacted
+					l.resetTokenCache()
+					msgTokens = l.estimateMessageTokensCached(messages)
+					l.autoCompactState.recordSuccess()
+
+					// Sync session state
+					if mr, ok := l.session.(MessageReplacer); ok {
+						mr.ReplaceMessages(messages)
+					}
+
+					// Notify TUI
+					if l.streamCB != nil {
+						postPressure := calculateTokenPressure(msgTokens, windowSize, l.autoCompactCfg)
+						l.streamCB(StreamEvent{
+							Type:           StreamCompact,
+							TokensFreed:    freed,
+							MessagesBefore: msgsBefore,
+							MessagesAfter:  len(messages),
+							PercentUsed:    postPressure.PercentUsed,
+						})
+					}
+				} else {
+					l.autoCompactState.recordFailure()
+				}
+			}
+		}
+
 		promptBudget := windowSize - outputReserve - msgTokens
 		if promptBudget < 0 {
 			promptBudget = 0
@@ -625,6 +670,13 @@ func (l *Loop) convertToolDefsCached(defs []ToolDef) []provider.ToolDef {
 	l.cachedToolDefs = convertToolDefs(defs)
 	l.toolDefsCachedVer = l.toolDefsVersion
 	return l.cachedToolDefs
+}
+
+// resetTokenCache invalidates the per-index token cache.
+// Called after auto-compact replaces the message slice.
+func (l *Loop) resetTokenCache() {
+	l.tokenCache = l.tokenCache[:0]
+	l.tokenCacheTotal = 0
 }
 
 // InvalidateToolDefs forces the next convertToolDefsCached call to recompute.
