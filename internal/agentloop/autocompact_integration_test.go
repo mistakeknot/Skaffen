@@ -354,3 +354,90 @@ func TestAutoCompactSessionWithoutMessageReplacer(t *testing.T) {
 		t.Error("expected compaction events even without MessageReplacer")
 	}
 }
+
+func TestAutoCompactPostCompactHookInLoop(t *testing.T) {
+	// Verify that PostCompactHook is called after compaction and its
+	// returned messages replace the generic snip marker.
+	cfg := AutoCompactConfig{
+		BufferTokens:           800,
+		BlockingBufferTokens:   200,
+		MaxConsecutiveFailures: 3,
+		KeepRecent:             2,
+		OutputReserve:          200,
+		Enabled:                true,
+	}
+
+	// Track hook invocations
+	hookCalled := false
+	var hookPreCompactLen int
+	var hookPhase string
+
+	cfg.PostCompactHook = func(preCompact []provider.Message, phase string) []provider.Message {
+		hookCalled = true
+		hookPreCompactLen = len(preCompact)
+		hookPhase = phase
+		return []provider.Message{{
+			Role: provider.RoleUser,
+			Content: []provider.ContentBlock{{
+				Type: "text",
+				Text: "[Context restored] Goal: test the hook. Phase: " + phase,
+			}},
+		}}
+	}
+
+	p := &multiTurnProvider{maxTurns: 4, resultSize: 8000}
+	reg := NewRegistry()
+	reg.Register(&largeResultTool{size: 8000})
+
+	session := &compactSession{}
+
+	loop := New(p, reg,
+		WithRouter(&smallWindowRouter{window: 5000}),
+		WithSession(session),
+		WithMaxTurns(15),
+		WithAutoCompact(cfg),
+	)
+
+	_, err := loop.Run(context.Background(), "test the hook", LoopConfig{
+		Hints: SelectionHints{Phase: "act"},
+	})
+	if err != nil {
+		t.Fatalf("Run error: %v", err)
+	}
+
+	if !hookCalled {
+		t.Fatal("PostCompactHook was not called")
+	}
+
+	// Hook should receive pre-compaction messages (more than keepRecent)
+	if hookPreCompactLen <= cfg.KeepRecent {
+		t.Errorf("hook received %d pre-compact messages, want > %d", hookPreCompactLen, cfg.KeepRecent)
+	}
+
+	// Hook should receive the phase
+	if hookPhase != "act" {
+		t.Errorf("hook phase = %q, want 'act'", hookPhase)
+	}
+
+	// The orientation message should be in the session (replacing the snip marker)
+	found := false
+	for _, msg := range session.messages {
+		for _, block := range msg.Content {
+			if block.Type == "text" && strings.Contains(block.Text, "[Context restored]") {
+				found = true
+			}
+		}
+	}
+	if !found {
+		t.Error("orientation message from PostCompactHook not found in session messages")
+	}
+
+	// The generic snip marker should NOT be present (replaced by hook)
+	for _, msg := range session.messages {
+		for _, block := range msg.Content {
+			if block.Type == "text" && strings.Contains(block.Text, "automatically removed") {
+				t.Error("generic snip marker should have been replaced by hook message")
+			}
+		}
+	}
+}

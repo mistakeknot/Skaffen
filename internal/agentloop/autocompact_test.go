@@ -303,7 +303,7 @@ func TestAutoCompactMessagesLayeredStrategy(t *testing.T) {
 		NeedsCompaction: true,
 	}
 
-	result, freed, applied := autoCompactMessages(msgs, pressure, cfg, estimateMessageTokens)
+	result, freed, applied := autoCompactMessages(msgs, pressure, cfg, estimateMessageTokens, "")
 	if !applied {
 		t.Error("compaction should have been applied")
 	}
@@ -329,7 +329,7 @@ func TestAutoCompactMessagesNoOpBelowThreshold(t *testing.T) {
 		NeedsCompaction: false, // not used directly by autoCompactMessages, but caller checks
 	}
 
-	result, freed, applied := autoCompactMessages(msgs, pressure, cfg, estimateMessageTokens)
+	result, freed, applied := autoCompactMessages(msgs, pressure, cfg, estimateMessageTokens, "")
 	// With only 2 messages and keepRecent=6, both strategies are no-ops
 	if applied {
 		t.Error("should not compact when messages <= keepRecent")

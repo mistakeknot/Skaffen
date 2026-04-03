@@ -152,6 +152,7 @@ func (l *Loop) RunWithContent(ctx context.Context, content []provider.ContentBlo
 				compacted, freed, applied := autoCompactMessages(
 					messages, pressure, l.autoCompactCfg,
 					estimateMessageTokens, // standalone estimator for compacted slice
+					config.Hints.Phase,
 				)
 				if applied && freed > 0 {
 					messages = compacted

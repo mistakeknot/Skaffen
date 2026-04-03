@@ -41,6 +41,13 @@ type AutoCompactConfig struct {
 	// Enabled controls whether auto-compact runs. When false, the loop
 	// skips all compaction checks.
 	Enabled bool
+
+	// PostCompactHook is called after successful compaction to build a
+	// context restoration message. It receives the pre-compaction messages
+	// and current phase, and returns messages to inject after the snip
+	// marker (replacing the generic marker if non-nil).
+	// Optional — nil means no context restoration.
+	PostCompactHook func(preCompact []provider.Message, phase string) []provider.Message
 }
 
 // DefaultAutoCompactConfig returns production defaults matching Claude Code's
@@ -215,7 +222,9 @@ func snip(messages []provider.Message, keepRecent int, tokenEstimator func([]pro
 // autoCompactMessages applies the layered compaction strategy:
 // 1. MicroCompact (always — low cost, preserves structure)
 // 2. Snip (if still over threshold — drops oldest messages)
+// 3. PostCompactHook (if configured — inject context restoration)
 //
+// The phase parameter is passed to the PostCompactHook for context.
 // Returns the compacted messages, total tokens freed, and whether any
 // compaction was applied.
 func autoCompactMessages(
@@ -223,24 +232,51 @@ func autoCompactMessages(
 	pressure TokenPressure,
 	cfg AutoCompactConfig,
 	tokenEstimator func([]provider.Message) int,
+	phase string,
 ) ([]provider.Message, int, bool) {
 	totalFreed := 0
+	preCompact := messages // save reference for hook
+	snipRan := false
 
 	// Strategy 1: MicroCompact — elide old tool results
 	messages, freed := microCompact(messages, cfg.KeepRecent)
 	totalFreed += freed
 
 	// Re-check pressure after microcompact
+	needsSnip := true
 	if freed > 0 {
 		newTokens := tokenEstimator(messages)
 		if newTokens < pressure.Threshold {
-			return messages, totalFreed, true
+			needsSnip = false
 		}
 	}
 
-	// Strategy 2: Snip — drop oldest messages
-	messages, freed = snip(messages, cfg.KeepRecent, tokenEstimator)
-	totalFreed += freed
+	// Strategy 2: Snip — drop oldest messages (if microcompact wasn't enough)
+	if needsSnip {
+		messages, freed = snip(messages, cfg.KeepRecent, tokenEstimator)
+		totalFreed += freed
+		snipRan = freed > 0
+	}
+
+	// PostCompactHook — inject context restoration after any successful compaction
+	if totalFreed > 0 && cfg.PostCompactHook != nil {
+		hookMsgs := cfg.PostCompactHook(preCompact, phase)
+		if len(hookMsgs) > 0 {
+			if snipRan {
+				// Replace the generic snip marker (messages[0]) with hook messages
+				restored := make([]provider.Message, 0, len(hookMsgs)+len(messages)-1)
+				restored = append(restored, hookMsgs...)
+				restored = append(restored, messages[1:]...) // skip snip marker
+				messages = restored
+			} else {
+				// MicroCompact only — prepend hook messages
+				restored := make([]provider.Message, 0, len(hookMsgs)+len(messages))
+				restored = append(restored, hookMsgs...)
+				restored = append(restored, messages...)
+				messages = restored
+			}
+		}
+	}
 
 	return messages, totalFreed, totalFreed > 0
 }

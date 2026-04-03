@@ -3,6 +3,7 @@ package agent
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 
 	"github.com/mistakeknot/Skaffen/internal/agentloop"
@@ -204,7 +205,9 @@ func (a *Agent) runWithContent(ctx context.Context, content []provider.ContentBl
 	if tb := a.ThinkingBudget(); tb > 0 {
 		loopOpts = append(loopOpts, agentloop.WithThinkingBudget(tb))
 	}
-	loopOpts = append(loopOpts, agentloop.WithAutoCompact(agentloop.DefaultAutoCompactConfig()))
+	acCfg := agentloop.DefaultAutoCompactConfig()
+	acCfg.PostCompactHook = buildPostCompactHook()
+	loopOpts = append(loopOpts, agentloop.WithAutoCompact(acCfg))
 
 	loop := agentloop.New(a.provider, loopReg, loopOpts...)
 	if a.approver != nil {
@@ -384,4 +387,89 @@ func (a *hookAdapter) PreToolUse(ctx context.Context, toolName string, input jso
 
 func (a *hookAdapter) PostToolUse(ctx context.Context, toolName string, input json.RawMessage, result string, isError bool) {
 	a.exec.PostToolUse(ctx, toolName, input, result, isError)
+}
+
+// buildPostCompactHook returns a PostCompactHook that scans pre-compaction
+// messages to build a context restoration message with the goal, files
+// touched, and current phase.
+func buildPostCompactHook() func(preCompact []provider.Message, phase string) []provider.Message {
+	return func(preCompact []provider.Message, phase string) []provider.Message {
+		// Extract goal from first user message
+		goal := ""
+		for _, msg := range preCompact {
+			if msg.Role == provider.RoleUser {
+				for _, block := range msg.Content {
+					if block.Type == "text" && block.Text != "" {
+						goal = block.Text
+						if len(goal) > 200 {
+							goal = goal[:200] + "..."
+						}
+						break
+					}
+				}
+				if goal != "" {
+					break
+				}
+			}
+		}
+
+		// Extract files touched from tool calls
+		seen := make(map[string]bool)
+		var files []string
+		for _, msg := range preCompact {
+			if msg.Role != provider.RoleAssistant {
+				continue
+			}
+			for _, block := range msg.Content {
+				if block.Type != "tool_use" {
+					continue
+				}
+				switch block.Name {
+				case "read", "write", "edit", "Read", "Write", "Edit":
+					var p struct {
+						FilePath string `json:"file_path"`
+					}
+					if json.Unmarshal(block.Input, &p) == nil && p.FilePath != "" && !seen[p.FilePath] {
+						seen[p.FilePath] = true
+						files = append(files, p.FilePath)
+					}
+				}
+			}
+		}
+
+		// Build orientation message
+		text := "[Context restored after auto-compaction]\n"
+		if goal != "" {
+			text += "\nGoal: " + goal
+		}
+		if len(files) > 0 {
+			// Show at most 10 files
+			show := files
+			if len(show) > 10 {
+				show = show[:10]
+			}
+			text += "\nFiles touched: "
+			for i, f := range show {
+				if i > 0 {
+					text += ", "
+				}
+				text += f
+			}
+			if len(files) > 10 {
+				text += fmt.Sprintf(" (+%d more)", len(files)-10)
+			}
+		}
+		if phase != "" {
+			text += "\nPhase: " + phase
+		}
+		text += "\n\nContinue from where you left off."
+
+		return []provider.Message{{
+			Role: provider.RoleUser,
+			Content: []provider.ContentBlock{{
+				Type: "text",
+				Text: text,
+			}},
+		}}
+	}
 }
