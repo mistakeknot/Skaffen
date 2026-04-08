@@ -19,6 +19,7 @@ type Config struct {
 	ReadModel       string            `yaml:"read_model"`
 	MaxTokens       int               `yaml:"max_tokens"`       // budget cap (0 = unlimited)
 	ContextWindows  map[string]int    `yaml:"context_windows"`  // model → window size overrides
+	Complexity      ComplexityConfig  `yaml:"complexity"`       // proactive escalation thresholds
 }
 
 // Backend maps a model prefix to a provider instance.
@@ -40,6 +41,9 @@ type CostRouter struct {
 
 	// Failure state from previous turn (set by Emit, read by SelectModel).
 	lastFailure agentloop.FailureType
+
+	// Proactive complexity tracking.
+	tracker *complexityTracker
 }
 
 // New creates a CostRouter with the given config and provider backends.
@@ -47,6 +51,7 @@ func New(cfg Config, backends []Backend) *CostRouter {
 	return &CostRouter{
 		cfg:      cfg,
 		backends: backends,
+		tracker:  newComplexityTracker(cfg.Complexity),
 	}
 }
 
@@ -62,6 +67,17 @@ func (r *CostRouter) SelectModel(hints agentloop.SelectionHints) (string, string
 			model = "claude-sonnet-4-6"
 		}
 		return model, "escalation-after-failure"
+	}
+
+	// Proactive escalation: behavioral signals suggest the task is too complex
+	// for the cheap model, even before an explicit failure.
+	if escalate, reason := r.tracker.shouldEscalate(); escalate {
+		r.tracker.reset() // consume — avoid re-triggering next turn
+		model := r.cfg.EscalationModel
+		if model == "" {
+			model = "claude-sonnet-4-6"
+		}
+		return model, reason
 	}
 
 	// Task-type routing using documented SelectionHints.TaskType values.
@@ -133,11 +149,17 @@ func (r *CostRouter) ContextWindow(model string) int {
 
 // --- agentloop.Emitter implementation (for failure feedback) ---
 
-// Emit records per-turn evidence. CostRouter only cares about the failure type
-// for escalation decisions on the next turn.
+// Emit records per-turn evidence. Feeds the complexity tracker with behavioral
+// signals and the failure type for reactive escalation.
 func (r *CostRouter) Emit(ev agentloop.Evidence) error {
 	r.lastFailure = ev.Failure
+	r.tracker.observe(ev)
 	return nil
+}
+
+// CostReport returns per-model token spend breakdown.
+func (r *CostRouter) CostReport() []ModelCostReport {
+	return r.tracker.costReport()
 }
 
 // --- Provider dispatch ---
