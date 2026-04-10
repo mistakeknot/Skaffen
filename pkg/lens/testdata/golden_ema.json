@@ -1,0 +1,249 @@
+{
+  "trajectories": {
+    "engaged_5x": {
+      "initial_score": 0.5,
+      "initial_usage_count": 10,
+      "events": [
+        "engaged",
+        "engaged",
+        "engaged",
+        "engaged",
+        "engaged"
+      ],
+      "steps": [
+        {
+          "event": "engaged",
+          "usage_count": 10,
+          "score_before": 0.5,
+          "delta": 0.1,
+          "score_after": 0.6
+        },
+        {
+          "event": "engaged",
+          "usage_count": 11,
+          "score_before": 0.6,
+          "delta": 0.1,
+          "score_after": 0.7
+        },
+        {
+          "event": "engaged",
+          "usage_count": 12,
+          "score_before": 0.7,
+          "delta": 0.1,
+          "score_after": 0.8
+        },
+        {
+          "event": "engaged",
+          "usage_count": 13,
+          "score_before": 0.8,
+          "delta": 0.1,
+          "score_after": 0.9
+        },
+        {
+          "event": "engaged",
+          "usage_count": 14,
+          "score_before": 0.9,
+          "delta": 0.1,
+          "score_after": 1.0
+        }
+      ],
+      "final_score": 1.0
+    },
+    "ignored_5x": {
+      "initial_score": 0.5,
+      "initial_usage_count": 10,
+      "events": [
+        "ignored",
+        "ignored",
+        "ignored",
+        "ignored",
+        "ignored"
+      ],
+      "steps": [
+        {
+          "event": "ignored",
+          "usage_count": 10,
+          "score_before": 0.5,
+          "delta": -0.05,
+          "score_after": 0.45
+        },
+        {
+          "event": "ignored",
+          "usage_count": 11,
+          "score_before": 0.45,
+          "delta": -0.05,
+          "score_after": 0.4
+        },
+        {
+          "event": "ignored",
+          "usage_count": 12,
+          "score_before": 0.4,
+          "delta": -0.05,
+          "score_after": 0.35
+        },
+        {
+          "event": "ignored",
+          "usage_count": 13,
+          "score_before": 0.35,
+          "delta": -0.05,
+          "score_after": 0.3
+        },
+        {
+          "event": "ignored",
+          "usage_count": 14,
+          "score_before": 0.3,
+          "delta": -0.05,
+          "score_after": 0.25
+        }
+      ],
+      "final_score": 0.25
+    },
+    "pushed_back_5x": {
+      "initial_score": 0.5,
+      "initial_usage_count": 10,
+      "events": [
+        "pushed_back",
+        "pushed_back",
+        "pushed_back",
+        "pushed_back",
+        "pushed_back"
+      ],
+      "steps": [
+        {
+          "event": "pushed_back",
+          "usage_count": 10,
+          "score_before": 0.5,
+          "delta": -0.1,
+          "score_after": 0.4
+        },
+        {
+          "event": "pushed_back",
+          "usage_count": 11,
+          "score_before": 0.4,
+          "delta": -0.1,
+          "score_after": 0.3
+        },
+        {
+          "event": "pushed_back",
+          "usage_count": 12,
+          "score_before": 0.3,
+          "delta": -0.1,
+          "score_after": 0.2
+        },
+        {
+          "event": "pushed_back",
+          "usage_count": 13,
+          "score_before": 0.2,
+          "delta": -0.1,
+          "score_after": 0.1
+        },
+        {
+          "event": "pushed_back",
+          "usage_count": 14,
+          "score_before": 0.1,
+          "delta": -0.1,
+          "score_after": 0.1
+        }
+      ],
+      "final_score": 0.1
+    },
+    "mixed": {
+      "initial_score": 0.5,
+      "initial_usage_count": 10,
+      "events": [
+        "engaged",
+        "ignored",
+        "pushed_back",
+        "engaged",
+        "ignored"
+      ],
+      "steps": [
+        {
+          "event": "engaged",
+          "usage_count": 10,
+          "score_before": 0.5,
+          "delta": 0.1,
+          "score_after": 0.6
+        },
+        {
+          "event": "ignored",
+          "usage_count": 11,
+          "score_before": 0.6,
+          "delta": -0.05,
+          "score_after": 0.55
+        },
+        {
+          "event": "pushed_back",
+          "usage_count": 12,
+          "score_before": 0.55,
+          "delta": -0.1,
+          "score_after": 0.45
+        },
+        {
+          "event": "engaged",
+          "usage_count": 13,
+          "score_before": 0.45,
+          "delta": 0.1,
+          "score_after": 0.55
+        },
+        {
+          "event": "ignored",
+          "usage_count": 14,
+          "score_before": 0.55,
+          "delta": -0.05,
+          "score_after": 0.5
+        }
+      ],
+      "final_score": 0.5
+    },
+    "cold_start": {
+      "initial_score": 0.5,
+      "initial_usage_count": 0,
+      "events": [
+        "engaged",
+        "engaged",
+        "engaged",
+        "engaged",
+        "engaged"
+      ],
+      "steps": [
+        {
+          "event": "engaged",
+          "usage_count": 0,
+          "score_before": 0.5,
+          "delta": 0.1,
+          "score_after": 0.75
+        },
+        {
+          "event": "engaged",
+          "usage_count": 1,
+          "score_before": 0.75,
+          "delta": 0.1,
+          "score_after": 1.0
+        },
+        {
+          "event": "engaged",
+          "usage_count": 2,
+          "score_before": 1.0,
+          "delta": 0.1,
+          "score_after": 1.0
+        },
+        {
+          "event": "engaged",
+          "usage_count": 3,
+          "score_before": 1.0,
+          "delta": 0.1,
+          "score_after": 1.0
+        },
+        {
+          "event": "engaged",
+          "usage_count": 4,
+          "score_before": 1.0,
+          "delta": 0.1,
+          "score_after": 1.0
+        }
+      ],
+      "final_score": 1.0
+    }
+  }
+}

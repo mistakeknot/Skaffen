@@ -1,0 +1,169 @@
+{
+  "stacks": {
+    "deep_gold": {
+      "lenses": [
+        "Situation-Behavior-Impact",
+        "The Disappointing Super-Chicken",
+        "Explore vs. Exploit",
+        "Kobayashi Maru"
+      ],
+      "depth": "deep_gold",
+      "phases": [
+        {
+          "lens": "Situation-Behavior-Impact",
+          "phase_index": 0,
+          "problem_redefinition": null,
+          "transition_text": null,
+          "annealing_suggested": false,
+          "annealing_seconds": 0
+        },
+        {
+          "lens": "The Disappointing Super-Chicken",
+          "phase_index": 1,
+          "problem_redefinition": "That reframes things",
+          "transition_text": "Your answer just changed what this problem is about.",
+          "annealing_suggested": false,
+          "annealing_seconds": 0
+        },
+        {
+          "lens": "Explore vs. Exploit",
+          "phase_index": 2,
+          "problem_redefinition": "Now I see the pattern",
+          "transition_text": "Your answer just changed what this problem is about.",
+          "annealing_suggested": false,
+          "annealing_seconds": 0
+        },
+        {
+          "lens": "Kobayashi Maru",
+          "phase_index": 3,
+          "problem_redefinition": "What's the deeper issue?",
+          "transition_text": "Your answer just changed what this problem is about.",
+          "annealing_suggested": false,
+          "annealing_seconds": 0
+        }
+      ],
+      "is_complete": true,
+      "orchestrator_state": {
+        "lenses": [
+          "Situation-Behavior-Impact",
+          "The Disappointing Super-Chicken",
+          "Explore vs. Exploit",
+          "Kobayashi Maru"
+        ],
+        "depth": "deep_gold",
+        "annealing_seconds": 0,
+        "phase_index": 4
+      }
+    },
+    "shallow_gold": {
+      "lenses": [
+        "Situation-Behavior-Impact",
+        "The Disappointing Super-Chicken",
+        "Explore vs. Exploit",
+        "Kobayashi Maru"
+      ],
+      "depth": "shallow_gold",
+      "phases": [
+        {
+          "lens": "Situation-Behavior-Impact",
+          "phase_index": 0,
+          "problem_redefinition": null,
+          "transition_text": null,
+          "annealing_suggested": false,
+          "annealing_seconds": 0
+        },
+        {
+          "lens": "The Disappointing Super-Chicken",
+          "phase_index": 1,
+          "problem_redefinition": "That reframes things",
+          "transition_text": "Notice the shift? A moment ago the question was about situation-behavior-impact. Now it's about the disappointing super-chicken.",
+          "annealing_suggested": false,
+          "annealing_seconds": 0
+        },
+        {
+          "lens": "Explore vs. Exploit",
+          "phase_index": 2,
+          "problem_redefinition": "Now I see the pattern",
+          "transition_text": "Notice the shift? A moment ago the question was about the disappointing super-chicken. Now it's about explore vs. exploit.",
+          "annealing_suggested": false,
+          "annealing_seconds": 0
+        },
+        {
+          "lens": "Kobayashi Maru",
+          "phase_index": 3,
+          "problem_redefinition": "What's the deeper issue?",
+          "transition_text": "Notice the shift? A moment ago the question was about explore vs. exploit. Now it's about kobayashi maru.",
+          "annealing_suggested": false,
+          "annealing_seconds": 0
+        }
+      ],
+      "is_complete": true,
+      "orchestrator_state": {
+        "lenses": [
+          "Situation-Behavior-Impact",
+          "The Disappointing Super-Chicken",
+          "Explore vs. Exploit",
+          "Kobayashi Maru"
+        ],
+        "depth": "shallow_gold",
+        "annealing_seconds": 0,
+        "phase_index": 4
+      }
+    },
+    "wax": {
+      "lenses": [
+        "Situation-Behavior-Impact",
+        "The Disappointing Super-Chicken",
+        "Explore vs. Exploit",
+        "Kobayashi Maru"
+      ],
+      "depth": "wax",
+      "phases": [
+        {
+          "lens": "Situation-Behavior-Impact",
+          "phase_index": 0,
+          "problem_redefinition": null,
+          "transition_text": null,
+          "annealing_suggested": false,
+          "annealing_seconds": 0
+        },
+        {
+          "lens": "The Disappointing Super-Chicken",
+          "phase_index": 1,
+          "problem_redefinition": "That reframes things",
+          "transition_text": "We've moved from Situation-Behavior-Impact to The Disappointing Super-Chicken. The first lens addressed situation-behavior-impact \u2014 now we're looking at the disappointing super-chicken.",
+          "annealing_suggested": false,
+          "annealing_seconds": 0
+        },
+        {
+          "lens": "Explore vs. Exploit",
+          "phase_index": 2,
+          "problem_redefinition": "Now I see the pattern",
+          "transition_text": "We've moved from The Disappointing Super-Chicken to Explore vs. Exploit. The first lens addressed the disappointing super-chicken \u2014 now we're looking at explore vs. exploit.",
+          "annealing_suggested": false,
+          "annealing_seconds": 0
+        },
+        {
+          "lens": "Kobayashi Maru",
+          "phase_index": 3,
+          "problem_redefinition": "What's the deeper issue?",
+          "transition_text": "We've moved from Explore vs. Exploit to Kobayashi Maru. The first lens addressed explore vs. exploit \u2014 now we're looking at kobayashi maru.",
+          "annealing_suggested": false,
+          "annealing_seconds": 0
+        }
+      ],
+      "is_complete": true,
+      "orchestrator_state": {
+        "lenses": [
+          "Situation-Behavior-Impact",
+          "The Disappointing Super-Chicken",
+          "Explore vs. Exploit",
+          "Kobayashi Maru"
+        ],
+        "depth": "wax",
+        "annealing_seconds": 0,
+        "phase_index": 4
+      }
+    }
+  }
+}

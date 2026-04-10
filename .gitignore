@@ -20,6 +20,8 @@ Cargo.lock
 
 # Local config
 .skaffen/
+.env
+.env.*
 
 # Plugin caches
 .claude/

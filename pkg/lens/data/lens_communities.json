@@ -1,0 +1,127 @@
+{
+  "num_communities": 7,
+  "communities": {
+    "0": {
+      "size": 54,
+      "members": [
+        "lens_21_headline_scrambling_status_games_with_zoom",
+        "lens_39_weekly_key_ingredients",
+        "lens_23_weekly_the_undercurrent",
+        "lens_125_headline_know_thy_hooks",
+        "lens_75_headline_from_molehills_to_mountains",
+        "lens_94_weekly_organizational_misalignment_breeding_texas_sharpshooters",
+        "lens_14_headline_cultivating_our_inner_dialogue",
+        "lens_32_weekly_stepping_stones",
+        "lens_171_weekly_the_illusion_of_efficacy",
+        "lens_43_weekly_the_balcony_and_the_dance_floor"
+      ]
+    },
+    "1": {
+      "size": 25,
+      "members": [
+        "lens_121_weekly_hidden_keystones",
+        "lens_25_headline_hidden_for_all_to_see",
+        "lens_195_headline_dancing_with_many_partners",
+        "lens_163_headline_to_wake__perchance_to_dream",
+        "lens_120_headline_thinking_and_doing__for_the_navy_and_the_pirates",
+        "lens_183_headline_from_getting_it_to_building_it",
+        "lens_148_headline_catalyzing_variety",
+        "lens_95_headline_lost_and_found",
+        "lens_51_headline_the_fleet_of_theseus",
+        "lens_190_weekly_tradition_and_convention"
+      ]
+    },
+    "2": {
+      "size": 35,
+      "members": [
+        "lens_19_headline_playful_lessons_in_systems_thinking",
+        "lens_29_weekly_the_hedgehog_and_the_fox",
+        "lens_165_headline_lost_in_confusion",
+        "lens_160_weekly_recursive_de_risking",
+        "lens_79_headline_strategy_as_mask_or_mirror",
+        "lens_90_weekly_revealed_specialist",
+        "lens_66_weekly_the_cobra_effect",
+        "lens_20_weekly_static_and_dynamic_equilibrium",
+        "lens_100_headline_systems_thinking",
+        "lens_164_weekly_the_cone_of_uncertainty"
+      ]
+    },
+    "3": {
+      "size": 41,
+      "members": [
+        "lens_150_weekly_trilemma",
+        "lens_143_weekly_vibe_upscaler",
+        "lens_186_headline_hope_with_teeth",
+        "lens_123_weekly_sour_spots",
+        "lens_14_weekly_what_would_it_take_to_succeed?",
+        "lens_194_headline_depth_by_degrees",
+        "lens_173_headline_growing_in_the_shade",
+        "lens_134_headline_resilient_expectations",
+        "lens_28_headline_the_struggle_against_preferential_attachment",
+        "lens_191_weekly_the_robustness_principle"
+      ]
+    },
+    "4": {
+      "size": 40,
+      "members": [
+        "lens_194_weekly_prestige_and_dominance",
+        "lens_112_weekly_regression_to_the_mean",
+        "lens_95_weekly_whale_fall,_redux",
+        "lens_71_weekly_time_horizons",
+        "lens_119_headline_cultivation",
+        "lens_86_weekly_over-adaptation",
+        "lens_70_headline_choose_enthusiastic_dance_partners",
+        "lens_63_weekly_katana_deficit_principle",
+        "lens_154_headline_grounding__granding__grinding_moments",
+        "lens_102_headline_signposts"
+      ]
+    },
+    "5": {
+      "size": 52,
+      "members": [
+        "lens_105_headline_three_mazes",
+        "lens_59_weekly_zeroth_principles",
+        "lens_stigmergy",
+        "lens_knowledge_as_wayfinding",
+        "lens_93_headline_herding_cats_of_the_mind",
+        "lens_warm_data_and_symmathesy",
+        "lens_140_weekly_data_lenses__induction__abduction__and_deduction_",
+        "lens_144_weekly_trading_zones",
+        "lens_active_inference",
+        "lens_reckoning_vs_judgment"
+      ]
+    },
+    "6": {
+      "size": 44,
+      "members": [
+        "lens_12_weekly_explore_vs._exploit",
+        "lens_174_weekly_the_shaper",
+        "lens_114_headline_the_risks_of_peculiar_specialization",
+        "lens_148_weekly_theory_of_change",
+        "lens_enabling_constraints",
+        "lens_182_headline_machine_environment_fit",
+        "lens_154_weekly_topological_transformations",
+        "lens_socratic_pathways",
+        "lens_116_headline_dancing_with_art",
+        "lens_108_headline_stumbling_towards_manageable_uncertainty"
+      ]
+    }
+  },
+  "bridge_lenses": [
+    "lens_161_headline_founder_mode",
+    "lens_78_headline_safe-to-fail_experiments",
+    "lens_12_weekly_explore_vs._exploit",
+    "lens_31_weekly_simple_rules",
+    "lens_89_headline_you_can't_slay_quicksand",
+    "lens_71_weekly_time_horizons",
+    "lens_127_headline_navigating_the_many_ways_of_knowing",
+    "lens_19_weekly_ooda_loop",
+    "lens_narrative_identity_construction",
+    "lens_119_weekly_chestertons_fence",
+    "lens_27_weekly_reversal_of_the_causal_arrow",
+    "lens_162_headline_bridging_the_belief_gap",
+    "lens_22_weekly_proof_of_work",
+    "lens_19_headline_playful_lessons_in_systems_thinking",
+    "lens_159_weekly_commitment_device"
+  ]
+}

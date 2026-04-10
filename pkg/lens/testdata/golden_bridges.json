@@ -1,0 +1,80 @@
+{
+  "bridges": [
+    {
+      "lens_id": "lens_161_headline_founder_mode",
+      "betweenness_score": 0.028778739,
+      "community_id": 2
+    },
+    {
+      "lens_id": "lens_78_headline_safe-to-fail_experiments",
+      "betweenness_score": 0.0215408668,
+      "community_id": 2
+    },
+    {
+      "lens_id": "lens_12_weekly_explore_vs._exploit",
+      "betweenness_score": 0.0200033438,
+      "community_id": 6
+    },
+    {
+      "lens_id": "lens_31_weekly_simple_rules",
+      "betweenness_score": 0.018847162,
+      "community_id": 2
+    },
+    {
+      "lens_id": "lens_89_headline_you_can't_slay_quicksand",
+      "betweenness_score": 0.0184767277,
+      "community_id": 4
+    },
+    {
+      "lens_id": "lens_71_weekly_time_horizons",
+      "betweenness_score": 0.0173790188,
+      "community_id": 4
+    },
+    {
+      "lens_id": "lens_127_headline_navigating_the_many_ways_of_knowing",
+      "betweenness_score": 0.0154069555,
+      "community_id": 5
+    },
+    {
+      "lens_id": "lens_19_weekly_ooda_loop",
+      "betweenness_score": 0.0152228917,
+      "community_id": 4
+    },
+    {
+      "lens_id": "lens_narrative_identity_construction",
+      "betweenness_score": 0.0144873008,
+      "community_id": 1
+    },
+    {
+      "lens_id": "lens_119_weekly_chestertons_fence",
+      "betweenness_score": 0.0144709506,
+      "community_id": 6
+    },
+    {
+      "lens_id": "lens_27_weekly_reversal_of_the_causal_arrow",
+      "betweenness_score": 0.0142208496,
+      "community_id": 0
+    },
+    {
+      "lens_id": "lens_162_headline_bridging_the_belief_gap",
+      "betweenness_score": 0.0139483366,
+      "community_id": 4
+    },
+    {
+      "lens_id": "lens_22_weekly_proof_of_work",
+      "betweenness_score": 0.01394309,
+      "community_id": 4
+    },
+    {
+      "lens_id": "lens_19_headline_playful_lessons_in_systems_thinking",
+      "betweenness_score": 0.0134451096,
+      "community_id": 2
+    },
+    {
+      "lens_id": "lens_159_weekly_commitment_device",
+      "betweenness_score": 0.0134322884,
+      "community_id": 0
+    }
+  ],
+  "count": 15
+}
