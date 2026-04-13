@@ -1,0 +1,3993 @@
+{
+  "version": 1,
+  "generator": "python3 auraken.style",
+  "message_count": 20,
+  "steps": [
+    {
+      "index": 0,
+      "message": "i feel so overwhelmed right now, i can't handle this",
+      "observables": {
+        "word_count": 10,
+        "message_length": 52,
+        "capitalization_ratio": 0.0,
+        "emoji_count": 0,
+        "emoji_density": 0.0,
+        "has_contraction": true,
+        "has_question": false,
+        "has_period": false,
+        "has_exclamation": false,
+        "is_all_lowercase": true,
+        "is_multi_sentence": false,
+        "laughter": [],
+        "affirmation": [],
+        "intensifiers": [
+          "so"
+        ],
+        "hedges": [],
+        "opener": "i",
+        "mode": "emotional"
+      },
+      "mode": "emotional",
+      "fingerprint_after": {
+        "message_count": 1,
+        "global": {
+          "n": 1,
+          "avg_words": 10.0,
+          "capitalization_ratio": 0.0,
+          "emoji_density": 0.0,
+          "pct_contraction": 1.0,
+          "pct_question": 0.0,
+          "pct_period": 0.0,
+          "pct_exclamation": 0.0,
+          "pct_lowercase": 1.0,
+          "pct_multi_sentence": 0.0,
+          "laughter": {},
+          "affirmation": {},
+          "intensifier": {
+            "so": 1
+          },
+          "hedge": {},
+          "opener": {
+            "i": 1
+          }
+        },
+        "modes": {
+          "emotional": {
+            "n": 1,
+            "avg_words": 10.0,
+            "capitalization_ratio": 0.0,
+            "emoji_density": 0.0,
+            "pct_contraction": 1.0,
+            "pct_question": 0.0,
+            "pct_period": 0.0,
+            "pct_exclamation": 0.0,
+            "pct_lowercase": 1.0,
+            "pct_multi_sentence": 0.0,
+            "laughter": {},
+            "affirmation": {},
+            "intensifier": {
+              "so": 1
+            },
+            "hedge": {},
+            "opener": {
+              "i": 1
+            }
+          }
+        },
+        "cadence": {
+          "avg_burst_size": 1.0,
+          "burst_count": 0
+        }
+      }
+    },
+    {
+      "index": 1,
+      "message": "the root cause is a constraint in the framework, however the evidence suggests a trade-off",
+      "observables": {
+        "word_count": 15,
+        "message_length": 90,
+        "capitalization_ratio": 0.0,
+        "emoji_count": 0,
+        "emoji_density": 0.0,
+        "has_contraction": false,
+        "has_question": false,
+        "has_period": false,
+        "has_exclamation": false,
+        "is_all_lowercase": true,
+        "is_multi_sentence": false,
+        "laughter": [],
+        "affirmation": [],
+        "intensifiers": [],
+        "hedges": [],
+        "opener": "the",
+        "mode": "analytical"
+      },
+      "mode": "analytical",
+      "fingerprint_after": {
+        "message_count": 2,
+        "global": {
+          "n": 2,
+          "avg_words": 12.5,
+          "capitalization_ratio": 0.0,
+          "emoji_density": 0.0,
+          "pct_contraction": 0.5,
+          "pct_question": 0.0,
+          "pct_period": 0.0,
+          "pct_exclamation": 0.0,
+          "pct_lowercase": 1.0,
+          "pct_multi_sentence": 0.0,
+          "laughter": {},
+          "affirmation": {},
+          "intensifier": {
+            "so": 1
+          },
+          "hedge": {},
+          "opener": {
+            "i": 1,
+            "the": 1
+          }
+        },
+        "modes": {
+          "emotional": {
+            "n": 1,
+            "avg_words": 10.0,
+            "capitalization_ratio": 0.0,
+            "emoji_density": 0.0,
+            "pct_contraction": 1.0,
+            "pct_question": 0.0,
+            "pct_period": 0.0,
+            "pct_exclamation": 0.0,
+            "pct_lowercase": 1.0,
+            "pct_multi_sentence": 0.0,
+            "laughter": {},
+            "affirmation": {},
+            "intensifier": {
+              "so": 1
+            },
+            "hedge": {},
+            "opener": {
+              "i": 1
+            }
+          },
+          "analytical": {
+            "n": 1,
+            "avg_words": 15.0,
+            "capitalization_ratio": 0.0,
+            "emoji_density": 0.0,
+            "pct_contraction": 0.0,
+            "pct_question": 0.0,
+            "pct_period": 0.0,
+            "pct_exclamation": 0.0,
+            "pct_lowercase": 1.0,
+            "pct_multi_sentence": 0.0,
+            "laughter": {},
+            "affirmation": {},
+            "intensifier": {},
+            "hedge": {},
+            "opener": {
+              "the": 1
+            }
+          }
+        },
+        "cadence": {
+          "avg_burst_size": 1.0,
+          "burst_count": 0
+        }
+      }
+    },
+    {
+      "index": 2,
+      "message": "haha omg that's so wild lol",
+      "observables": {
+        "word_count": 6,
+        "message_length": 27,
+        "capitalization_ratio": 0.0,
+        "emoji_count": 0,
+        "emoji_density": 0.0,
+        "has_contraction": true,
+        "has_question": false,
+        "has_period": false,
+        "has_exclamation": false,
+        "is_all_lowercase": true,
+        "is_multi_sentence": false,
+        "laughter": [
+          "haha",
+          "lol"
+        ],
+        "affirmation": [],
+        "intensifiers": [
+          "so"
+        ],
+        "hedges": [],
+        "opener": "haha",
+        "mode": "playful"
+      },
+      "mode": "playful",
+      "fingerprint_after": {
+        "message_count": 3,
+        "global": {
+          "n": 3,
+          "avg_words": 10.333333333333334,
+          "capitalization_ratio": 0.0,
+          "emoji_density": 0.0,
+          "pct_contraction": 0.6666666666666667,
+          "pct_question": 0.0,
+          "pct_period": 0.0,
+          "pct_exclamation": 0.0,
+          "pct_lowercase": 1.0,
+          "pct_multi_sentence": 0.0,
+          "laughter": {
+            "haha": 1,
+            "lol": 1
+          },
+          "affirmation": {},
+          "intensifier": {
+            "so": 2
+          },
+          "hedge": {},
+          "opener": {
+            "i": 1,
+            "the": 1,
+            "haha": 1
+          }
+        },
+        "modes": {
+          "emotional": {
+            "n": 1,
+            "avg_words": 10.0,
+            "capitalization_ratio": 0.0,
+            "emoji_density": 0.0,
+            "pct_contraction": 1.0,
+            "pct_question": 0.0,
+            "pct_period": 0.0,
+            "pct_exclamation": 0.0,
+            "pct_lowercase": 1.0,
+            "pct_multi_sentence": 0.0,
+            "laughter": {},
+            "affirmation": {},
+            "intensifier": {
+              "so": 1
+            },
+            "hedge": {},
+            "opener": {
+              "i": 1
+            }
+          },
+          "analytical": {
+            "n": 1,
+            "avg_words": 15.0,
+            "capitalization_ratio": 0.0,
+            "emoji_density": 0.0,
+            "pct_contraction": 0.0,
+            "pct_question": 0.0,
+            "pct_period": 0.0,
+            "pct_exclamation": 0.0,
+            "pct_lowercase": 1.0,
+            "pct_multi_sentence": 0.0,
+            "laughter": {},
+            "affirmation": {},
+            "intensifier": {},
+            "hedge": {},
+            "opener": {
+              "the": 1
+            }
+          },
+          "playful": {
+            "n": 1,
+            "avg_words": 6.0,
+            "capitalization_ratio": 0.0,
+            "emoji_density": 0.0,
+            "pct_contraction": 1.0,
+            "pct_question": 0.0,
+            "pct_period": 0.0,
+            "pct_exclamation": 0.0,
+            "pct_lowercase": 1.0,
+            "pct_multi_sentence": 0.0,
+            "laughter": {
+              "haha": 1,
+              "lol": 1
+            },
+            "affirmation": {},
+            "intensifier": {
+              "so": 1
+            },
+            "hedge": {},
+            "opener": {
+              "haha": 1
+            }
+          }
+        },
+        "cadence": {
+          "avg_burst_size": 1.0,
+          "burst_count": 0
+        }
+      }
+    },
+    {
+      "index": 3,
+      "message": "i love you baby, sleep well, sweet dreams",
+      "observables": {
+        "word_count": 8,
+        "message_length": 41,
+        "capitalization_ratio": 0.0,
+        "emoji_count": 0,
+        "emoji_density": 0.0,
+        "has_contraction": false,
+        "has_question": false,
+        "has_period": false,
+        "has_exclamation": false,
+        "is_all_lowercase": true,
+        "is_multi_sentence": false,
+        "laughter": [],
+        "affirmation": [],
+        "intensifiers": [],
+        "hedges": [],
+        "opener": "i",
+        "mode": "intimate"
+      },
+      "mode": "intimate",
+      "fingerprint_after": {
+        "message_count": 4,
+        "global": {
+          "n": 4,
+          "avg_words": 9.75,
+          "capitalization_ratio": 0.0,
+          "emoji_density": 0.0,
+          "pct_contraction": 0.5,
+          "pct_question": 0.0,
+          "pct_period": 0.0,
+          "pct_exclamation": 0.0,
+          "pct_lowercase": 1.0,
+          "pct_multi_sentence": 0.0,
+          "laughter": {
+            "haha": 1,
+            "lol": 1
+          },
+          "affirmation": {},
+          "intensifier": {
+            "so": 2
+          },
+          "hedge": {},
+          "opener": {
+            "i": 2,
+            "the": 1,
+            "haha": 1
+          }
+        },
+        "modes": {
+          "emotional": {
+            "n": 1,
+            "avg_words": 10.0,
+            "capitalization_ratio": 0.0,
+            "emoji_density": 0.0,
+            "pct_contraction": 1.0,
+            "pct_question": 0.0,
+            "pct_period": 0.0,
+            "pct_exclamation": 0.0,
+            "pct_lowercase": 1.0,
+            "pct_multi_sentence": 0.0,
+            "laughter": {},
+            "affirmation": {},
+            "intensifier": {
+              "so": 1
+            },
+            "hedge": {},
+            "opener": {
+              "i": 1
+            }
+          },
+          "analytical": {
+            "n": 1,
+            "avg_words": 15.0,
+            "capitalization_ratio": 0.0,
+            "emoji_density": 0.0,
+            "pct_contraction": 0.0,
+            "pct_question": 0.0,
+            "pct_period": 0.0,
+            "pct_exclamation": 0.0,
+            "pct_lowercase": 1.0,
+            "pct_multi_sentence": 0.0,
+            "laughter": {},
+            "affirmation": {},
+            "intensifier": {},
+            "hedge": {},
+            "opener": {
+              "the": 1
+            }
+          },
+          "playful": {
+            "n": 1,
+            "avg_words": 6.0,
+            "capitalization_ratio": 0.0,
+            "emoji_density": 0.0,
+            "pct_contraction": 1.0,
+            "pct_question": 0.0,
+            "pct_period": 0.0,
+            "pct_exclamation": 0.0,
+            "pct_lowercase": 1.0,
+            "pct_multi_sentence": 0.0,
+            "laughter": {
+              "haha": 1,
+              "lol": 1
+            },
+            "affirmation": {},
+            "intensifier": {
+              "so": 1
+            },
+            "hedge": {},
+            "opener": {
+              "haha": 1
+            }
+          },
+          "intimate": {
+            "n": 1,
+            "avg_words": 8.0,
+            "capitalization_ratio": 0.0,
+            "emoji_density": 0.0,
+            "pct_contraction": 0.0,
+            "pct_question": 0.0,
+            "pct_period": 0.0,
+            "pct_exclamation": 0.0,
+            "pct_lowercase": 1.0,
+            "pct_multi_sentence": 0.0,
+            "laughter": {},
+            "affirmation": {},
+            "intensifier": {},
+            "hedge": {},
+            "opener": {
+              "i": 1
+            }
+          }
+        },
+        "cadence": {
+          "avg_burst_size": 1.0,
+          "burst_count": 0
+        }
+      }
+    },
+    {
+      "index": 4,
+      "message": "what time tomorrow? i'm free at 3pm, sounds good",
+      "observables": {
+        "word_count": 9,
+        "message_length": 48,
+        "capitalization_ratio": 0.0,
+        "emoji_count": 0,
+        "emoji_density": 0.0,
+        "has_contraction": true,
+        "has_question": false,
+        "has_period": false,
+        "has_exclamation": false,
+        "is_all_lowercase": true,
+        "is_multi_sentence": false,
+        "laughter": [],
+        "affirmation": [],
+        "intensifiers": [],
+        "hedges": [],
+        "opener": "what",
+        "mode": "logistics"
+      },
+      "mode": "logistics",
+      "fingerprint_after": {
+        "message_count": 5,
+        "global": {
+          "n": 5,
+          "avg_words": 9.600000000000001,
+          "capitalization_ratio": 0.0,
+          "emoji_density": 0.0,
+          "pct_contraction": 0.6000000000000001,
+          "pct_question": 0.0,
+          "pct_period": 0.0,
+          "pct_exclamation": 0.0,
+          "pct_lowercase": 1.0,
+          "pct_multi_sentence": 0.0,
+          "laughter": {
+            "haha": 1,
+            "lol": 1
+          },
+          "affirmation": {},
+          "intensifier": {
+            "so": 2
+          },
+          "hedge": {},
+          "opener": {
+            "i": 2,
+            "the": 1,
+            "haha": 1,
+            "what": 1
+          }
+        },
+        "modes": {
+          "emotional": {
+            "n": 1,
+            "avg_words": 10.0,
+            "capitalization_ratio": 0.0,
+            "emoji_density": 0.0,
+            "pct_contraction": 1.0,
+            "pct_question": 0.0,
+            "pct_period": 0.0,
+            "pct_exclamation": 0.0,
+            "pct_lowercase": 1.0,
+            "pct_multi_sentence": 0.0,
+            "laughter": {},
+            "affirmation": {},
+            "intensifier": {
+              "so": 1
+            },
+            "hedge": {},
+            "opener": {
+              "i": 1
+            }
+          },
+          "analytical": {
+            "n": 1,
+            "avg_words": 15.0,
+            "capitalization_ratio": 0.0,
+            "emoji_density": 0.0,
+            "pct_contraction": 0.0,
+            "pct_question": 0.0,
+            "pct_period": 0.0,
+            "pct_exclamation": 0.0,
+            "pct_lowercase": 1.0,
+            "pct_multi_sentence": 0.0,
+            "laughter": {},
+            "affirmation": {},
+            "intensifier": {},
+            "hedge": {},
+            "opener": {
+              "the": 1
+            }
+          },
+          "playful": {
+            "n": 1,
+            "avg_words": 6.0,
+            "capitalization_ratio": 0.0,
+            "emoji_density": 0.0,
+            "pct_contraction": 1.0,
+            "pct_question": 0.0,
+            "pct_period": 0.0,
+            "pct_exclamation": 0.0,
+            "pct_lowercase": 1.0,
+            "pct_multi_sentence": 0.0,
+            "laughter": {
+              "haha": 1,
+              "lol": 1
+            },
+            "affirmation": {},
+            "intensifier": {
+              "so": 1
+            },
+            "hedge": {},
+            "opener": {
+              "haha": 1
+            }
+          },
+          "intimate": {
+            "n": 1,
+            "avg_words": 8.0,
+            "capitalization_ratio": 0.0,
+            "emoji_density": 0.0,
+            "pct_contraction": 0.0,
+            "pct_question": 0.0,
+            "pct_period": 0.0,
+            "pct_exclamation": 0.0,
+            "pct_lowercase": 1.0,
+            "pct_multi_sentence": 0.0,
+            "laughter": {},
+            "affirmation": {},
+            "intensifier": {},
+            "hedge": {},
+            "opener": {
+              "i": 1
+            }
+          },
+          "logistics": {
+            "n": 1,
+            "avg_words": 9.0,
+            "capitalization_ratio": 0.0,
+            "emoji_density": 0.0,
+            "pct_contraction": 1.0,
+            "pct_question": 0.0,
+            "pct_period": 0.0,
+            "pct_exclamation": 0.0,
+            "pct_lowercase": 1.0,
+            "pct_multi_sentence": 0.0,
+            "laughter": {},
+            "affirmation": {},
+            "intensifier": {},
+            "hedge": {},
+            "opener": {
+              "what": 1
+            }
+          }
+        },
+        "cadence": {
+          "avg_burst_size": 1.0,
+          "burst_count": 0
+        }
+      }
+    },
+    {
+      "index": 5,
+      "message": "hey just got home, work was long, day was exhausting",
+      "observables": {
+        "word_count": 10,
+        "message_length": 52,
+        "capitalization_ratio": 0.0,
+        "emoji_count": 0,
+        "emoji_density": 0.0,
+        "has_contraction": false,
+        "has_question": false,
+        "has_period": false,
+        "has_exclamation": false,
+        "is_all_lowercase": true,
+        "is_multi_sentence": false,
+        "laughter": [],
+        "affirmation": [],
+        "intensifiers": [],
+        "hedges": [],
+        "opener": "hey",
+        "mode": "update"
+      },
+      "mode": "update",
+      "fingerprint_after": {
+        "message_count": 6,
+        "global": {
+          "n": 6,
+          "avg_words": 9.72,
+          "capitalization_ratio": 0.0,
+          "emoji_density": 0.0,
+          "pct_contraction": 0.42000000000000004,
+          "pct_question": 0.0,
+          "pct_period": 0.0,
+          "pct_exclamation": 0.0,
+          "pct_lowercase": 1.0,
+          "pct_multi_sentence": 0.0,
+          "laughter": {
+            "haha": 1,
+            "lol": 1
+          },
+          "affirmation": {},
+          "intensifier": {
+            "so": 2
+          },
+          "hedge": {},
+          "opener": {
+            "i": 2,
+            "the": 1,
+            "haha": 1,
+            "what": 1,
+            "hey": 1
+          }
+        },
+        "modes": {
+          "emotional": {
+            "n": 1,
+            "avg_words": 10.0,
+            "capitalization_ratio": 0.0,
+            "emoji_density": 0.0,
+            "pct_contraction": 1.0,
+            "pct_question": 0.0,
+            "pct_period": 0.0,
+            "pct_exclamation": 0.0,
+            "pct_lowercase": 1.0,
+            "pct_multi_sentence": 0.0,
+            "laughter": {},
+            "affirmation": {},
+            "intensifier": {
+              "so": 1
+            },
+            "hedge": {},
+            "opener": {
+              "i": 1
+            }
+          },
+          "analytical": {
+            "n": 1,
+            "avg_words": 15.0,
+            "capitalization_ratio": 0.0,
+            "emoji_density": 0.0,
+            "pct_contraction": 0.0,
+            "pct_question": 0.0,
+            "pct_period": 0.0,
+            "pct_exclamation": 0.0,
+            "pct_lowercase": 1.0,
+            "pct_multi_sentence": 0.0,
+            "laughter": {},
+            "affirmation": {},
+            "intensifier": {},
+            "hedge": {},
+            "opener": {
+              "the": 1
+            }
+          },
+          "playful": {
+            "n": 1,
+            "avg_words": 6.0,
+            "capitalization_ratio": 0.0,
+            "emoji_density": 0.0,
+            "pct_contraction": 1.0,
+            "pct_question": 0.0,
+            "pct_period": 0.0,
+            "pct_exclamation": 0.0,
+            "pct_lowercase": 1.0,
+            "pct_multi_sentence": 0.0,
+            "laughter": {
+              "haha": 1,
+              "lol": 1
+            },
+            "affirmation": {},
+            "intensifier": {
+              "so": 1
+            },
+            "hedge": {},
+            "opener": {
+              "haha": 1
+            }
+          },
+          "intimate": {
+            "n": 1,
+            "avg_words": 8.0,
+            "capitalization_ratio": 0.0,
+            "emoji_density": 0.0,
+            "pct_contraction": 0.0,
+            "pct_question": 0.0,
+            "pct_period": 0.0,
+            "pct_exclamation": 0.0,
+            "pct_lowercase": 1.0,
+            "pct_multi_sentence": 0.0,
+            "laughter": {},
+            "affirmation": {},
+            "intensifier": {},
+            "hedge": {},
+            "opener": {
+              "i": 1
+            }
+          },
+          "logistics": {
+            "n": 1,
+            "avg_words": 9.0,
+            "capitalization_ratio": 0.0,
+            "emoji_density": 0.0,
+            "pct_contraction": 1.0,
+            "pct_question": 0.0,
+            "pct_period": 0.0,
+            "pct_exclamation": 0.0,
+            "pct_lowercase": 1.0,
+            "pct_multi_sentence": 0.0,
+            "laughter": {},
+            "affirmation": {},
+            "intensifier": {},
+            "hedge": {},
+            "opener": {
+              "what": 1
+            }
+          },
+          "update": {
+            "n": 1,
+            "avg_words": 10.0,
+            "capitalization_ratio": 0.0,
+            "emoji_density": 0.0,
+            "pct_contraction": 0.0,
+            "pct_question": 0.0,
+            "pct_period": 0.0,
+            "pct_exclamation": 0.0,
+            "pct_lowercase": 1.0,
+            "pct_multi_sentence": 0.0,
+            "laughter": {},
+            "affirmation": {},
+            "intensifier": {},
+            "hedge": {},
+            "opener": {
+              "hey": 1
+            }
+          }
+        },
+        "cadence": {
+          "avg_burst_size": 1.0,
+          "burst_count": 0
+        }
+      }
+    },
+    {
+      "index": 6,
+      "message": "cool thanks",
+      "observables": {
+        "word_count": 2,
+        "message_length": 11,
+        "capitalization_ratio": 0.0,
+        "emoji_count": 0,
+        "emoji_density": 0.0,
+        "has_contraction": false,
+        "has_question": false,
+        "has_period": false,
+        "has_exclamation": false,
+        "is_all_lowercase": true,
+        "is_multi_sentence": false,
+        "laughter": [],
+        "affirmation": [],
+        "intensifiers": [],
+        "hedges": [],
+        "opener": "cool",
+        "mode": "general"
+      },
+      "mode": "general",
+      "fingerprint_after": {
+        "message_count": 7,
+        "global": {
+          "n": 7,
+          "avg_words": 7.404,
+          "capitalization_ratio": 0.0,
+          "emoji_density": 0.0,
+          "pct_contraction": 0.294,
+          "pct_question": 0.0,
+          "pct_period": 0.0,
+          "pct_exclamation": 0.0,
+          "pct_lowercase": 1.0,
+          "pct_multi_sentence": 0.0,
+          "laughter": {
+            "haha": 1,
+            "lol": 1
+          },
+          "affirmation": {},
+          "intensifier": {
+            "so": 2
+          },
+          "hedge": {},
+          "opener": {
+            "i": 2,
+            "the": 1,
+            "haha": 1,
+            "what": 1,
+            "hey": 1,
+            "cool": 1
+          }
+        },
+        "modes": {
+          "emotional": {
+            "n": 1,
+            "avg_words": 10.0,
+            "capitalization_ratio": 0.0,
+            "emoji_density": 0.0,
+            "pct_contraction": 1.0,
+            "pct_question": 0.0,
+            "pct_period": 0.0,
+            "pct_exclamation": 0.0,
+            "pct_lowercase": 1.0,
+            "pct_multi_sentence": 0.0,
+            "laughter": {},
+            "affirmation": {},
+            "intensifier": {
+              "so": 1
+            },
+            "hedge": {},
+            "opener": {
+              "i": 1
+            }
+          },
+          "analytical": {
+            "n": 1,
+            "avg_words": 15.0,
+            "capitalization_ratio": 0.0,
+            "emoji_density": 0.0,
+            "pct_contraction": 0.0,
+            "pct_question": 0.0,
+            "pct_period": 0.0,
+            "pct_exclamation": 0.0,
+            "pct_lowercase": 1.0,
+            "pct_multi_sentence": 0.0,
+            "laughter": {},
+            "affirmation": {},
+            "intensifier": {},
+            "hedge": {},
+            "opener": {
+              "the": 1
+            }
+          },
+          "playful": {
+            "n": 1,
+            "avg_words": 6.0,
+            "capitalization_ratio": 0.0,
+            "emoji_density": 0.0,
+            "pct_contraction": 1.0,
+            "pct_question": 0.0,
+            "pct_period": 0.0,
+            "pct_exclamation": 0.0,
+            "pct_lowercase": 1.0,
+            "pct_multi_sentence": 0.0,
+            "laughter": {
+              "haha": 1,
+              "lol": 1
+            },
+            "affirmation": {},
+            "intensifier": {
+              "so": 1
+            },
+            "hedge": {},
+            "opener": {
+              "haha": 1
+            }
+          },
+          "intimate": {
+            "n": 1,
+            "avg_words": 8.0,
+            "capitalization_ratio": 0.0,
+            "emoji_density": 0.0,
+            "pct_contraction": 0.0,
+            "pct_question": 0.0,
+            "pct_period": 0.0,
+            "pct_exclamation": 0.0,
+            "pct_lowercase": 1.0,
+            "pct_multi_sentence": 0.0,
+            "laughter": {},
+            "affirmation": {},
+            "intensifier": {},
+            "hedge": {},
+            "opener": {
+              "i": 1
+            }
+          },
+          "logistics": {
+            "n": 1,
+            "avg_words": 9.0,
+            "capitalization_ratio": 0.0,
+            "emoji_density": 0.0,
+            "pct_contraction": 1.0,
+            "pct_question": 0.0,
+            "pct_period": 0.0,
+            "pct_exclamation": 0.0,
+            "pct_lowercase": 1.0,
+            "pct_multi_sentence": 0.0,
+            "laughter": {},
+            "affirmation": {},
+            "intensifier": {},
+            "hedge": {},
+            "opener": {
+              "what": 1
+            }
+          },
+          "update": {
+            "n": 1,
+            "avg_words": 10.0,
+            "capitalization_ratio": 0.0,
+            "emoji_density": 0.0,
+            "pct_contraction": 0.0,
+            "pct_question": 0.0,
+            "pct_period": 0.0,
+            "pct_exclamation": 0.0,
+            "pct_lowercase": 1.0,
+            "pct_multi_sentence": 0.0,
+            "laughter": {},
+            "affirmation": {},
+            "intensifier": {},
+            "hedge": {},
+            "opener": {
+              "hey": 1
+            }
+          },
+          "general": {
+            "n": 1,
+            "avg_words": 2.0,
+            "capitalization_ratio": 0.0,
+            "emoji_density": 0.0,
+            "pct_contraction": 0.0,
+            "pct_question": 0.0,
+            "pct_period": 0.0,
+            "pct_exclamation": 0.0,
+            "pct_lowercase": 1.0,
+            "pct_multi_sentence": 0.0,
+            "laughter": {},
+            "affirmation": {},
+            "intensifier": {},
+            "hedge": {},
+            "opener": {
+              "cool": 1
+            }
+          }
+        },
+        "cadence": {
+          "avg_burst_size": 1.0,
+          "burst_count": 0
+        }
+      }
+    },
+    {
+      "index": 7,
+      "message": "i'm struggling with anxiety, i'm afraid of what happens next",
+      "observables": {
+        "word_count": 10,
+        "message_length": 60,
+        "capitalization_ratio": 0.0,
+        "emoji_count": 0,
+        "emoji_density": 0.0,
+        "has_contraction": true,
+        "has_question": false,
+        "has_period": false,
+        "has_exclamation": false,
+        "is_all_lowercase": true,
+        "is_multi_sentence": false,
+        "laughter": [],
+        "affirmation": [],
+        "intensifiers": [],
+        "hedges": [],
+        "opener": "i'm",
+        "mode": "emotional"
+      },
+      "mode": "emotional",
+      "fingerprint_after": {
+        "message_count": 8,
+        "global": {
+          "n": 8,
+          "avg_words": 8.1828,
+          "capitalization_ratio": 0.0,
+          "emoji_density": 0.0,
+          "pct_contraction": 0.5058,
+          "pct_question": 0.0,
+          "pct_period": 0.0,
+          "pct_exclamation": 0.0,
+          "pct_lowercase": 1.0,
+          "pct_multi_sentence": 0.0,
+          "laughter": {
+            "haha": 1,
+            "lol": 1
+          },
+          "affirmation": {},
+          "intensifier": {
+            "so": 2
+          },
+          "hedge": {},
+          "opener": {
+            "i": 2,
+            "the": 1,
+            "haha": 1,
+            "what": 1,
+            "hey": 1,
+            "cool": 1,
+            "i'm": 1
+          }
+        },
+        "modes": {
+          "emotional": {
+            "n": 2,
+            "avg_words": 10.0,
+            "capitalization_ratio": 0.0,
+            "emoji_density": 0.0,
+            "pct_contraction": 1.0,
+            "pct_question": 0.0,
+            "pct_period": 0.0,
+            "pct_exclamation": 0.0,
+            "pct_lowercase": 1.0,
+            "pct_multi_sentence": 0.0,
+            "laughter": {},
+            "affirmation": {},
+            "intensifier": {
+              "so": 1
+            },
+            "hedge": {},
+            "opener": {
+              "i": 1,
+              "i'm": 1
+            }
+          },
+          "analytical": {
+            "n": 1,
+            "avg_words": 15.0,
+            "capitalization_ratio": 0.0,
+            "emoji_density": 0.0,
+            "pct_contraction": 0.0,
+            "pct_question": 0.0,
+            "pct_period": 0.0,
+            "pct_exclamation": 0.0,
+            "pct_lowercase": 1.0,
+            "pct_multi_sentence": 0.0,
+            "laughter": {},
+            "affirmation": {},
+            "intensifier": {},
+            "hedge": {},
+            "opener": {
+              "the": 1
+            }
+          },
+          "playful": {
+            "n": 1,
+            "avg_words": 6.0,
+            "capitalization_ratio": 0.0,
+            "emoji_density": 0.0,
+            "pct_contraction": 1.0,
+            "pct_question": 0.0,
+            "pct_period": 0.0,
+            "pct_exclamation": 0.0,
+            "pct_lowercase": 1.0,
+            "pct_multi_sentence": 0.0,
+            "laughter": {
+              "haha": 1,
+              "lol": 1
+            },
+            "affirmation": {},
+            "intensifier": {
+              "so": 1
+            },
+            "hedge": {},
+            "opener": {
+              "haha": 1
+            }
+          },
+          "intimate": {
+            "n": 1,
+            "avg_words": 8.0,
+            "capitalization_ratio": 0.0,
+            "emoji_density": 0.0,
+            "pct_contraction": 0.0,
+            "pct_question": 0.0,
+            "pct_period": 0.0,
+            "pct_exclamation": 0.0,
+            "pct_lowercase": 1.0,
+            "pct_multi_sentence": 0.0,
+            "laughter": {},
+            "affirmation": {},
+            "intensifier": {},
+            "hedge": {},
+            "opener": {
+              "i": 1
+            }
+          },
+          "logistics": {
+            "n": 1,
+            "avg_words": 9.0,
+            "capitalization_ratio": 0.0,
+            "emoji_density": 0.0,
+            "pct_contraction": 1.0,
+            "pct_question": 0.0,
+            "pct_period": 0.0,
+            "pct_exclamation": 0.0,
+            "pct_lowercase": 1.0,
+            "pct_multi_sentence": 0.0,
+            "laughter": {},
+            "affirmation": {},
+            "intensifier": {},
+            "hedge": {},
+            "opener": {
+              "what": 1
+            }
+          },
+          "update": {
+            "n": 1,
+            "avg_words": 10.0,
+            "capitalization_ratio": 0.0,
+            "emoji_density": 0.0,
+            "pct_contraction": 0.0,
+            "pct_question": 0.0,
+            "pct_period": 0.0,
+            "pct_exclamation": 0.0,
+            "pct_lowercase": 1.0,
+            "pct_multi_sentence": 0.0,
+            "laughter": {},
+            "affirmation": {},
+            "intensifier": {},
+            "hedge": {},
+            "opener": {
+              "hey": 1
+            }
+          },
+          "general": {
+            "n": 1,
+            "avg_words": 2.0,
+            "capitalization_ratio": 0.0,
+            "emoji_density": 0.0,
+            "pct_contraction": 0.0,
+            "pct_question": 0.0,
+            "pct_period": 0.0,
+            "pct_exclamation": 0.0,
+            "pct_lowercase": 1.0,
+            "pct_multi_sentence": 0.0,
+            "laughter": {},
+            "affirmation": {},
+            "intensifier": {},
+            "hedge": {},
+            "opener": {
+              "cool": 1
+            }
+          }
+        },
+        "cadence": {
+          "avg_burst_size": 1.0,
+          "burst_count": 0
+        }
+      }
+    },
+    {
+      "index": 8,
+      "message": "yeah totally",
+      "observables": {
+        "word_count": 2,
+        "message_length": 12,
+        "capitalization_ratio": 0.0,
+        "emoji_count": 0,
+        "emoji_density": 0.0,
+        "has_contraction": false,
+        "has_question": false,
+        "has_period": false,
+        "has_exclamation": false,
+        "is_all_lowercase": true,
+        "is_multi_sentence": false,
+        "laughter": [],
+        "affirmation": [
+          "yeah"
+        ],
+        "intensifiers": [],
+        "hedges": [],
+        "opener": "yeah",
+        "mode": "general"
+      },
+      "mode": "general",
+      "fingerprint_after": {
+        "message_count": 9,
+        "global": {
+          "n": 9,
+          "avg_words": 6.327959999999999,
+          "capitalization_ratio": 0.0,
+          "emoji_density": 0.0,
+          "pct_contraction": 0.35406,
+          "pct_question": 0.0,
+          "pct_period": 0.0,
+          "pct_exclamation": 0.0,
+          "pct_lowercase": 1.0,
+          "pct_multi_sentence": 0.0,
+          "laughter": {
+            "haha": 1,
+            "lol": 1
+          },
+          "affirmation": {
+            "yeah": 1
+          },
+          "intensifier": {
+            "so": 2
+          },
+          "hedge": {},
+          "opener": {
+            "i": 2,
+            "the": 1,
+            "haha": 1,
+            "what": 1,
+            "hey": 1,
+            "cool": 1,
+            "i'm": 1,
+            "yeah": 1
+          }
+        },
+        "modes": {
+          "emotional": {
+            "n": 2,
+            "avg_words": 10.0,
+            "capitalization_ratio": 0.0,
+            "emoji_density": 0.0,
+            "pct_contraction": 1.0,
+            "pct_question": 0.0,
+            "pct_period": 0.0,
+            "pct_exclamation": 0.0,
+            "pct_lowercase": 1.0,
+            "pct_multi_sentence": 0.0,
+            "laughter": {},
+            "affirmation": {},
+            "intensifier": {
+              "so": 1
+            },
+            "hedge": {},
+            "opener": {
+              "i": 1,
+              "i'm": 1
+            }
+          },
+          "analytical": {
+            "n": 1,
+            "avg_words": 15.0,
+            "capitalization_ratio": 0.0,
+            "emoji_density": 0.0,
+            "pct_contraction": 0.0,
+            "pct_question": 0.0,
+            "pct_period": 0.0,
+            "pct_exclamation": 0.0,
+            "pct_lowercase": 1.0,
+            "pct_multi_sentence": 0.0,
+            "laughter": {},
+            "affirmation": {},
+            "intensifier": {},
+            "hedge": {},
+            "opener": {
+              "the": 1
+            }
+          },
+          "playful": {
+            "n": 1,
+            "avg_words": 6.0,
+            "capitalization_ratio": 0.0,
+            "emoji_density": 0.0,
+            "pct_contraction": 1.0,
+            "pct_question": 0.0,
+            "pct_period": 0.0,
+            "pct_exclamation": 0.0,
+            "pct_lowercase": 1.0,
+            "pct_multi_sentence": 0.0,
+            "laughter": {
+              "haha": 1,
+              "lol": 1
+            },
+            "affirmation": {},
+            "intensifier": {
+              "so": 1
+            },
+            "hedge": {},
+            "opener": {
+              "haha": 1
+            }
+          },
+          "intimate": {
+            "n": 1,
+            "avg_words": 8.0,
+            "capitalization_ratio": 0.0,
+            "emoji_density": 0.0,
+            "pct_contraction": 0.0,
+            "pct_question": 0.0,
+            "pct_period": 0.0,
+            "pct_exclamation": 0.0,
+            "pct_lowercase": 1.0,
+            "pct_multi_sentence": 0.0,
+            "laughter": {},
+            "affirmation": {},
+            "intensifier": {},
+            "hedge": {},
+            "opener": {
+              "i": 1
+            }
+          },
+          "logistics": {
+            "n": 1,
+            "avg_words": 9.0,
+            "capitalization_ratio": 0.0,
+            "emoji_density": 0.0,
+            "pct_contraction": 1.0,
+            "pct_question": 0.0,
+            "pct_period": 0.0,
+            "pct_exclamation": 0.0,
+            "pct_lowercase": 1.0,
+            "pct_multi_sentence": 0.0,
+            "laughter": {},
+            "affirmation": {},
+            "intensifier": {},
+            "hedge": {},
+            "opener": {
+              "what": 1
+            }
+          },
+          "update": {
+            "n": 1,
+            "avg_words": 10.0,
+            "capitalization_ratio": 0.0,
+            "emoji_density": 0.0,
+            "pct_contraction": 0.0,
+            "pct_question": 0.0,
+            "pct_period": 0.0,
+            "pct_exclamation": 0.0,
+            "pct_lowercase": 1.0,
+            "pct_multi_sentence": 0.0,
+            "laughter": {},
+            "affirmation": {},
+            "intensifier": {},
+            "hedge": {},
+            "opener": {
+              "hey": 1
+            }
+          },
+          "general": {
+            "n": 2,
+            "avg_words": 2.0,
+            "capitalization_ratio": 0.0,
+            "emoji_density": 0.0,
+            "pct_contraction": 0.0,
+            "pct_question": 0.0,
+            "pct_period": 0.0,
+            "pct_exclamation": 0.0,
+            "pct_lowercase": 1.0,
+            "pct_multi_sentence": 0.0,
+            "laughter": {},
+            "affirmation": {
+              "yeah": 1
+            },
+            "intensifier": {},
+            "hedge": {},
+            "opener": {
+              "cool": 1,
+              "yeah": 1
+            }
+          }
+        },
+        "cadence": {
+          "avg_burst_size": 1.0,
+          "burst_count": 0
+        }
+      }
+    },
+    {
+      "index": 9,
+      "message": "This is amazing! I can't believe it. Wow!",
+      "observables": {
+        "word_count": 8,
+        "message_length": 41,
+        "capitalization_ratio": 0.1,
+        "emoji_count": 0,
+        "emoji_density": 0.0,
+        "has_contraction": true,
+        "has_question": false,
+        "has_period": false,
+        "has_exclamation": true,
+        "is_all_lowercase": false,
+        "is_multi_sentence": true,
+        "laughter": [],
+        "affirmation": [],
+        "intensifiers": [],
+        "hedges": [],
+        "opener": "this",
+        "mode": "general"
+      },
+      "mode": "general",
+      "fingerprint_after": {
+        "message_count": 10,
+        "global": {
+          "n": 10,
+          "avg_words": 6.829571999999999,
+          "capitalization_ratio": 0.03,
+          "emoji_density": 0.0,
+          "pct_contraction": 0.5478419999999999,
+          "pct_question": 0.0,
+          "pct_period": 0.0,
+          "pct_exclamation": 0.3,
+          "pct_lowercase": 0.7,
+          "pct_multi_sentence": 0.3,
+          "laughter": {
+            "haha": 1,
+            "lol": 1
+          },
+          "affirmation": {
+            "yeah": 1
+          },
+          "intensifier": {
+            "so": 2
+          },
+          "hedge": {},
+          "opener": {
+            "i": 2,
+            "the": 1,
+            "haha": 1,
+            "what": 1,
+            "hey": 1,
+            "cool": 1,
+            "i'm": 1,
+            "yeah": 1,
+            "this": 1
+          }
+        },
+        "modes": {
+          "emotional": {
+            "n": 2,
+            "avg_words": 10.0,
+            "capitalization_ratio": 0.0,
+            "emoji_density": 0.0,
+            "pct_contraction": 1.0,
+            "pct_question": 0.0,
+            "pct_period": 0.0,
+            "pct_exclamation": 0.0,
+            "pct_lowercase": 1.0,
+            "pct_multi_sentence": 0.0,
+            "laughter": {},
+            "affirmation": {},
+            "intensifier": {
+              "so": 1
+            },
+            "hedge": {},
+            "opener": {
+              "i": 1,
+              "i'm": 1
+            }
+          },
+          "analytical": {
+            "n": 1,
+            "avg_words": 15.0,
+            "capitalization_ratio": 0.0,
+            "emoji_density": 0.0,
+            "pct_contraction": 0.0,
+            "pct_question": 0.0,
+            "pct_period": 0.0,
+            "pct_exclamation": 0.0,
+            "pct_lowercase": 1.0,
+            "pct_multi_sentence": 0.0,
+            "laughter": {},
+            "affirmation": {},
+            "intensifier": {},
+            "hedge": {},
+            "opener": {
+              "the": 1
+            }
+          },
+          "playful": {
+            "n": 1,
+            "avg_words": 6.0,
+            "capitalization_ratio": 0.0,
+            "emoji_density": 0.0,
+            "pct_contraction": 1.0,
+            "pct_question": 0.0,
+            "pct_period": 0.0,
+            "pct_exclamation": 0.0,
+            "pct_lowercase": 1.0,
+            "pct_multi_sentence": 0.0,
+            "laughter": {
+              "haha": 1,
+              "lol": 1
+            },
+            "affirmation": {},
+            "intensifier": {
+              "so": 1
+            },
+            "hedge": {},
+            "opener": {
+              "haha": 1
+            }
+          },
+          "intimate": {
+            "n": 1,
+            "avg_words": 8.0,
+            "capitalization_ratio": 0.0,
+            "emoji_density": 0.0,
+            "pct_contraction": 0.0,
+            "pct_question": 0.0,
+            "pct_period": 0.0,
+            "pct_exclamation": 0.0,
+            "pct_lowercase": 1.0,
+            "pct_multi_sentence": 0.0,
+            "laughter": {},
+            "affirmation": {},
+            "intensifier": {},
+            "hedge": {},
+            "opener": {
+              "i": 1
+            }
+          },
+          "logistics": {
+            "n": 1,
+            "avg_words": 9.0,
+            "capitalization_ratio": 0.0,
+            "emoji_density": 0.0,
+            "pct_contraction": 1.0,
+            "pct_question": 0.0,
+            "pct_period": 0.0,
+            "pct_exclamation": 0.0,
+            "pct_lowercase": 1.0,
+            "pct_multi_sentence": 0.0,
+            "laughter": {},
+            "affirmation": {},
+            "intensifier": {},
+            "hedge": {},
+            "opener": {
+              "what": 1
+            }
+          },
+          "update": {
+            "n": 1,
+            "avg_words": 10.0,
+            "capitalization_ratio": 0.0,
+            "emoji_density": 0.0,
+            "pct_contraction": 0.0,
+            "pct_question": 0.0,
+            "pct_period": 0.0,
+            "pct_exclamation": 0.0,
+            "pct_lowercase": 1.0,
+            "pct_multi_sentence": 0.0,
+            "laughter": {},
+            "affirmation": {},
+            "intensifier": {},
+            "hedge": {},
+            "opener": {
+              "hey": 1
+            }
+          },
+          "general": {
+            "n": 3,
+            "avg_words": 4.0,
+            "capitalization_ratio": 0.03333333333333333,
+            "emoji_density": 0.0,
+            "pct_contraction": 0.3333333333333333,
+            "pct_question": 0.0,
+            "pct_period": 0.0,
+            "pct_exclamation": 0.3333333333333333,
+            "pct_lowercase": 0.6666666666666667,
+            "pct_multi_sentence": 0.3333333333333333,
+            "laughter": {},
+            "affirmation": {
+              "yeah": 1
+            },
+            "intensifier": {},
+            "hedge": {},
+            "opener": {
+              "cool": 1,
+              "yeah": 1,
+              "this": 1
+            }
+          }
+        },
+        "cadence": {
+          "avg_burst_size": 1.0,
+          "burst_count": 0
+        }
+      }
+    },
+    {
+      "index": 10,
+      "message": "haha 😂 that's cursed lmao",
+      "observables": {
+        "word_count": 5,
+        "message_length": 25,
+        "capitalization_ratio": 0.0,
+        "emoji_count": 1,
+        "emoji_density": 0.04,
+        "has_contraction": true,
+        "has_question": false,
+        "has_period": false,
+        "has_exclamation": false,
+        "is_all_lowercase": true,
+        "is_multi_sentence": false,
+        "laughter": [
+          "haha",
+          "lmao"
+        ],
+        "affirmation": [],
+        "intensifiers": [],
+        "hedges": [],
+        "opener": "haha",
+        "mode": "playful"
+      },
+      "mode": "playful",
+      "fingerprint_after": {
+        "message_count": 11,
+        "global": {
+          "n": 11,
+          "avg_words": 6.280700399999999,
+          "capitalization_ratio": 0.020999999999999998,
+          "emoji_density": 0.012,
+          "pct_contraction": 0.6834893999999999,
+          "pct_question": 0.0,
+          "pct_period": 0.0,
+          "pct_exclamation": 0.21,
+          "pct_lowercase": 0.7899999999999999,
+          "pct_multi_sentence": 0.21,
+          "laughter": {
+            "haha": 2,
+            "lol": 1,
+            "lmao": 1
+          },
+          "affirmation": {
+            "yeah": 1
+          },
+          "intensifier": {
+            "so": 2
+          },
+          "hedge": {},
+          "opener": {
+            "i": 2,
+            "the": 1,
+            "haha": 2,
+            "what": 1,
+            "hey": 1,
+            "cool": 1,
+            "i'm": 1,
+            "yeah": 1,
+            "this": 1
+          }
+        },
+        "modes": {
+          "emotional": {
+            "n": 2,
+            "avg_words": 10.0,
+            "capitalization_ratio": 0.0,
+            "emoji_density": 0.0,
+            "pct_contraction": 1.0,
+            "pct_question": 0.0,
+            "pct_period": 0.0,
+            "pct_exclamation": 0.0,
+            "pct_lowercase": 1.0,
+            "pct_multi_sentence": 0.0,
+            "laughter": {},
+            "affirmation": {},
+            "intensifier": {
+              "so": 1
+            },
+            "hedge": {},
+            "opener": {
+              "i": 1,
+              "i'm": 1
+            }
+          },
+          "analytical": {
+            "n": 1,
+            "avg_words": 15.0,
+            "capitalization_ratio": 0.0,
+            "emoji_density": 0.0,
+            "pct_contraction": 0.0,
+            "pct_question": 0.0,
+            "pct_period": 0.0,
+            "pct_exclamation": 0.0,
+            "pct_lowercase": 1.0,
+            "pct_multi_sentence": 0.0,
+            "laughter": {},
+            "affirmation": {},
+            "intensifier": {},
+            "hedge": {},
+            "opener": {
+              "the": 1
+            }
+          },
+          "playful": {
+            "n": 2,
+            "avg_words": 5.5,
+            "capitalization_ratio": 0.0,
+            "emoji_density": 0.02,
+            "pct_contraction": 1.0,
+            "pct_question": 0.0,
+            "pct_period": 0.0,
+            "pct_exclamation": 0.0,
+            "pct_lowercase": 1.0,
+            "pct_multi_sentence": 0.0,
+            "laughter": {
+              "haha": 2,
+              "lol": 1,
+              "lmao": 1
+            },
+            "affirmation": {},
+            "intensifier": {
+              "so": 1
+            },
+            "hedge": {},
+            "opener": {
+              "haha": 2
+            }
+          },
+          "intimate": {
+            "n": 1,
+            "avg_words": 8.0,
+            "capitalization_ratio": 0.0,
+            "emoji_density": 0.0,
+            "pct_contraction": 0.0,
+            "pct_question": 0.0,
+            "pct_period": 0.0,
+            "pct_exclamation": 0.0,
+            "pct_lowercase": 1.0,
+            "pct_multi_sentence": 0.0,
+            "laughter": {},
+            "affirmation": {},
+            "intensifier": {},
+            "hedge": {},
+            "opener": {
+              "i": 1
+            }
+          },
+          "logistics": {
+            "n": 1,
+            "avg_words": 9.0,
+            "capitalization_ratio": 0.0,
+            "emoji_density": 0.0,
+            "pct_contraction": 1.0,
+            "pct_question": 0.0,
+            "pct_period": 0.0,
+            "pct_exclamation": 0.0,
+            "pct_lowercase": 1.0,
+            "pct_multi_sentence": 0.0,
+            "laughter": {},
+            "affirmation": {},
+            "intensifier": {},
+            "hedge": {},
+            "opener": {
+              "what": 1
+            }
+          },
+          "update": {
+            "n": 1,
+            "avg_words": 10.0,
+            "capitalization_ratio": 0.0,
+            "emoji_density": 0.0,
+            "pct_contraction": 0.0,
+            "pct_question": 0.0,
+            "pct_period": 0.0,
+            "pct_exclamation": 0.0,
+            "pct_lowercase": 1.0,
+            "pct_multi_sentence": 0.0,
+            "laughter": {},
+            "affirmation": {},
+            "intensifier": {},
+            "hedge": {},
+            "opener": {
+              "hey": 1
+            }
+          },
+          "general": {
+            "n": 3,
+            "avg_words": 4.0,
+            "capitalization_ratio": 0.03333333333333333,
+            "emoji_density": 0.0,
+            "pct_contraction": 0.3333333333333333,
+            "pct_question": 0.0,
+            "pct_period": 0.0,
+            "pct_exclamation": 0.3333333333333333,
+            "pct_lowercase": 0.6666666666666667,
+            "pct_multi_sentence": 0.3333333333333333,
+            "laughter": {},
+            "affirmation": {
+              "yeah": 1
+            },
+            "intensifier": {},
+            "hedge": {},
+            "opener": {
+              "cool": 1,
+              "yeah": 1,
+              "this": 1
+            }
+          }
+        },
+        "cadence": {
+          "avg_burst_size": 1.0,
+          "burst_count": 0
+        }
+      }
+    },
+    {
+      "index": 11,
+      "message": "i think maybe the assumption here is probably wrong, although i'm not sure",
+      "observables": {
+        "word_count": 13,
+        "message_length": 74,
+        "capitalization_ratio": 0.0,
+        "emoji_count": 0,
+        "emoji_density": 0.0,
+        "has_contraction": true,
+        "has_question": false,
+        "has_period": false,
+        "has_exclamation": false,
+        "is_all_lowercase": true,
+        "is_multi_sentence": false,
+        "laughter": [],
+        "affirmation": [],
+        "intensifiers": [],
+        "hedges": [
+          "i think",
+          "maybe",
+          "probably",
+          "not sure"
+        ],
+        "opener": "i",
+        "mode": "analytical"
+      },
+      "mode": "analytical",
+      "fingerprint_after": {
+        "message_count": 12,
+        "global": {
+          "n": 12,
+          "avg_words": 8.296490279999999,
+          "capitalization_ratio": 0.014699999999999998,
+          "emoji_density": 0.0084,
+          "pct_contraction": 0.7784425799999999,
+          "pct_question": 0.0,
+          "pct_period": 0.0,
+          "pct_exclamation": 0.147,
+          "pct_lowercase": 0.853,
+          "pct_multi_sentence": 0.147,
+          "laughter": {
+            "haha": 2,
+            "lol": 1,
+            "lmao": 1
+          },
+          "affirmation": {
+            "yeah": 1
+          },
+          "intensifier": {
+            "so": 2
+          },
+          "hedge": {
+            "i think": 1,
+            "maybe": 1,
+            "probably": 1,
+            "not sure": 1
+          },
+          "opener": {
+            "i": 3,
+            "the": 1,
+            "haha": 2,
+            "what": 1,
+            "hey": 1,
+            "cool": 1,
+            "i'm": 1,
+            "yeah": 1,
+            "this": 1
+          }
+        },
+        "modes": {
+          "emotional": {
+            "n": 2,
+            "avg_words": 10.0,
+            "capitalization_ratio": 0.0,
+            "emoji_density": 0.0,
+            "pct_contraction": 1.0,
+            "pct_question": 0.0,
+            "pct_period": 0.0,
+            "pct_exclamation": 0.0,
+            "pct_lowercase": 1.0,
+            "pct_multi_sentence": 0.0,
+            "laughter": {},
+            "affirmation": {},
+            "intensifier": {
+              "so": 1
+            },
+            "hedge": {},
+            "opener": {
+              "i": 1,
+              "i'm": 1
+            }
+          },
+          "analytical": {
+            "n": 2,
+            "avg_words": 14.0,
+            "capitalization_ratio": 0.0,
+            "emoji_density": 0.0,
+            "pct_contraction": 0.5,
+            "pct_question": 0.0,
+            "pct_period": 0.0,
+            "pct_exclamation": 0.0,
+            "pct_lowercase": 1.0,
+            "pct_multi_sentence": 0.0,
+            "laughter": {},
+            "affirmation": {},
+            "intensifier": {},
+            "hedge": {
+              "i think": 1,
+              "maybe": 1,
+              "probably": 1,
+              "not sure": 1
+            },
+            "opener": {
+              "the": 1,
+              "i": 1
+            }
+          },
+          "playful": {
+            "n": 2,
+            "avg_words": 5.5,
+            "capitalization_ratio": 0.0,
+            "emoji_density": 0.02,
+            "pct_contraction": 1.0,
+            "pct_question": 0.0,
+            "pct_period": 0.0,
+            "pct_exclamation": 0.0,
+            "pct_lowercase": 1.0,
+            "pct_multi_sentence": 0.0,
+            "laughter": {
+              "haha": 2,
+              "lol": 1,
+              "lmao": 1
+            },
+            "affirmation": {},
+            "intensifier": {
+              "so": 1
+            },
+            "hedge": {},
+            "opener": {
+              "haha": 2
+            }
+          },
+          "intimate": {
+            "n": 1,
+            "avg_words": 8.0,
+            "capitalization_ratio": 0.0,
+            "emoji_density": 0.0,
+            "pct_contraction": 0.0,
+            "pct_question": 0.0,
+            "pct_period": 0.0,
+            "pct_exclamation": 0.0,
+            "pct_lowercase": 1.0,
+            "pct_multi_sentence": 0.0,
+            "laughter": {},
+            "affirmation": {},
+            "intensifier": {},
+            "hedge": {},
+            "opener": {
+              "i": 1
+            }
+          },
+          "logistics": {
+            "n": 1,
+            "avg_words": 9.0,
+            "capitalization_ratio": 0.0,
+            "emoji_density": 0.0,
+            "pct_contraction": 1.0,
+            "pct_question": 0.0,
+            "pct_period": 0.0,
+            "pct_exclamation": 0.0,
+            "pct_lowercase": 1.0,
+            "pct_multi_sentence": 0.0,
+            "laughter": {},
+            "affirmation": {},
+            "intensifier": {},
+            "hedge": {},
+            "opener": {
+              "what": 1
+            }
+          },
+          "update": {
+            "n": 1,
+            "avg_words": 10.0,
+            "capitalization_ratio": 0.0,
+            "emoji_density": 0.0,
+            "pct_contraction": 0.0,
+            "pct_question": 0.0,
+            "pct_period": 0.0,
+            "pct_exclamation": 0.0,
+            "pct_lowercase": 1.0,
+            "pct_multi_sentence": 0.0,
+            "laughter": {},
+            "affirmation": {},
+            "intensifier": {},
+            "hedge": {},
+            "opener": {
+              "hey": 1
+            }
+          },
+          "general": {
+            "n": 3,
+            "avg_words": 4.0,
+            "capitalization_ratio": 0.03333333333333333,
+            "emoji_density": 0.0,
+            "pct_contraction": 0.3333333333333333,
+            "pct_question": 0.0,
+            "pct_period": 0.0,
+            "pct_exclamation": 0.3333333333333333,
+            "pct_lowercase": 0.6666666666666667,
+            "pct_multi_sentence": 0.3333333333333333,
+            "laughter": {},
+            "affirmation": {
+              "yeah": 1
+            },
+            "intensifier": {},
+            "hedge": {},
+            "opener": {
+              "cool": 1,
+              "yeah": 1,
+              "this": 1
+            }
+          }
+        },
+        "cadence": {
+          "avg_burst_size": 1.0,
+          "burst_count": 0
+        }
+      }
+    },
+    {
+      "index": 12,
+      "message": "when are we meeting? next week works for me, confirm the reservation",
+      "observables": {
+        "word_count": 12,
+        "message_length": 68,
+        "capitalization_ratio": 0.0,
+        "emoji_count": 0,
+        "emoji_density": 0.0,
+        "has_contraction": false,
+        "has_question": false,
+        "has_period": false,
+        "has_exclamation": false,
+        "is_all_lowercase": true,
+        "is_multi_sentence": false,
+        "laughter": [],
+        "affirmation": [],
+        "intensifiers": [],
+        "hedges": [],
+        "opener": "when",
+        "mode": "logistics"
+      },
+      "mode": "logistics",
+      "fingerprint_after": {
+        "message_count": 13,
+        "global": {
+          "n": 13,
+          "avg_words": 9.407543195999999,
+          "capitalization_ratio": 0.010289999999999997,
+          "emoji_density": 0.005879999999999999,
+          "pct_contraction": 0.5449098059999998,
+          "pct_question": 0.0,
+          "pct_period": 0.0,
+          "pct_exclamation": 0.10289999999999999,
+          "pct_lowercase": 0.8971,
+          "pct_multi_sentence": 0.10289999999999999,
+          "laughter": {
+            "haha": 2,
+            "lol": 1,
+            "lmao": 1
+          },
+          "affirmation": {
+            "yeah": 1
+          },
+          "intensifier": {
+            "so": 2
+          },
+          "hedge": {
+            "i think": 1,
+            "maybe": 1,
+            "probably": 1,
+            "not sure": 1
+          },
+          "opener": {
+            "i": 3,
+            "the": 1,
+            "haha": 2,
+            "what": 1,
+            "hey": 1,
+            "cool": 1,
+            "i'm": 1,
+            "yeah": 1,
+            "this": 1,
+            "when": 1
+          }
+        },
+        "modes": {
+          "emotional": {
+            "n": 2,
+            "avg_words": 10.0,
+            "capitalization_ratio": 0.0,
+            "emoji_density": 0.0,
+            "pct_contraction": 1.0,
+            "pct_question": 0.0,
+            "pct_period": 0.0,
+            "pct_exclamation": 0.0,
+            "pct_lowercase": 1.0,
+            "pct_multi_sentence": 0.0,
+            "laughter": {},
+            "affirmation": {},
+            "intensifier": {
+              "so": 1
+            },
+            "hedge": {},
+            "opener": {
+              "i": 1,
+              "i'm": 1
+            }
+          },
+          "analytical": {
+            "n": 2,
+            "avg_words": 14.0,
+            "capitalization_ratio": 0.0,
+            "emoji_density": 0.0,
+            "pct_contraction": 0.5,
+            "pct_question": 0.0,
+            "pct_period": 0.0,
+            "pct_exclamation": 0.0,
+            "pct_lowercase": 1.0,
+            "pct_multi_sentence": 0.0,
+            "laughter": {},
+            "affirmation": {},
+            "intensifier": {},
+            "hedge": {
+              "i think": 1,
+              "maybe": 1,
+              "probably": 1,
+              "not sure": 1
+            },
+            "opener": {
+              "the": 1,
+              "i": 1
+            }
+          },
+          "playful": {
+            "n": 2,
+            "avg_words": 5.5,
+            "capitalization_ratio": 0.0,
+            "emoji_density": 0.02,
+            "pct_contraction": 1.0,
+            "pct_question": 0.0,
+            "pct_period": 0.0,
+            "pct_exclamation": 0.0,
+            "pct_lowercase": 1.0,
+            "pct_multi_sentence": 0.0,
+            "laughter": {
+              "haha": 2,
+              "lol": 1,
+              "lmao": 1
+            },
+            "affirmation": {},
+            "intensifier": {
+              "so": 1
+            },
+            "hedge": {},
+            "opener": {
+              "haha": 2
+            }
+          },
+          "intimate": {
+            "n": 1,
+            "avg_words": 8.0,
+            "capitalization_ratio": 0.0,
+            "emoji_density": 0.0,
+            "pct_contraction": 0.0,
+            "pct_question": 0.0,
+            "pct_period": 0.0,
+            "pct_exclamation": 0.0,
+            "pct_lowercase": 1.0,
+            "pct_multi_sentence": 0.0,
+            "laughter": {},
+            "affirmation": {},
+            "intensifier": {},
+            "hedge": {},
+            "opener": {
+              "i": 1
+            }
+          },
+          "logistics": {
+            "n": 2,
+            "avg_words": 10.5,
+            "capitalization_ratio": 0.0,
+            "emoji_density": 0.0,
+            "pct_contraction": 0.5,
+            "pct_question": 0.0,
+            "pct_period": 0.0,
+            "pct_exclamation": 0.0,
+            "pct_lowercase": 1.0,
+            "pct_multi_sentence": 0.0,
+            "laughter": {},
+            "affirmation": {},
+            "intensifier": {},
+            "hedge": {},
+            "opener": {
+              "what": 1,
+              "when": 1
+            }
+          },
+          "update": {
+            "n": 1,
+            "avg_words": 10.0,
+            "capitalization_ratio": 0.0,
+            "emoji_density": 0.0,
+            "pct_contraction": 0.0,
+            "pct_question": 0.0,
+            "pct_period": 0.0,
+            "pct_exclamation": 0.0,
+            "pct_lowercase": 1.0,
+            "pct_multi_sentence": 0.0,
+            "laughter": {},
+            "affirmation": {},
+            "intensifier": {},
+            "hedge": {},
+            "opener": {
+              "hey": 1
+            }
+          },
+          "general": {
+            "n": 3,
+            "avg_words": 4.0,
+            "capitalization_ratio": 0.03333333333333333,
+            "emoji_density": 0.0,
+            "pct_contraction": 0.3333333333333333,
+            "pct_question": 0.0,
+            "pct_period": 0.0,
+            "pct_exclamation": 0.3333333333333333,
+            "pct_lowercase": 0.6666666666666667,
+            "pct_multi_sentence": 0.3333333333333333,
+            "laughter": {},
+            "affirmation": {
+              "yeah": 1
+            },
+            "intensifier": {},
+            "hedge": {},
+            "opener": {
+              "cool": 1,
+              "yeah": 1,
+              "this": 1
+            }
+          }
+        },
+        "cadence": {
+          "avg_burst_size": 1.0,
+          "burst_count": 0
+        }
+      }
+    },
+    {
+      "index": 13,
+      "message": "hi how's your day",
+      "observables": {
+        "word_count": 4,
+        "message_length": 17,
+        "capitalization_ratio": 0.0,
+        "emoji_count": 0,
+        "emoji_density": 0.0,
+        "has_contraction": true,
+        "has_question": false,
+        "has_period": false,
+        "has_exclamation": false,
+        "is_all_lowercase": true,
+        "is_multi_sentence": false,
+        "laughter": [],
+        "affirmation": [],
+        "intensifiers": [],
+        "hedges": [],
+        "opener": "hi",
+        "mode": "update"
+      },
+      "mode": "update",
+      "fingerprint_after": {
+        "message_count": 14,
+        "global": {
+          "n": 14,
+          "avg_words": 7.785280237199999,
+          "capitalization_ratio": 0.007202999999999998,
+          "emoji_density": 0.004115999999999999,
+          "pct_contraction": 0.6814368641999998,
+          "pct_question": 0.0,
+          "pct_period": 0.0,
+          "pct_exclamation": 0.07202999999999998,
+          "pct_lowercase": 0.92797,
+          "pct_multi_sentence": 0.07202999999999998,
+          "laughter": {
+            "haha": 2,
+            "lol": 1,
+            "lmao": 1
+          },
+          "affirmation": {
+            "yeah": 1
+          },
+          "intensifier": {
+            "so": 2
+          },
+          "hedge": {
+            "i think": 1,
+            "maybe": 1,
+            "probably": 1,
+            "not sure": 1
+          },
+          "opener": {
+            "i": 3,
+            "the": 1,
+            "haha": 2,
+            "what": 1,
+            "hey": 1,
+            "cool": 1,
+            "i'm": 1,
+            "yeah": 1,
+            "this": 1,
+            "when": 1,
+            "hi": 1
+          }
+        },
+        "modes": {
+          "emotional": {
+            "n": 2,
+            "avg_words": 10.0,
+            "capitalization_ratio": 0.0,
+            "emoji_density": 0.0,
+            "pct_contraction": 1.0,
+            "pct_question": 0.0,
+            "pct_period": 0.0,
+            "pct_exclamation": 0.0,
+            "pct_lowercase": 1.0,
+            "pct_multi_sentence": 0.0,
+            "laughter": {},
+            "affirmation": {},
+            "intensifier": {
+              "so": 1
+            },
+            "hedge": {},
+            "opener": {
+              "i": 1,
+              "i'm": 1
+            }
+          },
+          "analytical": {
+            "n": 2,
+            "avg_words": 14.0,
+            "capitalization_ratio": 0.0,
+            "emoji_density": 0.0,
+            "pct_contraction": 0.5,
+            "pct_question": 0.0,
+            "pct_period": 0.0,
+            "pct_exclamation": 0.0,
+            "pct_lowercase": 1.0,
+            "pct_multi_sentence": 0.0,
+            "laughter": {},
+            "affirmation": {},
+            "intensifier": {},
+            "hedge": {
+              "i think": 1,
+              "maybe": 1,
+              "probably": 1,
+              "not sure": 1
+            },
+            "opener": {
+              "the": 1,
+              "i": 1
+            }
+          },
+          "playful": {
+            "n": 2,
+            "avg_words": 5.5,
+            "capitalization_ratio": 0.0,
+            "emoji_density": 0.02,
+            "pct_contraction": 1.0,
+            "pct_question": 0.0,
+            "pct_period": 0.0,
+            "pct_exclamation": 0.0,
+            "pct_lowercase": 1.0,
+            "pct_multi_sentence": 0.0,
+            "laughter": {
+              "haha": 2,
+              "lol": 1,
+              "lmao": 1
+            },
+            "affirmation": {},
+            "intensifier": {
+              "so": 1
+            },
+            "hedge": {},
+            "opener": {
+              "haha": 2
+            }
+          },
+          "intimate": {
+            "n": 1,
+            "avg_words": 8.0,
+            "capitalization_ratio": 0.0,
+            "emoji_density": 0.0,
+            "pct_contraction": 0.0,
+            "pct_question": 0.0,
+            "pct_period": 0.0,
+            "pct_exclamation": 0.0,
+            "pct_lowercase": 1.0,
+            "pct_multi_sentence": 0.0,
+            "laughter": {},
+            "affirmation": {},
+            "intensifier": {},
+            "hedge": {},
+            "opener": {
+              "i": 1
+            }
+          },
+          "logistics": {
+            "n": 2,
+            "avg_words": 10.5,
+            "capitalization_ratio": 0.0,
+            "emoji_density": 0.0,
+            "pct_contraction": 0.5,
+            "pct_question": 0.0,
+            "pct_period": 0.0,
+            "pct_exclamation": 0.0,
+            "pct_lowercase": 1.0,
+            "pct_multi_sentence": 0.0,
+            "laughter": {},
+            "affirmation": {},
+            "intensifier": {},
+            "hedge": {},
+            "opener": {
+              "what": 1,
+              "when": 1
+            }
+          },
+          "update": {
+            "n": 2,
+            "avg_words": 7.0,
+            "capitalization_ratio": 0.0,
+            "emoji_density": 0.0,
+            "pct_contraction": 0.5,
+            "pct_question": 0.0,
+            "pct_period": 0.0,
+            "pct_exclamation": 0.0,
+            "pct_lowercase": 1.0,
+            "pct_multi_sentence": 0.0,
+            "laughter": {},
+            "affirmation": {},
+            "intensifier": {},
+            "hedge": {},
+            "opener": {
+              "hey": 1,
+              "hi": 1
+            }
+          },
+          "general": {
+            "n": 3,
+            "avg_words": 4.0,
+            "capitalization_ratio": 0.03333333333333333,
+            "emoji_density": 0.0,
+            "pct_contraction": 0.3333333333333333,
+            "pct_question": 0.0,
+            "pct_period": 0.0,
+            "pct_exclamation": 0.3333333333333333,
+            "pct_lowercase": 0.6666666666666667,
+            "pct_multi_sentence": 0.3333333333333333,
+            "laughter": {},
+            "affirmation": {
+              "yeah": 1
+            },
+            "intensifier": {},
+            "hedge": {},
+            "opener": {
+              "cool": 1,
+              "yeah": 1,
+              "this": 1
+            }
+          }
+        },
+        "cadence": {
+          "avg_burst_size": 1.0,
+          "burst_count": 0
+        }
+      }
+    },
+    {
+      "index": 14,
+      "message": "i'm really so stressed honestly, i literally can't deal",
+      "observables": {
+        "word_count": 9,
+        "message_length": 55,
+        "capitalization_ratio": 0.0,
+        "emoji_count": 0,
+        "emoji_density": 0.0,
+        "has_contraction": true,
+        "has_question": false,
+        "has_period": false,
+        "has_exclamation": false,
+        "is_all_lowercase": true,
+        "is_multi_sentence": false,
+        "laughter": [],
+        "affirmation": [],
+        "intensifiers": [
+          "so",
+          "really",
+          "literally",
+          "honestly"
+        ],
+        "hedges": [],
+        "opener": "i'm",
+        "mode": "general"
+      },
+      "mode": "general",
+      "fingerprint_after": {
+        "message_count": 15,
+        "global": {
+          "n": 15,
+          "avg_words": 8.149696166039998,
+          "capitalization_ratio": 0.005042099999999998,
+          "emoji_density": 0.002881199999999999,
+          "pct_contraction": 0.7770058049399998,
+          "pct_question": 0.0,
+          "pct_period": 0.0,
+          "pct_exclamation": 0.05042099999999999,
+          "pct_lowercase": 0.949579,
+          "pct_multi_sentence": 0.05042099999999999,
+          "laughter": {
+            "haha": 2,
+            "lol": 1,
+            "lmao": 1
+          },
+          "affirmation": {
+            "yeah": 1
+          },
+          "intensifier": {
+            "so": 3,
+            "really": 1,
+            "literally": 1,
+            "honestly": 1
+          },
+          "hedge": {
+            "i think": 1,
+            "maybe": 1,
+            "probably": 1,
+            "not sure": 1
+          },
+          "opener": {
+            "i": 3,
+            "the": 1,
+            "haha": 2,
+            "what": 1,
+            "hey": 1,
+            "cool": 1,
+            "i'm": 2,
+            "yeah": 1,
+            "this": 1,
+            "when": 1,
+            "hi": 1
+          }
+        },
+        "modes": {
+          "emotional": {
+            "n": 2,
+            "avg_words": 10.0,
+            "capitalization_ratio": 0.0,
+            "emoji_density": 0.0,
+            "pct_contraction": 1.0,
+            "pct_question": 0.0,
+            "pct_period": 0.0,
+            "pct_exclamation": 0.0,
+            "pct_lowercase": 1.0,
+            "pct_multi_sentence": 0.0,
+            "laughter": {},
+            "affirmation": {},
+            "intensifier": {
+              "so": 1
+            },
+            "hedge": {},
+            "opener": {
+              "i": 1,
+              "i'm": 1
+            }
+          },
+          "analytical": {
+            "n": 2,
+            "avg_words": 14.0,
+            "capitalization_ratio": 0.0,
+            "emoji_density": 0.0,
+            "pct_contraction": 0.5,
+            "pct_question": 0.0,
+            "pct_period": 0.0,
+            "pct_exclamation": 0.0,
+            "pct_lowercase": 1.0,
+            "pct_multi_sentence": 0.0,
+            "laughter": {},
+            "affirmation": {},
+            "intensifier": {},
+            "hedge": {
+              "i think": 1,
+              "maybe": 1,
+              "probably": 1,
+              "not sure": 1
+            },
+            "opener": {
+              "the": 1,
+              "i": 1
+            }
+          },
+          "playful": {
+            "n": 2,
+            "avg_words": 5.5,
+            "capitalization_ratio": 0.0,
+            "emoji_density": 0.02,
+            "pct_contraction": 1.0,
+            "pct_question": 0.0,
+            "pct_period": 0.0,
+            "pct_exclamation": 0.0,
+            "pct_lowercase": 1.0,
+            "pct_multi_sentence": 0.0,
+            "laughter": {
+              "haha": 2,
+              "lol": 1,
+              "lmao": 1
+            },
+            "affirmation": {},
+            "intensifier": {
+              "so": 1
+            },
+            "hedge": {},
+            "opener": {
+              "haha": 2
+            }
+          },
+          "intimate": {
+            "n": 1,
+            "avg_words": 8.0,
+            "capitalization_ratio": 0.0,
+            "emoji_density": 0.0,
+            "pct_contraction": 0.0,
+            "pct_question": 0.0,
+            "pct_period": 0.0,
+            "pct_exclamation": 0.0,
+            "pct_lowercase": 1.0,
+            "pct_multi_sentence": 0.0,
+            "laughter": {},
+            "affirmation": {},
+            "intensifier": {},
+            "hedge": {},
+            "opener": {
+              "i": 1
+            }
+          },
+          "logistics": {
+            "n": 2,
+            "avg_words": 10.5,
+            "capitalization_ratio": 0.0,
+            "emoji_density": 0.0,
+            "pct_contraction": 0.5,
+            "pct_question": 0.0,
+            "pct_period": 0.0,
+            "pct_exclamation": 0.0,
+            "pct_lowercase": 1.0,
+            "pct_multi_sentence": 0.0,
+            "laughter": {},
+            "affirmation": {},
+            "intensifier": {},
+            "hedge": {},
+            "opener": {
+              "what": 1,
+              "when": 1
+            }
+          },
+          "update": {
+            "n": 2,
+            "avg_words": 7.0,
+            "capitalization_ratio": 0.0,
+            "emoji_density": 0.0,
+            "pct_contraction": 0.5,
+            "pct_question": 0.0,
+            "pct_period": 0.0,
+            "pct_exclamation": 0.0,
+            "pct_lowercase": 1.0,
+            "pct_multi_sentence": 0.0,
+            "laughter": {},
+            "affirmation": {},
+            "intensifier": {},
+            "hedge": {},
+            "opener": {
+              "hey": 1,
+              "hi": 1
+            }
+          },
+          "general": {
+            "n": 4,
+            "avg_words": 5.25,
+            "capitalization_ratio": 0.025,
+            "emoji_density": 0.0,
+            "pct_contraction": 0.5,
+            "pct_question": 0.0,
+            "pct_period": 0.0,
+            "pct_exclamation": 0.25,
+            "pct_lowercase": 0.75,
+            "pct_multi_sentence": 0.25,
+            "laughter": {},
+            "affirmation": {
+              "yeah": 1
+            },
+            "intensifier": {
+              "so": 1,
+              "really": 1,
+              "literally": 1,
+              "honestly": 1
+            },
+            "hedge": {},
+            "opener": {
+              "cool": 1,
+              "yeah": 1,
+              "this": 1,
+              "i'm": 1
+            }
+          }
+        },
+        "cadence": {
+          "avg_burst_size": 1.0,
+          "burst_count": 0
+        }
+      }
+    },
+    {
+      "index": 15,
+      "message": "haha baby that's wild",
+      "observables": {
+        "word_count": 4,
+        "message_length": 21,
+        "capitalization_ratio": 0.0,
+        "emoji_count": 0,
+        "emoji_density": 0.0,
+        "has_contraction": true,
+        "has_question": false,
+        "has_period": false,
+        "has_exclamation": false,
+        "is_all_lowercase": true,
+        "is_multi_sentence": false,
+        "laughter": [
+          "haha"
+        ],
+        "affirmation": [],
+        "intensifiers": [],
+        "hedges": [],
+        "opener": "haha",
+        "mode": "playful"
+      },
+      "mode": "playful",
+      "fingerprint_after": {
+        "message_count": 16,
+        "global": {
+          "n": 16,
+          "avg_words": 6.904787316227998,
+          "capitalization_ratio": 0.0035294699999999985,
+          "emoji_density": 0.0020168399999999993,
+          "pct_contraction": 0.8439040634579997,
+          "pct_question": 0.0,
+          "pct_period": 0.0,
+          "pct_exclamation": 0.03529469999999999,
+          "pct_lowercase": 0.9647052999999999,
+          "pct_multi_sentence": 0.03529469999999999,
+          "laughter": {
+            "haha": 3,
+            "lol": 1,
+            "lmao": 1
+          },
+          "affirmation": {
+            "yeah": 1
+          },
+          "intensifier": {
+            "so": 3,
+            "really": 1,
+            "literally": 1,
+            "honestly": 1
+          },
+          "hedge": {
+            "i think": 1,
+            "maybe": 1,
+            "probably": 1,
+            "not sure": 1
+          },
+          "opener": {
+            "i": 3,
+            "the": 1,
+            "haha": 3,
+            "what": 1,
+            "hey": 1,
+            "cool": 1,
+            "i'm": 2,
+            "yeah": 1,
+            "this": 1,
+            "when": 1,
+            "hi": 1
+          }
+        },
+        "modes": {
+          "emotional": {
+            "n": 2,
+            "avg_words": 10.0,
+            "capitalization_ratio": 0.0,
+            "emoji_density": 0.0,
+            "pct_contraction": 1.0,
+            "pct_question": 0.0,
+            "pct_period": 0.0,
+            "pct_exclamation": 0.0,
+            "pct_lowercase": 1.0,
+            "pct_multi_sentence": 0.0,
+            "laughter": {},
+            "affirmation": {},
+            "intensifier": {
+              "so": 1
+            },
+            "hedge": {},
+            "opener": {
+              "i": 1,
+              "i'm": 1
+            }
+          },
+          "analytical": {
+            "n": 2,
+            "avg_words": 14.0,
+            "capitalization_ratio": 0.0,
+            "emoji_density": 0.0,
+            "pct_contraction": 0.5,
+            "pct_question": 0.0,
+            "pct_period": 0.0,
+            "pct_exclamation": 0.0,
+            "pct_lowercase": 1.0,
+            "pct_multi_sentence": 0.0,
+            "laughter": {},
+            "affirmation": {},
+            "intensifier": {},
+            "hedge": {
+              "i think": 1,
+              "maybe": 1,
+              "probably": 1,
+              "not sure": 1
+            },
+            "opener": {
+              "the": 1,
+              "i": 1
+            }
+          },
+          "playful": {
+            "n": 3,
+            "avg_words": 5.0,
+            "capitalization_ratio": 0.0,
+            "emoji_density": 0.013333333333333336,
+            "pct_contraction": 1.0,
+            "pct_question": 0.0,
+            "pct_period": 0.0,
+            "pct_exclamation": 0.0,
+            "pct_lowercase": 1.0,
+            "pct_multi_sentence": 0.0,
+            "laughter": {
+              "haha": 3,
+              "lol": 1,
+              "lmao": 1
+            },
+            "affirmation": {},
+            "intensifier": {
+              "so": 1
+            },
+            "hedge": {},
+            "opener": {
+              "haha": 3
+            }
+          },
+          "intimate": {
+            "n": 1,
+            "avg_words": 8.0,
+            "capitalization_ratio": 0.0,
+            "emoji_density": 0.0,
+            "pct_contraction": 0.0,
+            "pct_question": 0.0,
+            "pct_period": 0.0,
+            "pct_exclamation": 0.0,
+            "pct_lowercase": 1.0,
+            "pct_multi_sentence": 0.0,
+            "laughter": {},
+            "affirmation": {},
+            "intensifier": {},
+            "hedge": {},
+            "opener": {
+              "i": 1
+            }
+          },
+          "logistics": {
+            "n": 2,
+            "avg_words": 10.5,
+            "capitalization_ratio": 0.0,
+            "emoji_density": 0.0,
+            "pct_contraction": 0.5,
+            "pct_question": 0.0,
+            "pct_period": 0.0,
+            "pct_exclamation": 0.0,
+            "pct_lowercase": 1.0,
+            "pct_multi_sentence": 0.0,
+            "laughter": {},
+            "affirmation": {},
+            "intensifier": {},
+            "hedge": {},
+            "opener": {
+              "what": 1,
+              "when": 1
+            }
+          },
+          "update": {
+            "n": 2,
+            "avg_words": 7.0,
+            "capitalization_ratio": 0.0,
+            "emoji_density": 0.0,
+            "pct_contraction": 0.5,
+            "pct_question": 0.0,
+            "pct_period": 0.0,
+            "pct_exclamation": 0.0,
+            "pct_lowercase": 1.0,
+            "pct_multi_sentence": 0.0,
+            "laughter": {},
+            "affirmation": {},
+            "intensifier": {},
+            "hedge": {},
+            "opener": {
+              "hey": 1,
+              "hi": 1
+            }
+          },
+          "general": {
+            "n": 4,
+            "avg_words": 5.25,
+            "capitalization_ratio": 0.025,
+            "emoji_density": 0.0,
+            "pct_contraction": 0.5,
+            "pct_question": 0.0,
+            "pct_period": 0.0,
+            "pct_exclamation": 0.25,
+            "pct_lowercase": 0.75,
+            "pct_multi_sentence": 0.25,
+            "laughter": {},
+            "affirmation": {
+              "yeah": 1
+            },
+            "intensifier": {
+              "so": 1,
+              "really": 1,
+              "literally": 1,
+              "honestly": 1
+            },
+            "hedge": {},
+            "opener": {
+              "cool": 1,
+              "yeah": 1,
+              "this": 1,
+              "i'm": 1
+            }
+          }
+        },
+        "cadence": {
+          "avg_burst_size": 1.0,
+          "burst_count": 0
+        }
+      }
+    },
+    {
+      "index": 16,
+      "message": "THIS IS IMPORTANT",
+      "observables": {
+        "word_count": 3,
+        "message_length": 17,
+        "capitalization_ratio": 1.0,
+        "emoji_count": 0,
+        "emoji_density": 0.0,
+        "has_contraction": false,
+        "has_question": false,
+        "has_period": false,
+        "has_exclamation": false,
+        "is_all_lowercase": false,
+        "is_multi_sentence": false,
+        "laughter": [],
+        "affirmation": [],
+        "intensifiers": [],
+        "hedges": [],
+        "opener": "this",
+        "mode": "general"
+      },
+      "mode": "general",
+      "fingerprint_after": {
+        "message_count": 17,
+        "global": {
+          "n": 17,
+          "avg_words": 5.733351121359599,
+          "capitalization_ratio": 0.302470629,
+          "emoji_density": 0.0014117879999999995,
+          "pct_contraction": 0.5907328444205998,
+          "pct_question": 0.0,
+          "pct_period": 0.0,
+          "pct_exclamation": 0.024706289999999992,
+          "pct_lowercase": 0.6752937099999998,
+          "pct_multi_sentence": 0.024706289999999992,
+          "laughter": {
+            "haha": 3,
+            "lol": 1,
+            "lmao": 1
+          },
+          "affirmation": {
+            "yeah": 1
+          },
+          "intensifier": {
+            "so": 3,
+            "really": 1,
+            "literally": 1,
+            "honestly": 1
+          },
+          "hedge": {
+            "i think": 1,
+            "maybe": 1,
+            "probably": 1,
+            "not sure": 1
+          },
+          "opener": {
+            "i": 3,
+            "the": 1,
+            "haha": 3,
+            "what": 1,
+            "hey": 1,
+            "cool": 1,
+            "i'm": 2,
+            "yeah": 1,
+            "this": 2,
+            "when": 1,
+            "hi": 1
+          }
+        },
+        "modes": {
+          "emotional": {
+            "n": 2,
+            "avg_words": 10.0,
+            "capitalization_ratio": 0.0,
+            "emoji_density": 0.0,
+            "pct_contraction": 1.0,
+            "pct_question": 0.0,
+            "pct_period": 0.0,
+            "pct_exclamation": 0.0,
+            "pct_lowercase": 1.0,
+            "pct_multi_sentence": 0.0,
+            "laughter": {},
+            "affirmation": {},
+            "intensifier": {
+              "so": 1
+            },
+            "hedge": {},
+            "opener": {
+              "i": 1,
+              "i'm": 1
+            }
+          },
+          "analytical": {
+            "n": 2,
+            "avg_words": 14.0,
+            "capitalization_ratio": 0.0,
+            "emoji_density": 0.0,
+            "pct_contraction": 0.5,
+            "pct_question": 0.0,
+            "pct_period": 0.0,
+            "pct_exclamation": 0.0,
+            "pct_lowercase": 1.0,
+            "pct_multi_sentence": 0.0,
+            "laughter": {},
+            "affirmation": {},
+            "intensifier": {},
+            "hedge": {
+              "i think": 1,
+              "maybe": 1,
+              "probably": 1,
+              "not sure": 1
+            },
+            "opener": {
+              "the": 1,
+              "i": 1
+            }
+          },
+          "playful": {
+            "n": 3,
+            "avg_words": 5.0,
+            "capitalization_ratio": 0.0,
+            "emoji_density": 0.013333333333333336,
+            "pct_contraction": 1.0,
+            "pct_question": 0.0,
+            "pct_period": 0.0,
+            "pct_exclamation": 0.0,
+            "pct_lowercase": 1.0,
+            "pct_multi_sentence": 0.0,
+            "laughter": {
+              "haha": 3,
+              "lol": 1,
+              "lmao": 1
+            },
+            "affirmation": {},
+            "intensifier": {
+              "so": 1
+            },
+            "hedge": {},
+            "opener": {
+              "haha": 3
+            }
+          },
+          "intimate": {
+            "n": 1,
+            "avg_words": 8.0,
+            "capitalization_ratio": 0.0,
+            "emoji_density": 0.0,
+            "pct_contraction": 0.0,
+            "pct_question": 0.0,
+            "pct_period": 0.0,
+            "pct_exclamation": 0.0,
+            "pct_lowercase": 1.0,
+            "pct_multi_sentence": 0.0,
+            "laughter": {},
+            "affirmation": {},
+            "intensifier": {},
+            "hedge": {},
+            "opener": {
+              "i": 1
+            }
+          },
+          "logistics": {
+            "n": 2,
+            "avg_words": 10.5,
+            "capitalization_ratio": 0.0,
+            "emoji_density": 0.0,
+            "pct_contraction": 0.5,
+            "pct_question": 0.0,
+            "pct_period": 0.0,
+            "pct_exclamation": 0.0,
+            "pct_lowercase": 1.0,
+            "pct_multi_sentence": 0.0,
+            "laughter": {},
+            "affirmation": {},
+            "intensifier": {},
+            "hedge": {},
+            "opener": {
+              "what": 1,
+              "when": 1
+            }
+          },
+          "update": {
+            "n": 2,
+            "avg_words": 7.0,
+            "capitalization_ratio": 0.0,
+            "emoji_density": 0.0,
+            "pct_contraction": 0.5,
+            "pct_question": 0.0,
+            "pct_period": 0.0,
+            "pct_exclamation": 0.0,
+            "pct_lowercase": 1.0,
+            "pct_multi_sentence": 0.0,
+            "laughter": {},
+            "affirmation": {},
+            "intensifier": {},
+            "hedge": {},
+            "opener": {
+              "hey": 1,
+              "hi": 1
+            }
+          },
+          "general": {
+            "n": 5,
+            "avg_words": 4.800000000000001,
+            "capitalization_ratio": 0.22000000000000003,
+            "emoji_density": 0.0,
+            "pct_contraction": 0.4,
+            "pct_question": 0.0,
+            "pct_period": 0.0,
+            "pct_exclamation": 0.2,
+            "pct_lowercase": 0.6000000000000001,
+            "pct_multi_sentence": 0.2,
+            "laughter": {},
+            "affirmation": {
+              "yeah": 1
+            },
+            "intensifier": {
+              "so": 1,
+              "really": 1,
+              "literally": 1,
+              "honestly": 1
+            },
+            "hedge": {},
+            "opener": {
+              "cool": 1,
+              "yeah": 1,
+              "this": 2,
+              "i'm": 1
+            }
+          }
+        },
+        "cadence": {
+          "avg_burst_size": 1.0,
+          "burst_count": 0
+        }
+      }
+    },
+    {
+      "index": 17,
+      "message": "i'm don't think we're they're it's",
+      "observables": {
+        "word_count": 6,
+        "message_length": 34,
+        "capitalization_ratio": 0.0,
+        "emoji_count": 0,
+        "emoji_density": 0.0,
+        "has_contraction": true,
+        "has_question": false,
+        "has_period": false,
+        "has_exclamation": false,
+        "is_all_lowercase": true,
+        "is_multi_sentence": false,
+        "laughter": [],
+        "affirmation": [],
+        "intensifiers": [],
+        "hedges": [],
+        "opener": "i'm",
+        "mode": "general"
+      },
+      "mode": "general",
+      "fingerprint_after": {
+        "message_count": 18,
+        "global": {
+          "n": 18,
+          "avg_words": 5.813345784951719,
+          "capitalization_ratio": 0.2117294403,
+          "emoji_density": 0.0009882515999999997,
+          "pct_contraction": 0.7135129910944198,
+          "pct_question": 0.0,
+          "pct_period": 0.0,
+          "pct_exclamation": 0.017294402999999993,
+          "pct_lowercase": 0.7727055969999999,
+          "pct_multi_sentence": 0.017294402999999993,
+          "laughter": {
+            "haha": 3,
+            "lol": 1,
+            "lmao": 1
+          },
+          "affirmation": {
+            "yeah": 1
+          },
+          "intensifier": {
+            "so": 3,
+            "really": 1,
+            "literally": 1,
+            "honestly": 1
+          },
+          "hedge": {
+            "i think": 1,
+            "maybe": 1,
+            "probably": 1,
+            "not sure": 1
+          },
+          "opener": {
+            "i": 3,
+            "the": 1,
+            "haha": 3,
+            "what": 1,
+            "hey": 1,
+            "cool": 1,
+            "i'm": 3,
+            "yeah": 1,
+            "this": 2,
+            "when": 1,
+            "hi": 1
+          }
+        },
+        "modes": {
+          "emotional": {
+            "n": 2,
+            "avg_words": 10.0,
+            "capitalization_ratio": 0.0,
+            "emoji_density": 0.0,
+            "pct_contraction": 1.0,
+            "pct_question": 0.0,
+            "pct_period": 0.0,
+            "pct_exclamation": 0.0,
+            "pct_lowercase": 1.0,
+            "pct_multi_sentence": 0.0,
+            "laughter": {},
+            "affirmation": {},
+            "intensifier": {
+              "so": 1
+            },
+            "hedge": {},
+            "opener": {
+              "i": 1,
+              "i'm": 1
+            }
+          },
+          "analytical": {
+            "n": 2,
+            "avg_words": 14.0,
+            "capitalization_ratio": 0.0,
+            "emoji_density": 0.0,
+            "pct_contraction": 0.5,
+            "pct_question": 0.0,
+            "pct_period": 0.0,
+            "pct_exclamation": 0.0,
+            "pct_lowercase": 1.0,
+            "pct_multi_sentence": 0.0,
+            "laughter": {},
+            "affirmation": {},
+            "intensifier": {},
+            "hedge": {
+              "i think": 1,
+              "maybe": 1,
+              "probably": 1,
+              "not sure": 1
+            },
+            "opener": {
+              "the": 1,
+              "i": 1
+            }
+          },
+          "playful": {
+            "n": 3,
+            "avg_words": 5.0,
+            "capitalization_ratio": 0.0,
+            "emoji_density": 0.013333333333333336,
+            "pct_contraction": 1.0,
+            "pct_question": 0.0,
+            "pct_period": 0.0,
+            "pct_exclamation": 0.0,
+            "pct_lowercase": 1.0,
+            "pct_multi_sentence": 0.0,
+            "laughter": {
+              "haha": 3,
+              "lol": 1,
+              "lmao": 1
+            },
+            "affirmation": {},
+            "intensifier": {
+              "so": 1
+            },
+            "hedge": {},
+            "opener": {
+              "haha": 3
+            }
+          },
+          "intimate": {
+            "n": 1,
+            "avg_words": 8.0,
+            "capitalization_ratio": 0.0,
+            "emoji_density": 0.0,
+            "pct_contraction": 0.0,
+            "pct_question": 0.0,
+            "pct_period": 0.0,
+            "pct_exclamation": 0.0,
+            "pct_lowercase": 1.0,
+            "pct_multi_sentence": 0.0,
+            "laughter": {},
+            "affirmation": {},
+            "intensifier": {},
+            "hedge": {},
+            "opener": {
+              "i": 1
+            }
+          },
+          "logistics": {
+            "n": 2,
+            "avg_words": 10.5,
+            "capitalization_ratio": 0.0,
+            "emoji_density": 0.0,
+            "pct_contraction": 0.5,
+            "pct_question": 0.0,
+            "pct_period": 0.0,
+            "pct_exclamation": 0.0,
+            "pct_lowercase": 1.0,
+            "pct_multi_sentence": 0.0,
+            "laughter": {},
+            "affirmation": {},
+            "intensifier": {},
+            "hedge": {},
+            "opener": {
+              "what": 1,
+              "when": 1
+            }
+          },
+          "update": {
+            "n": 2,
+            "avg_words": 7.0,
+            "capitalization_ratio": 0.0,
+            "emoji_density": 0.0,
+            "pct_contraction": 0.5,
+            "pct_question": 0.0,
+            "pct_period": 0.0,
+            "pct_exclamation": 0.0,
+            "pct_lowercase": 1.0,
+            "pct_multi_sentence": 0.0,
+            "laughter": {},
+            "affirmation": {},
+            "intensifier": {},
+            "hedge": {},
+            "opener": {
+              "hey": 1,
+              "hi": 1
+            }
+          },
+          "general": {
+            "n": 6,
+            "avg_words": 5.16,
+            "capitalization_ratio": 0.154,
+            "emoji_density": 0.0,
+            "pct_contraction": 0.58,
+            "pct_question": 0.0,
+            "pct_period": 0.0,
+            "pct_exclamation": 0.13999999999999999,
+            "pct_lowercase": 0.72,
+            "pct_multi_sentence": 0.13999999999999999,
+            "laughter": {},
+            "affirmation": {
+              "yeah": 1
+            },
+            "intensifier": {
+              "so": 1,
+              "really": 1,
+              "literally": 1,
+              "honestly": 1
+            },
+            "hedge": {},
+            "opener": {
+              "cool": 1,
+              "yeah": 1,
+              "this": 2,
+              "i'm": 2
+            }
+          }
+        },
+        "cadence": {
+          "avg_burst_size": 1.0,
+          "burst_count": 0
+        }
+      }
+    },
+    {
+      "index": 18,
+      "message": "ok",
+      "observables": {
+        "word_count": 1,
+        "message_length": 2,
+        "capitalization_ratio": 0.0,
+        "emoji_count": 0,
+        "emoji_density": 0.0,
+        "has_contraction": false,
+        "has_question": false,
+        "has_period": false,
+        "has_exclamation": false,
+        "is_all_lowercase": true,
+        "is_multi_sentence": false,
+        "laughter": [],
+        "affirmation": [
+          "okay"
+        ],
+        "intensifiers": [],
+        "hedges": [],
+        "opener": "ok",
+        "mode": "general"
+      },
+      "mode": "general",
+      "fingerprint_after": {
+        "message_count": 19,
+        "global": {
+          "n": 19,
+          "avg_words": 4.369342049466202,
+          "capitalization_ratio": 0.14821060820999998,
+          "emoji_density": 0.0006917761199999997,
+          "pct_contraction": 0.4994590937660938,
+          "pct_question": 0.0,
+          "pct_period": 0.0,
+          "pct_exclamation": 0.012106082099999995,
+          "pct_lowercase": 0.8408939178999999,
+          "pct_multi_sentence": 0.012106082099999995,
+          "laughter": {
+            "haha": 3,
+            "lol": 1,
+            "lmao": 1
+          },
+          "affirmation": {
+            "yeah": 1,
+            "okay": 1
+          },
+          "intensifier": {
+            "so": 3,
+            "really": 1,
+            "literally": 1,
+            "honestly": 1
+          },
+          "hedge": {
+            "i think": 1,
+            "maybe": 1,
+            "probably": 1,
+            "not sure": 1
+          },
+          "opener": {
+            "i": 3,
+            "the": 1,
+            "haha": 3,
+            "what": 1,
+            "hey": 1,
+            "cool": 1,
+            "i'm": 3,
+            "yeah": 1,
+            "this": 2,
+            "when": 1,
+            "hi": 1,
+            "ok": 1
+          }
+        },
+        "modes": {
+          "emotional": {
+            "n": 2,
+            "avg_words": 10.0,
+            "capitalization_ratio": 0.0,
+            "emoji_density": 0.0,
+            "pct_contraction": 1.0,
+            "pct_question": 0.0,
+            "pct_period": 0.0,
+            "pct_exclamation": 0.0,
+            "pct_lowercase": 1.0,
+            "pct_multi_sentence": 0.0,
+            "laughter": {},
+            "affirmation": {},
+            "intensifier": {
+              "so": 1
+            },
+            "hedge": {},
+            "opener": {
+              "i": 1,
+              "i'm": 1
+            }
+          },
+          "analytical": {
+            "n": 2,
+            "avg_words": 14.0,
+            "capitalization_ratio": 0.0,
+            "emoji_density": 0.0,
+            "pct_contraction": 0.5,
+            "pct_question": 0.0,
+            "pct_period": 0.0,
+            "pct_exclamation": 0.0,
+            "pct_lowercase": 1.0,
+            "pct_multi_sentence": 0.0,
+            "laughter": {},
+            "affirmation": {},
+            "intensifier": {},
+            "hedge": {
+              "i think": 1,
+              "maybe": 1,
+              "probably": 1,
+              "not sure": 1
+            },
+            "opener": {
+              "the": 1,
+              "i": 1
+            }
+          },
+          "playful": {
+            "n": 3,
+            "avg_words": 5.0,
+            "capitalization_ratio": 0.0,
+            "emoji_density": 0.013333333333333336,
+            "pct_contraction": 1.0,
+            "pct_question": 0.0,
+            "pct_period": 0.0,
+            "pct_exclamation": 0.0,
+            "pct_lowercase": 1.0,
+            "pct_multi_sentence": 0.0,
+            "laughter": {
+              "haha": 3,
+              "lol": 1,
+              "lmao": 1
+            },
+            "affirmation": {},
+            "intensifier": {
+              "so": 1
+            },
+            "hedge": {},
+            "opener": {
+              "haha": 3
+            }
+          },
+          "intimate": {
+            "n": 1,
+            "avg_words": 8.0,
+            "capitalization_ratio": 0.0,
+            "emoji_density": 0.0,
+            "pct_contraction": 0.0,
+            "pct_question": 0.0,
+            "pct_period": 0.0,
+            "pct_exclamation": 0.0,
+            "pct_lowercase": 1.0,
+            "pct_multi_sentence": 0.0,
+            "laughter": {},
+            "affirmation": {},
+            "intensifier": {},
+            "hedge": {},
+            "opener": {
+              "i": 1
+            }
+          },
+          "logistics": {
+            "n": 2,
+            "avg_words": 10.5,
+            "capitalization_ratio": 0.0,
+            "emoji_density": 0.0,
+            "pct_contraction": 0.5,
+            "pct_question": 0.0,
+            "pct_period": 0.0,
+            "pct_exclamation": 0.0,
+            "pct_lowercase": 1.0,
+            "pct_multi_sentence": 0.0,
+            "laughter": {},
+            "affirmation": {},
+            "intensifier": {},
+            "hedge": {},
+            "opener": {
+              "what": 1,
+              "when": 1
+            }
+          },
+          "update": {
+            "n": 2,
+            "avg_words": 7.0,
+            "capitalization_ratio": 0.0,
+            "emoji_density": 0.0,
+            "pct_contraction": 0.5,
+            "pct_question": 0.0,
+            "pct_period": 0.0,
+            "pct_exclamation": 0.0,
+            "pct_lowercase": 1.0,
+            "pct_multi_sentence": 0.0,
+            "laughter": {},
+            "affirmation": {},
+            "intensifier": {},
+            "hedge": {},
+            "opener": {
+              "hey": 1,
+              "hi": 1
+            }
+          },
+          "general": {
+            "n": 7,
+            "avg_words": 3.9119999999999995,
+            "capitalization_ratio": 0.10779999999999999,
+            "emoji_density": 0.0,
+            "pct_contraction": 0.40599999999999997,
+            "pct_question": 0.0,
+            "pct_period": 0.0,
+            "pct_exclamation": 0.09799999999999999,
+            "pct_lowercase": 0.804,
+            "pct_multi_sentence": 0.09799999999999999,
+            "laughter": {},
+            "affirmation": {
+              "yeah": 1,
+              "okay": 1
+            },
+            "intensifier": {
+              "so": 1,
+              "really": 1,
+              "literally": 1,
+              "honestly": 1
+            },
+            "hedge": {},
+            "opener": {
+              "cool": 1,
+              "yeah": 1,
+              "this": 2,
+              "i'm": 2,
+              "ok": 1
+            }
+          }
+        },
+        "cadence": {
+          "avg_burst_size": 1.0,
+          "burst_count": 0
+        }
+      }
+    },
+    {
+      "index": 19,
+      "message": "haha ahaha that was funny",
+      "observables": {
+        "word_count": 5,
+        "message_length": 25,
+        "capitalization_ratio": 0.0,
+        "emoji_count": 0,
+        "emoji_density": 0.0,
+        "has_contraction": false,
+        "has_question": false,
+        "has_period": false,
+        "has_exclamation": false,
+        "is_all_lowercase": true,
+        "is_multi_sentence": false,
+        "laughter": [
+          "haha",
+          "haha"
+        ],
+        "affirmation": [],
+        "intensifiers": [],
+        "hedges": [],
+        "opener": "haha",
+        "mode": "playful"
+      },
+      "mode": "playful",
+      "fingerprint_after": {
+        "message_count": 20,
+        "global": {
+          "n": 20,
+          "avg_words": 4.558539434626342,
+          "capitalization_ratio": 0.10374742574699998,
+          "emoji_density": 0.00048424328399999976,
+          "pct_contraction": 0.34962136563626567,
+          "pct_question": 0.0,
+          "pct_period": 0.0,
+          "pct_exclamation": 0.008474257469999996,
+          "pct_lowercase": 0.8886257425299999,
+          "pct_multi_sentence": 0.008474257469999996,
+          "laughter": {
+            "haha": 5,
+            "lol": 1,
+            "lmao": 1
+          },
+          "affirmation": {
+            "yeah": 1,
+            "okay": 1
+          },
+          "intensifier": {
+            "so": 3,
+            "really": 1,
+            "literally": 1,
+            "honestly": 1
+          },
+          "hedge": {
+            "i think": 1,
+            "maybe": 1,
+            "probably": 1,
+            "not sure": 1
+          },
+          "opener": {
+            "i": 3,
+            "the": 1,
+            "haha": 4,
+            "what": 1,
+            "hey": 1,
+            "cool": 1,
+            "i'm": 3,
+            "yeah": 1,
+            "this": 2,
+            "when": 1,
+            "hi": 1,
+            "ok": 1
+          }
+        },
+        "modes": {
+          "emotional": {
+            "n": 2,
+            "avg_words": 10.0,
+            "capitalization_ratio": 0.0,
+            "emoji_density": 0.0,
+            "pct_contraction": 1.0,
+            "pct_question": 0.0,
+            "pct_period": 0.0,
+            "pct_exclamation": 0.0,
+            "pct_lowercase": 1.0,
+            "pct_multi_sentence": 0.0,
+            "laughter": {},
+            "affirmation": {},
+            "intensifier": {
+              "so": 1
+            },
+            "hedge": {},
+            "opener": {
+              "i": 1,
+              "i'm": 1
+            }
+          },
+          "analytical": {
+            "n": 2,
+            "avg_words": 14.0,
+            "capitalization_ratio": 0.0,
+            "emoji_density": 0.0,
+            "pct_contraction": 0.5,
+            "pct_question": 0.0,
+            "pct_period": 0.0,
+            "pct_exclamation": 0.0,
+            "pct_lowercase": 1.0,
+            "pct_multi_sentence": 0.0,
+            "laughter": {},
+            "affirmation": {},
+            "intensifier": {},
+            "hedge": {
+              "i think": 1,
+              "maybe": 1,
+              "probably": 1,
+              "not sure": 1
+            },
+            "opener": {
+              "the": 1,
+              "i": 1
+            }
+          },
+          "playful": {
+            "n": 4,
+            "avg_words": 5.0,
+            "capitalization_ratio": 0.0,
+            "emoji_density": 0.010000000000000002,
+            "pct_contraction": 0.75,
+            "pct_question": 0.0,
+            "pct_period": 0.0,
+            "pct_exclamation": 0.0,
+            "pct_lowercase": 1.0,
+            "pct_multi_sentence": 0.0,
+            "laughter": {
+              "haha": 5,
+              "lol": 1,
+              "lmao": 1
+            },
+            "affirmation": {},
+            "intensifier": {
+              "so": 1
+            },
+            "hedge": {},
+            "opener": {
+              "haha": 4
+            }
+          },
+          "intimate": {
+            "n": 1,
+            "avg_words": 8.0,
+            "capitalization_ratio": 0.0,
+            "emoji_density": 0.0,
+            "pct_contraction": 0.0,
+            "pct_question": 0.0,
+            "pct_period": 0.0,
+            "pct_exclamation": 0.0,
+            "pct_lowercase": 1.0,
+            "pct_multi_sentence": 0.0,
+            "laughter": {},
+            "affirmation": {},
+            "intensifier": {},
+            "hedge": {},
+            "opener": {
+              "i": 1
+            }
+          },
+          "logistics": {
+            "n": 2,
+            "avg_words": 10.5,
+            "capitalization_ratio": 0.0,
+            "emoji_density": 0.0,
+            "pct_contraction": 0.5,
+            "pct_question": 0.0,
+            "pct_period": 0.0,
+            "pct_exclamation": 0.0,
+            "pct_lowercase": 1.0,
+            "pct_multi_sentence": 0.0,
+            "laughter": {},
+            "affirmation": {},
+            "intensifier": {},
+            "hedge": {},
+            "opener": {
+              "what": 1,
+              "when": 1
+            }
+          },
+          "update": {
+            "n": 2,
+            "avg_words": 7.0,
+            "capitalization_ratio": 0.0,
+            "emoji_density": 0.0,
+            "pct_contraction": 0.5,
+            "pct_question": 0.0,
+            "pct_period": 0.0,
+            "pct_exclamation": 0.0,
+            "pct_lowercase": 1.0,
+            "pct_multi_sentence": 0.0,
+            "laughter": {},
+            "affirmation": {},
+            "intensifier": {},
+            "hedge": {},
+            "opener": {
+              "hey": 1,
+              "hi": 1
+            }
+          },
+          "general": {
+            "n": 7,
+            "avg_words": 3.9119999999999995,
+            "capitalization_ratio": 0.10779999999999999,
+            "emoji_density": 0.0,
+            "pct_contraction": 0.40599999999999997,
+            "pct_question": 0.0,
+            "pct_period": 0.0,
+            "pct_exclamation": 0.09799999999999999,
+            "pct_lowercase": 0.804,
+            "pct_multi_sentence": 0.09799999999999999,
+            "laughter": {},
+            "affirmation": {
+              "yeah": 1,
+              "okay": 1
+            },
+            "intensifier": {
+              "so": 1,
+              "really": 1,
+              "literally": 1,
+              "honestly": 1
+            },
+            "hedge": {},
+            "opener": {
+              "cool": 1,
+              "yeah": 1,
+              "this": 2,
+              "i'm": 2,
+              "ok": 1
+            }
+          }
+        },
+        "cadence": {
+          "avg_burst_size": 1.0,
+          "burst_count": 0
+        }
+      }
+    }
+  ],
+  "final_mirroring": {
+    "general": "\n## Communication Style — Mirror This Person\n- Keep responses very short — 1-2 sentences.\n- Use lowercase. Don't capitalize unless they do.\n- Don't end messages with periods.\n- Always use contractions (I'm, that's, can't, don't).\n- For agreement, prefer 'yeah' over other affirmations.\n\nMirror their style by default. Use their vocabulary and tone.\n",
+    "emotional": "",
+    "analytical": "",
+    "playful": "\n## Communication Style — Mirror This Person\n- Keep responses very short — 1-2 sentences.\n- Use lowercase. Don't capitalize unless they do.\n- Don't end messages with periods.\n- Avoid exclamation marks — this person rarely uses them.\n- Always use contractions (I'm, that's, can't, don't).\n- If something is funny, use 'haha' — never 'lol'.\n- Primary intensifier: 'so'.\n- The user is being playful. Be light and brief. Match their energy — don't over-explain or get heavy.\n\nMirror their style by default. Use their vocabulary and tone.\n",
+    "intimate": "\n## Communication Style — Mirror This Person\n- Keep responses very short — 1-2 sentences.\n- Use lowercase. Don't capitalize unless they do.\n- Don't end messages with periods.\n- Avoid exclamation marks — this person rarely uses them.\n- Always use contractions (I'm, that's, can't, don't).\n- If something is funny, use 'haha' — never 'lol'.\n- For agreement, prefer 'yeah' over other affirmations.\n- Primary intensifier: 'so'.\n- When hedging, prefer 'i think'.\n- The user is being personal and warm. Be genuine and affectionate in tone. Don't be clinical.\n\nMirror their style by default. Use their vocabulary and tone.\n",
+    "logistics": "",
+    "update": ""
+  },
+  "instant_mirroring": {
+    "hey how are you": "\n## Communication Style — Match This Message\n- They wrote ~4 words. Reply in 1-2 short sentences max.\n- They write in all lowercase — you do too. no caps.\n- No end punctuation. Don't add periods or exclamation marks.\n- The user is sharing an update or checking in. Be curious and responsive, not analytical.\n",
+    "haha that's so funny": "PYTHON_BUG_SKIPPED",
+    "i'm really stressed": "\n## Communication Style — Match This Message\n- They wrote ~3 words. Reply in 1-2 short sentences max.\n- They write in all lowercase — you do too. no caps.\n- No end punctuation. Don't add periods or exclamation marks.\n- They use contractions. Always use contractions.\n"
+  },
+  "detect_mode": {
+    "last_5_all": "playful",
+    "last_3": "playful",
+    "empty": "general"
+  }
+}
