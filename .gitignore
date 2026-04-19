@@ -31,3 +31,6 @@ Cargo.lock
 .interfluence/
 .interwatch/
 .clavain/verdicts/
+
+# Python bytecode cache in testdata/
+__pycache__/
