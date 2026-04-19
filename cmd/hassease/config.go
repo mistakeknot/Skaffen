@@ -3,10 +3,12 @@ package main
 import (
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/mistakeknot/Skaffen/internal/costrouter"
 	"github.com/mistakeknot/Skaffen/internal/provider"
 	oai "github.com/mistakeknot/Skaffen/internal/provider/openai"
+	"github.com/mistakeknot/Skaffen/internal/signal"
 	"gopkg.in/yaml.v3"
 )
 
@@ -15,6 +17,30 @@ type HassConfig struct {
 	CostRouter costrouter.Config  `yaml:"cost_router"`
 	Providers  map[string]ProvCfg `yaml:"providers"`
 	Tools      ToolsConfig        `yaml:"tools"`
+	Signal     SignalConfig        `yaml:"signal"`
+}
+
+// SignalConfig controls the Signal approval transport.
+type SignalConfig struct {
+	Account      string   `yaml:"account"`       // signal-cli account (phone number)
+	Recipient    string   `yaml:"recipient"`      // builder's phone number
+	Binary       string   `yaml:"binary"`         // path to signal-cli (default: "signal-cli")
+	TimeoutSec   int      `yaml:"timeout_sec"`    // reply timeout in seconds (default: 300)
+	TestPatterns []string `yaml:"test_patterns"`  // globs that match test files (auto-approved)
+}
+
+// signalClientConfig converts SignalConfig to the signal package's Config.
+func (sc *SignalConfig) signalClientConfig() signal.Config {
+	timeout := 5 * time.Minute
+	if sc.TimeoutSec > 0 {
+		timeout = time.Duration(sc.TimeoutSec) * time.Second
+	}
+	return signal.Config{
+		Account:   sc.Account,
+		Recipient: sc.Recipient,
+		Binary:    sc.Binary,
+		Timeout:   timeout,
+	}
 }
 
 // ProvCfg describes a provider backend.

@@ -1,0 +1,53 @@
+# Hassease configuration — multi-model code execution daemon.
+#
+# Copy to hassease.yaml and fill in your values:
+#   cp hassease.example.yaml hassease.yaml
+#
+# Usage:
+#   echo "fix the bug in auth.go" | hassease --signal --config hassease.yaml
+
+# Signal approval transport — requires signal-cli.
+# See: docs/guides/hassease-signal-setup.md
+signal:
+  account: "+15550001111"       # Hassease's dedicated Signal number
+  recipient: "+15552223333"     # Builder's phone number (receives approval requests)
+  binary: "signal-cli"          # Path to signal-cli binary
+  timeout_sec: 300              # Seconds to wait for y/n reply (default: 300)
+
+  # Glob patterns for test files — edits auto-approved without Signal prompt.
+  # Defaults shown below; override to match your project conventions.
+  test_patterns:
+    - "*_test.go"
+    - "test_*.py"
+    - "*_test.py"
+    - "*.test.ts"
+    - "*.test.js"
+    - "*.spec.ts"
+    - "*.spec.js"
+
+# Cost router — model selection and escalation.
+cost_router:
+  default_model: "qwen-plus-latest"
+  escalation_model: "claude-sonnet-4-6"
+  planning_model: "claude-opus-4-6"
+  read_model: "glm-4-plus"
+
+# Provider backends — each needs an API key in the named env var.
+providers:
+  glm:
+    base_url: "https://open.bigmodel.cn/api/paas/v4"
+    api_key_env: "GLM_API_KEY"
+    model_prefix: "glm-"
+  qwen:
+    base_url: "https://dashscope.aliyuncs.com/compatible-mode/v1"
+    api_key_env: "DASHSCOPE_API_KEY"
+    model_prefix: "qwen-"
+  anthropic:
+    api_key_env: "ANTHROPIC_API_KEY"
+    model_prefix: "claude-"
+
+# Tool access control.
+tools:
+  allowed: [read, edit, grep, glob, ls, bash, write]
+  auto_approve: [read, grep, glob, ls]         # No approval needed
+  require_approval: [edit, write, bash]          # Signal prompt (or --approve-edits/--approve-bash)
