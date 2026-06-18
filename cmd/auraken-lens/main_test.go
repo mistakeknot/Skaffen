@@ -101,3 +101,30 @@ func TestReadInputBrokenJSONFallsThroughToPlainText(t *testing.T) {
 		t.Fatalf("broken JSON should fall through to plain text, got %q", in.Text)
 	}
 }
+
+// TestDefaultAPIMode pins the model→api_mode mapping that backs the
+// sylveste-22oi.1 misdiagnosis fix: Claude targets default to
+// anthropic_native (Anthropic restricts /chat/completions for the Claude
+// Max OAuth account); non-Claude targets default to chat_completions
+// (CLIProxyAPI's cross-provider translator path).
+func TestDefaultAPIMode(t *testing.T) {
+	cases := []struct {
+		model string
+		want  string
+	}{
+		{"claude-opus-4-7", apiModeAnthropicNative},
+		{"claude-haiku-4-5-20251001", apiModeAnthropicNative},
+		{"Claude-Opus-4-7", apiModeAnthropicNative}, // case-insensitive
+		{"gpt-5.5", apiModeChatCompletions},
+		{"gpt-5.4-mini", apiModeChatCompletions},
+		{"gpt-5.3-codex", apiModeChatCompletions},
+		{"", apiModeChatCompletions},        // empty model → chat_completions
+		{"mistral-large", apiModeChatCompletions},
+	}
+	for _, c := range cases {
+		got := defaultAPIMode(c.model)
+		if got != c.want {
+			t.Errorf("defaultAPIMode(%q) = %q, want %q", c.model, got, c.want)
+		}
+	}
+}

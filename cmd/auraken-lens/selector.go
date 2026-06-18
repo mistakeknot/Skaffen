@@ -14,13 +14,44 @@ import (
 	"github.com/mistakeknot/Skaffen/pkg/lens"
 )
 
+// API-mode constants. The mode dictates which endpoint + request body
+// shape the binary uses against AURAKEN_LENS_API_BASE.
+//
+//   - apiModeChatCompletions hits POST {base}/chat/completions with an
+//     OpenAI-shape body. CLIProxyAPI translates this for any provider it
+//     fronts. At v0.1 release this was the only path; at v0.2 it is kept
+//     as the default for GPT-family + non-Anthropic targets.
+//
+//   - apiModeAnthropicNative hits POST {base}/messages with the
+//     Anthropic Messages API body shape. Required for Claude targets via
+//     CLIProxyAPI + Claude Max OAuth: Anthropic restricts the
+//     /chat/completions translator endpoint for that account but accepts
+//     /messages. See sylveste-22oi.1 for the misdiagnosis correction.
+const (
+	apiModeChatCompletions = "chat_completions"
+	apiModeAnthropicNative = "anthropic_native"
+)
+
 // Config holds the runtime knobs for the lens-selection LLM call. All
 // fields have sensible CLIProxyAPI-friendly defaults.
 type Config struct {
 	APIBase string        // e.g. http://127.0.0.1:8317/v1
 	APIKey  string        // bearer; empty is allowed for unauthenticated proxies
 	Model   string        // e.g. claude-opus-4-7
+	APIMode string        // "chat_completions" or "anthropic_native"; defaults derived from Model
 	Timeout time.Duration // per-request HTTP timeout
+}
+
+// defaultAPIMode picks the wire mode for a given model identifier. Claude
+// targets default to anthropic_native because Anthropic blocks the
+// chat-completions translator path under OAuth-org policy; non-Claude
+// targets keep chat_completions for CLIProxyAPI's cross-provider
+// translator path.
+func defaultAPIMode(model string) string {
+	if strings.HasPrefix(strings.ToLower(model), "claude") {
+		return apiModeAnthropicNative
+	}
+	return apiModeChatCompletions
 }
 
 // systemPrompt frames the LLM as Auraken's lens selector. It commits the
@@ -66,8 +97,10 @@ CRITICAL constraints:
     exactly one question, max 400 chars.
   - Do not include any field other than empty/lens/rationale/next_question.`
 
-// selectSoundpost performs the single chat-completions call and returns
-// the parsed + validated soundpost.
+// selectSoundpost performs the lens-selection LLM call and returns the
+// parsed + validated soundpost. Dispatches between chat_completions and
+// anthropic_native paths based on cfg.APIMode (falling back to a model-
+// derived default if unset).
 func selectSoundpost(cfg Config, in Input, lenses []lens.Lens) (Soundpost, error) {
 	if cfg.APIBase == "" {
 		return Soundpost{}, errors.New("API base URL not configured")
@@ -76,8 +109,43 @@ func selectSoundpost(cfg Config, in Input, lenses []lens.Lens) (Soundpost, error
 		return Soundpost{}, errors.New("model not configured")
 	}
 
+	mode := cfg.APIMode
+	if mode == "" {
+		mode = defaultAPIMode(cfg.Model)
+	}
+
 	user := buildUserPrompt(in, lenses)
 
+	ctx, cancel := context.WithTimeout(context.Background(), cfg.Timeout)
+	defer cancel()
+
+	var (
+		content string
+		err     error
+	)
+	switch mode {
+	case apiModeAnthropicNative:
+		content, err = requestAnthropicMessages(ctx, cfg, user)
+	case apiModeChatCompletions:
+		content, err = requestChatCompletions(ctx, cfg, user)
+	default:
+		return Soundpost{}, fmt.Errorf("unknown api_mode %q (want %q or %q)",
+			mode, apiModeChatCompletions, apiModeAnthropicNative)
+	}
+	if err != nil {
+		return Soundpost{}, err
+	}
+	if content == "" {
+		return Soundpost{}, errors.New("empty model response")
+	}
+
+	return parseSoundpost(content)
+}
+
+// requestChatCompletions hits POST {base}/chat/completions with an
+// OpenAI-shape body. This is the path CLIProxyAPI uses to translate
+// cross-provider calls (GPT-family, etc.).
+func requestChatCompletions(ctx context.Context, cfg Config, user string) (string, error) {
 	req := chatRequest{
 		Model: cfg.Model,
 		Messages: []chatMessage{
@@ -89,18 +157,15 @@ func selectSoundpost(cfg Config, in Input, lenses []lens.Lens) (Soundpost, error
 	}
 	body, err := json.Marshal(req)
 	if err != nil {
-		return Soundpost{}, fmt.Errorf("encode request: %w", err)
+		return "", fmt.Errorf("encode request: %w", err)
 	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), cfg.Timeout)
-	defer cancel()
 
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost,
 		strings.TrimRight(cfg.APIBase, "/")+"/chat/completions",
 		bytes.NewReader(body),
 	)
 	if err != nil {
-		return Soundpost{}, fmt.Errorf("build request: %w", err)
+		return "", fmt.Errorf("build request: %w", err)
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
 	if cfg.APIKey != "" {
@@ -110,13 +175,13 @@ func selectSoundpost(cfg Config, in Input, lenses []lens.Lens) (Soundpost, error
 	client := &http.Client{Timeout: cfg.Timeout}
 	resp, err := client.Do(httpReq)
 	if err != nil {
-		return Soundpost{}, fmt.Errorf("chat-completions request: %w", err)
+		return "", fmt.Errorf("chat-completions request: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode/100 != 2 {
 		preview, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
-		return Soundpost{}, fmt.Errorf(
+		return "", fmt.Errorf(
 			"chat-completions status %d: %s",
 			resp.StatusCode, strings.TrimSpace(string(preview)),
 		)
@@ -124,13 +189,77 @@ func selectSoundpost(cfg Config, in Input, lenses []lens.Lens) (Soundpost, error
 
 	var cr chatResponse
 	if err := json.NewDecoder(resp.Body).Decode(&cr); err != nil {
-		return Soundpost{}, fmt.Errorf("decode response: %w", err)
+		return "", fmt.Errorf("decode response: %w", err)
 	}
-	if len(cr.Choices) == 0 || cr.Choices[0].Message.Content == "" {
-		return Soundpost{}, errors.New("empty model response")
+	if len(cr.Choices) == 0 {
+		return "", nil
+	}
+	return cr.Choices[0].Message.Content, nil
+}
+
+// requestAnthropicMessages hits POST {base}/messages with the Anthropic
+// Messages API body shape. The local Authorization: Bearer header is the
+// CLIProxyAPI local key — CLIProxyAPI handles upstream Anthropic OAuth
+// credential forwarding internally. We also set x-api-key and
+// anthropic-version for direct Anthropic endpoints (the headers are
+// harmless on the CLIProxyAPI hop).
+func requestAnthropicMessages(ctx context.Context, cfg Config, user string) (string, error) {
+	req := anthropicRequest{
+		Model:       cfg.Model,
+		System:      systemPrompt,
+		Messages:    []anthropicMessage{{Role: "user", Content: user}},
+		Temperature: 0.0,
+		MaxTokens:   600,
+	}
+	body, err := json.Marshal(req)
+	if err != nil {
+		return "", fmt.Errorf("encode request: %w", err)
 	}
 
-	return parseSoundpost(cr.Choices[0].Message.Content)
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost,
+		strings.TrimRight(cfg.APIBase, "/")+"/messages",
+		bytes.NewReader(body),
+	)
+	if err != nil {
+		return "", fmt.Errorf("build request: %w", err)
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+	httpReq.Header.Set("anthropic-version", "2023-06-01")
+	if cfg.APIKey != "" {
+		// Bearer for CLIProxyAPI local auth.
+		httpReq.Header.Set("Authorization", "Bearer "+cfg.APIKey)
+		// x-api-key for direct Anthropic (harmless on the CLIProxyAPI hop).
+		httpReq.Header.Set("x-api-key", cfg.APIKey)
+	}
+
+	client := &http.Client{Timeout: cfg.Timeout}
+	resp, err := client.Do(httpReq)
+	if err != nil {
+		return "", fmt.Errorf("anthropic-messages request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode/100 != 2 {
+		preview, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
+		return "", fmt.Errorf(
+			"anthropic-messages status %d: %s",
+			resp.StatusCode, strings.TrimSpace(string(preview)),
+		)
+	}
+
+	var ar anthropicResponse
+	if err := json.NewDecoder(resp.Body).Decode(&ar); err != nil {
+		return "", fmt.Errorf("decode response: %w", err)
+	}
+	// Anthropic returns a content array of typed blocks; concatenate text
+	// blocks and ignore others (tool_use, etc., shouldn't appear here).
+	var sb strings.Builder
+	for _, block := range ar.Content {
+		if block.Type == "text" {
+			sb.WriteString(block.Text)
+		}
+	}
+	return sb.String(), nil
 }
 
 // buildUserPrompt assembles the user-role message: context summary, user
@@ -199,4 +328,31 @@ type chatResponse struct {
 	Choices []struct {
 		Message chatMessage `json:"message"`
 	} `json:"choices"`
+}
+
+// Anthropic Messages API request / response shapes.
+
+type anthropicRequest struct {
+	Model       string             `json:"model"`
+	System      string             `json:"system,omitempty"`
+	Messages    []anthropicMessage `json:"messages"`
+	Temperature float64            `json:"temperature"`
+	MaxTokens   int                `json:"max_tokens"`
+}
+
+type anthropicMessage struct {
+	Role    string `json:"role"`
+	Content string `json:"content"`
+}
+
+type anthropicContentBlock struct {
+	Type string `json:"type"`
+	Text string `json:"text,omitempty"`
+}
+
+type anthropicResponse struct {
+	ID      string                  `json:"id"`
+	Type    string                  `json:"type"`
+	Role    string                  `json:"role"`
+	Content []anthropicContentBlock `json:"content"`
 }

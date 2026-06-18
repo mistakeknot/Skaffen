@@ -78,6 +78,8 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, "  AURAKEN_LENS_API_KEY        Bearer token (overrides AURAKEN_LENS_API_KEY_FILE)")
 		fmt.Fprintln(stderr, "  AURAKEN_LENS_API_KEY_FILE   File holding bearer token (default: ~/.cli-proxy-api/local-api-key)")
 		fmt.Fprintln(stderr, "  AURAKEN_LENS_MODEL          Model identifier (default: claude-opus-4-7)")
+		fmt.Fprintln(stderr, "  AURAKEN_LENS_API_MODE       Wire mode: chat_completions or anthropic_native")
+		fmt.Fprintln(stderr, "                              (default: anthropic_native for claude-*, else chat_completions)")
 		fmt.Fprintln(stderr, "  AURAKEN_LENS_TIMEOUT_SEC    HTTP timeout in seconds (default: 15)")
 	}
 
@@ -185,9 +187,11 @@ func emit(w io.Writer, sp Soundpost) {
 // loadConfig assembles runtime config from env vars + the default
 // CLIProxyAPI bearer-token file location.
 func loadConfig() (Config, error) {
+	model := getenv("AURAKEN_LENS_MODEL", "claude-opus-4-7")
 	cfg := Config{
 		APIBase: getenv("AURAKEN_LENS_API_BASE", "http://127.0.0.1:8317/v1"),
-		Model:   getenv("AURAKEN_LENS_MODEL", "claude-opus-4-7"),
+		Model:   model,
+		APIMode: getenv("AURAKEN_LENS_API_MODE", defaultAPIMode(model)),
 		Timeout: 15 * time.Second,
 	}
 
