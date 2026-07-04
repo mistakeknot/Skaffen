@@ -25,9 +25,10 @@ type Agent struct {
 	sessionID   string // for evidence attribution
 	streamCB    StreamCallback
 	approver    ToolApprover
-	hookExec    *hooks.Executor // lifecycle hooks (nil = disabled)
-	signalStore SignalStore     // quality signal persistence
-	evidenceDir string          // path to evidence JSONL directory
+	hookExec    *hooks.Executor  // lifecycle hooks (nil = disabled)
+	signalStore SignalStore      // quality signal persistence
+	evidenceDir string           // path to evidence JSONL directory
+	ctxPipeline *ContextPipeline // pre-turn context providers (nil = disabled)
 
 	maxTurns int // safety limit, default 100
 }
@@ -66,6 +67,14 @@ func WithSignalStore(s SignalStore) Option { return func(a *Agent) { a.signalSto
 
 // WithEvidenceDir sets the path to the evidence JSONL directory.
 func WithEvidenceDir(dir string) Option { return func(a *Agent) { a.evidenceDir = dir } }
+
+// WithContextPipeline sets a pre-turn context provider pipeline. When set,
+// the pipeline assembles the system prompt for each run from its providers
+// (persona context: lens, profile, style, steering, feedback, session),
+// overriding the Session's static SystemPrompt.
+func WithContextPipeline(p *ContextPipeline) Option {
+	return func(a *Agent) { a.ctxPipeline = p }
+}
 
 // New creates an Agent with the given provider, tool registry, and options.
 func New(p provider.Provider, reg *tool.Registry, opts ...Option) *Agent {
@@ -184,6 +193,16 @@ func (a *Agent) runWithContent(ctx context.Context, content []provider.ContentBl
 	// Build adapters that bridge phase-typed interfaces to agentloop
 	loopRouter := &routerAdapter{inner: a.router, phase: a.fsm.Current}
 	loopSession := &sessionAdapter{inner: a.session, phase: a.fsm.Current}
+
+	// Pre-turn context assembly: providers run before the loop starts and
+	// their composed output becomes this run's system prompt.
+	if a.ctxPipeline != nil {
+		assembled, err := a.ctxPipeline.Assemble(ctx, buildTurnContext(content, a.session.Messages()))
+		if err != nil {
+			return nil, fmt.Errorf("context pipeline: %w", err)
+		}
+		loopSession.promptOverride = assembled
+	}
 
 	loopEmitter := &emitterAdapter{inner: a.emitter}
 
@@ -315,13 +334,19 @@ func (ra *routerAdapter) BudgetState() agentloop.BudgetState {
 func (ra *routerAdapter) ContextWindow(model string) int { return ra.inner.ContextWindow(model) }
 
 // sessionAdapter wraps an agent.Session to satisfy agentloop.Session.
+// When promptOverride is set (context pipeline active), it replaces the
+// inner Session's static system prompt for this run.
 type sessionAdapter struct {
-	inner Session
-	phase func() tool.Phase
+	inner          Session
+	phase          func() tool.Phase
+	promptOverride string
 }
 
 func (sa *sessionAdapter) SystemPrompt(hints agentloop.PromptHints) string {
-	prompt := sa.inner.SystemPrompt(sa.phase(), hints.Budget)
+	prompt := sa.promptOverride
+	if prompt == "" {
+		prompt = sa.inner.SystemPrompt(sa.phase(), hints.Budget)
+	}
 	if hints.PlanMode {
 		prompt += "\n\nYou are in plan mode (read-only). You can explore the codebase, analyze code, explain patterns, and answer questions. You cannot modify files or run commands. The user will exit plan mode when ready to make changes."
 	}
