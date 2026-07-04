@@ -3,11 +3,17 @@
 // The assembly logic is agent-agnostic. Agent-specific personality
 // (system template, new-user intro) is injected via PromptConfig.
 // Default config uses the Auraken personality from templates.go.
+//
+// Section builders (BuildFeedbackContext, BuildLensContext, ...) are
+// exported so context providers (internal/auraken) can populate each
+// template slot independently. BuildSystemPrompt composes all sections
+// in one call and is the parity reference against Auraken's prompts.py.
 package prompts
 
 import (
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -16,7 +22,7 @@ import (
 
 // Turn represents a single conversation turn.
 type Turn struct {
-	Role    string `json:"role"`    // "user" or "assistant"
+	Role    string `json:"role"` // "user" or "assistant"
 	Content string `json:"content"`
 }
 
@@ -73,12 +79,12 @@ type PromptInput struct {
 
 // BuildSystemPrompt assembles a complete system prompt from profile data.
 func BuildSystemPrompt(cfg PromptConfig, input PromptInput) string {
-	feedbackCtx := buildFeedbackContext(input.FeedbackEntities)
-	lensCtx := buildLensContext(input.RelevantLenses)
-	profileCtx := buildProfileContext(cfg, input.WorkingProfile)
+	feedbackCtx := BuildFeedbackContext(input.FeedbackEntities)
+	lensCtx := BuildLensContext(input.RelevantLenses)
+	profileCtx := BuildProfileContext(cfg, input.WorkingProfile)
 	steeringCtx := BuildSteeringContext(input.ExploredDomains, input.KnownEntities, input.InteractionCount)
-	styleCtx := buildStyleContext(input.StyleFingerprint, input.RecentTurns, input.CurrentMessage)
-	sessionCtx := buildSessionContext(input.RecentTurns)
+	styleCtx := BuildStyleContext(input.StyleFingerprint, input.RecentTurns, input.CurrentMessage)
+	sessionCtx := BuildSessionContext(input.RecentTurns)
 
 	r := strings.NewReplacer(
 		"{feedback_context}", feedbackCtx,
@@ -98,7 +104,21 @@ func BuildSystemPrompt(cfg PromptConfig, input PromptInput) string {
 	return prompt
 }
 
-func buildFeedbackContext(entities []Feedback) string {
+// formatConfidence renders a confidence value the way Python's str() does
+// (repr of the float), so feedback lines are byte-identical to prompts.py:
+// 0.9 -> "0.9", 0.85 -> "0.85", 1.0 -> "1.0".
+func formatConfidence(c float64) string {
+	s := strconv.FormatFloat(c, 'g', -1, 64)
+	if !strings.ContainsAny(s, ".eE") {
+		s += ".0"
+	}
+	return s
+}
+
+// BuildFeedbackContext renders explicit user feedback as behavioral
+// instructions. Values are sanitized (headers and code fences stripped,
+// truncated to 200 characters) to limit prompt injection.
+func BuildFeedbackContext(entities []Feedback) string {
 	if len(entities) == 0 {
 		return ""
 	}
@@ -106,10 +126,17 @@ func buildFeedbackContext(entities []Feedback) string {
 	now := time.Now().UTC()
 	var lines []string
 	for _, fb := range entities {
-		// Sanitize: strip markdown headers and limit length
+		remainingStr := "no expiry"
+		if fb.ValidUntil != nil {
+			days := int(fb.ValidUntil.Sub(now).Hours() / 24)
+			remainingStr = fmt.Sprintf("%d days remaining", days)
+		}
+
+		// Sanitize: truncate to 200 characters (runes, matching Python's
+		// character slicing), then strip markdown headers and code fences.
 		value := fb.Value
-		if len(value) > 200 {
-			value = value[:200]
+		if r := []rune(value); len(r) > 200 {
+			value = string(r[:200])
 		}
 		value = strings.ReplaceAll(value, "#", "")
 		value = strings.ReplaceAll(value, "```", "")
@@ -118,30 +145,28 @@ func buildFeedbackContext(entities []Feedback) string {
 			continue
 		}
 
-		remainingStr := "no expiry"
-		if fb.ValidUntil != nil {
-			days := int(fb.ValidUntil.Sub(now).Hours() / 24)
-			remainingStr = fmt.Sprintf("%d days remaining", days)
-		}
-		lines = append(lines, fmt.Sprintf("- %s (confidence %.1f, %s)", value, fb.Confidence, remainingStr))
-	}
-	if len(lines) == 0 {
-		return ""
+		lines = append(lines, fmt.Sprintf("- %s (confidence %s, %s)", value, formatConfidence(fb.Confidence), remainingStr))
 	}
 
+	// Parity note: like prompts.py, the section header is emitted whenever
+	// feedback entities exist, even if every value sanitized to empty.
 	return "\n## User Feedback on Your Behavior\n" +
 		"The user has given you explicit feedback. Follow these instructions:\n" +
 		strings.Join(lines, "\n") + "\n\n"
 }
 
-func buildProfileContext(cfg PromptConfig, workingProfile string) string {
+// BuildProfileContext renders the working profile, or the new-user intro
+// from cfg when no profile exists yet.
+func BuildProfileContext(cfg PromptConfig, workingProfile string) string {
 	if workingProfile != "" {
 		return "\n## What You Know About This Person\n" + workingProfile + "\n\n"
 	}
 	return "\n" + cfg.NewUserIntro + "\n"
 }
 
-func buildLensContext(lenses []Lens) string {
+// BuildLensContext renders up to five relevant lenses as framework
+// suggestions.
+func BuildLensContext(lenses []Lens) string {
 	if len(lenses) == 0 {
 		return ""
 	}
@@ -174,7 +199,7 @@ func buildLensContext(lenses []Lens) string {
 }
 
 // BuildSteeringContext generates conversation steering instructions based on
-// profile state. Exported for testing.
+// profile state.
 func BuildSteeringContext(exploredDomains map[string]bool, knownEntities []Entity, interactionCount int) string {
 	var parts []string
 
@@ -248,7 +273,6 @@ func BuildSteeringContext(exploredDomains map[string]bool, knownEntities []Entit
 }
 
 // BuildBootstrapContext generates onboarding instructions for early conversations.
-// Exported for testing.
 func BuildBootstrapContext(isNewUser bool, interactionCount int) string {
 	if !isNewUser && interactionCount >= 3 {
 		return ""
@@ -313,7 +337,10 @@ func BuildBootstrapContext(isNewUser bool, interactionCount int) string {
 	return ""
 }
 
-func buildStyleContext(fp *style.Fingerprint, recentTurns []Turn, currentMessage string) string {
+// BuildStyleContext renders register-matching instructions. When the
+// fingerprint has enough observations it drives mode-aware mirroring;
+// otherwise instant mirroring is derived from the current message.
+func BuildStyleContext(fp *style.Fingerprint, recentTurns []Turn, currentMessage string) string {
 	if fp != nil && fp.MessageCount >= 3 {
 		mode := detectCurrentMode(recentTurns)
 		return fp.BuildMirroring(mode)
@@ -337,7 +364,8 @@ func detectCurrentMode(turns []Turn) style.Mode {
 	return style.DetectCurrentMode(userMsgs, 5)
 }
 
-func buildSessionContext(turns []Turn) string {
+// BuildSessionContext renders recent conversation turns.
+func BuildSessionContext(turns []Turn) string {
 	if len(turns) == 0 {
 		return ""
 	}
