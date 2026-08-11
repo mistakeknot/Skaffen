@@ -97,7 +97,7 @@ Cover:
 
 **Step 2: Run tests and verify RED**
 
-Run: `cd pi-package && npm test -- test/intercore.test.ts`  
+Run: `cd pi-package && npm test -- test/intercore.test.ts`
 Expected: FAIL because `src/intercore.ts` does not exist.
 
 **Step 3: Implement the minimum adapter**
@@ -149,7 +149,7 @@ Cover detailed rendering for:
 
 **Step 2: Run tests and verify RED**
 
-Run: `cd pi-package && npm test -- test/presentation.test.ts`  
+Run: `cd pi-package && npm test -- test/presentation.test.ts`
 Expected: FAIL because presentation exports do not exist.
 
 **Step 3: Implement status/detail renderers**
@@ -183,7 +183,7 @@ Invoke captured handlers to prove degraded state does not throw and repeated com
 
 **Step 2: Run tests and verify RED**
 
-Run: `cd pi-package && npm test -- test/extension.test.ts`  
+Run: `cd pi-package && npm test -- test/extension.test.ts`
 Expected: FAIL because the extension factory does not exist.
 
 **Step 3: Implement the minimum extension**

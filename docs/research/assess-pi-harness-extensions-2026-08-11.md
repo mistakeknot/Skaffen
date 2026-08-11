@@ -7,7 +7,7 @@ verdict: selective-adopt
 ---
 # Pi Harness Companion Extension Assessment
 
-**Date:** 2026-08-11  
+**Date:** 2026-08-11
 **Scope:** Published package metadata and unpacked npm tarballs. This is a targeted adoption review, not a complete security audit of every transitive dependency.
 
 ## Verdict
