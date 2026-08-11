@@ -1,0 +1,41 @@
+version: 1
+mode: all-sequential
+tier: deep
+max_parallel: 1
+timeout_per_task: 600
+
+stages:
+  - name: "Pi harness vertical slice"
+    tasks:
+      - id: task-1
+        title: "Package and test harness"
+        files:
+          - pi-package/package.json
+          - pi-package/tsconfig.json
+          - pi-package/README.md
+          - pi-package/src/types.ts
+        depends: []
+      - id: task-2
+        title: "Read-only Intercore adapter"
+        files:
+          - pi-package/src/intercore.ts
+          - pi-package/test/intercore.test.ts
+        depends: [task-1]
+      - id: task-3
+        title: "Bounded presentation"
+        files:
+          - pi-package/src/presentation.ts
+          - pi-package/test/presentation.test.ts
+        depends: [task-2]
+      - id: task-4
+        title: "Pi extension integration"
+        files:
+          - pi-package/src/index.ts
+          - pi-package/test/extension.test.ts
+        depends: [task-3]
+      - id: task-5
+        title: "Companion pinning, documentation, and activation"
+        files:
+          - docs/research/assess-pi-harness-extensions-2026-08-11.md
+          - README.md
+        depends: [task-4]

@@ -4,6 +4,7 @@
 
 # Build
 /dist/
+node_modules/
 
 # Rust artifacts (from archived rust-archive branch)
 /target/
