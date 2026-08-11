@@ -65,7 +65,7 @@ export default function skaffenExtension(pi: ExtensionAPI): void {
 			const state = await refresh(ctx);
 			const content = formatHarnessDetails(state);
 			appendStatus("harness", content);
-			ctx.ui.notify(content, state.health === "healthy" ? "info" : "warning");
+			ctx.ui.notify(`Skaffen harness: ${state.health}`, state.health === "healthy" ? "info" : "warning");
 		},
 	});
 
@@ -75,7 +75,7 @@ export default function skaffenExtension(pi: ExtensionAPI): void {
 			const state = await refresh(ctx);
 			const content = formatSituation(state);
 			appendStatus("situation", content);
-			ctx.ui.notify(content, state.snapshot ? "info" : "warning");
+			ctx.ui.notify(`Intercore situation: ${state.health}`, state.snapshot ? "info" : "warning");
 		},
 	});
 

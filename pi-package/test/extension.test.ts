@@ -124,6 +124,8 @@ describe("Skaffen Pi extension", () => {
 		expect(harness.entries[1]?.data).toEqual(
 			expect.objectContaining({ kind: "situation", content: expect.stringContaining("run-1") }),
 		);
+		expect(harness.notifications).toEqual(["Skaffen harness: degraded", "Intercore situation: degraded"]);
+		expect(harness.notifications.every((message) => !message.includes("\n"))).toBe(true);
 	});
 
 	it("returns the same refreshed situation to the agent without mutation", async () => {
