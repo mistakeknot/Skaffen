@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "operation": "intercore-schema39-rollback-boundary-transition",
+  "migration_proof": "docs/research/2026-08-18-intercore-schema39-migration-proof.json",
+  "previous_state": {
+    "rollback_eligible": true,
+    "confirmed_at": "2026-08-18T19:59:14.542253+00:00",
+    "condition": "no schema-39 application-data writes"
+  },
+  "transition": {
+    "rollback_eligible": false,
+    "occurred_at": "2026-08-18T20:07:32.742835000Z",
+    "trigger": "first schema-39 application-data write",
+    "command": "ic run artifact add niya78he --phase=brainstorm --path=/Users/arouth/projects/Skaffen/docs/plans/2026-08-18-sylveste-pi-ecosystem-sync.md --type=plan --json",
+    "artifact_id": "udy16kaj"
+  },
+  "recovery_policy": "roll-forward only",
+  "reason": "Application data now exists that the schema-37 binary/database pair does not contain; restoring the pre-migration pair would discard canonical run-artifact state."
+}

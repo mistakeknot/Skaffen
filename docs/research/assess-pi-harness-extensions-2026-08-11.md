@@ -85,7 +85,7 @@ Skaffen should observe `plan_mode_complete` and register the accepted plan as an
 | `@narumitw/pi-goal` | Pattern only | Strong completion, continuation, budget, and stale-goal guards, but it owns goal state that would compete with Intercore. |
 | `pi-goal-list-loop-audit` | Pattern only | Detached independent auditor and raw-evidence shield are valuable designs; its own goal/list/loop state machine overlaps Skaffen. |
 | `@mjasnikovs/pi-task` | Pattern only | Crash-safe deterministic spec pipeline, but `.pi-tasks` would create another lifecycle source of truth. |
-| `pi-subagents` | Defer | Useful later for workers/reviewers; first prove single-agent receipts and Intercore coordination. |
+| `pi-subagents@0.48.0` | Adopt as bounded execution backend | Exact pin audited and live-tested. It supplies process-isolated async workflows, status/transcript/steer/stop controls, worktrees, and terminal lifecycle receipts while Intercore remains canonical. Schedules and missions are disabled; ordinary children cannot become nested orchestrators. |
 | `pi-background-tasks` | Defer | Potential dispatch backend, but must not become a second durable scheduler beside Intercore. |
 | `@gotgenes/pi-permission-system` | Study | Permission composition and failure semantics need review against Skaffen's phase/trust policy before installation. |
 | `@juicesharp/rpiv-todo` | Do not adopt as canonical | Beads and Intercore already own work state. Its overlay is a UI pattern only. |
@@ -114,4 +114,19 @@ pi remove npm:@narumitw/pi-plan-mode
 pi remove npm:@juicesharp/rpiv-ask-user-question
 ```
 
-Pi packages execute with full user access. Re-review source and integrity before moving either pin.
+Pi packages execute with full user access. Re-review source and integrity before moving any pin.
+
+## `pi-subagents@0.48.0` bounded adoption
+
+Installed after a source/package audit and a live acceptance test. The trial proved a detached reviewer could run while foreground Pi executed `/harness` and completed an independent model turn. The child completed with durable status/events artifacts and no Skaffen worktree changes.
+
+Conservative user configuration lives at `~/.pi/agent/extensions/subagent/config.json`:
+
+- two active async workflows per session;
+- concurrency three, six tasks maximum, depth one;
+- twelve spawns per run and twenty-four per session;
+- schedules and package missions disabled;
+- destructive cleanup and budget grants require confirmation;
+- artifacts remain session-scoped rather than canonical project truth.
+
+This package is an execution substrate only. Skaffen may bridge terminal receipts and Intercore dispatch identities later, but package missions, schedules, or result files must not become a second durable authority store.

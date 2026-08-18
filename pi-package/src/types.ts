@@ -5,6 +5,38 @@ export interface ExecResult {
 	killed: boolean;
 }
 
+export interface IntercoreVersion {
+	version: string;
+	commit?: string;
+	commit_time?: string;
+	dirty: boolean;
+	go: string;
+	os: string;
+	arch: string;
+	source: string;
+	schema?: number;
+}
+
+export type IntercoreProvenance = "verified" | "unverified" | "unavailable";
+
+export interface ProducerSummary {
+	kind: string;
+	name: string;
+	class?: string;
+	version?: string;
+}
+
+export interface AgencySummary {
+	name: string;
+	cycle_id: string;
+	stage: string;
+	event_type: string;
+	run_id?: string;
+	project_dir?: string;
+	last_event_id: number;
+	updated_at: string;
+}
+
 export interface RunSummary {
 	id: string;
 	phase: string;
@@ -13,6 +45,7 @@ export interface RunSummary {
 	project_dir: string;
 	goal: string;
 	created_at: number;
+	producer?: ProducerSummary;
 }
 
 export interface DispatchSummary {
@@ -39,6 +72,7 @@ export interface SituationSnapshot {
 	runs: RunSummary[];
 	dispatches: DispatchSummary;
 	recent_events: unknown[];
+	agencies?: AgencySummary[];
 	queue: QueueSummary;
 	budget?: BudgetSummary;
 }
@@ -48,6 +82,9 @@ export type IntercoreHealth = "healthy" | "degraded" | "unavailable";
 export interface HarnessState {
 	health: IntercoreHealth;
 	reason?: string;
+	provenance: IntercoreProvenance;
+	provenanceReason?: string;
+	version?: IntercoreVersion;
 	checkedAt: string;
 	latencyMs: number;
 	snapshot?: SituationSnapshot;

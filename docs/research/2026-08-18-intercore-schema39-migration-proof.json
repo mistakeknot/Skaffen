@@ -1,0 +1,869 @@
+{
+  "approved_source": {
+    "commit": "ac2dc66f59fc57a901c214080f99056a96de670f",
+    "max_schema": 39,
+    "source_checkout": "/tmp/intercore-schema39-source",
+    "source_tests": "go test ./...: all listed packages passed",
+    "version": "0.3.5"
+  },
+  "binary": {
+    "installed_path": "/Users/arouth/.local/bin/ic",
+    "schema37_backup_path": "/Users/arouth/.local/bin/ic.backup-20260818-124609-schema37",
+    "schema37_backup_sha256": "c765aef6d7d20a190be891782f36e8bfa1f85681aaa4ebc27fbb243041f9e2c7",
+    "staged_and_installed_sha256": "c28525dc3d4b18c2c1ad817b85bb43d9bee6468785859b6996a4b3184abf868e",
+    "staged_path": "/tmp/ic-schema39-ac2dc66f"
+  },
+  "commands": {
+    "init_stdout": "initialized /Users/arouth/projects/.clavain/intercore.db (schema v39)",
+    "installed_post_migration_version": {
+      "arch": "arm64",
+      "commit": "ac2dc66f59fc57a901c214080f99056a96de670f",
+      "commit_time": "2026-08-17T03:35:01Z",
+      "dirty": false,
+      "go": "go1.26.0",
+      "os": "darwin",
+      "schema": 39,
+      "source": "vcs",
+      "version": "0.3.5"
+    },
+    "installed_pre_migration_version": {
+      "arch": "arm64",
+      "commit": "ac2dc66f59fc57a901c214080f99056a96de670f",
+      "commit_time": "2026-08-17T03:35:01Z",
+      "dirty": false,
+      "go": "go1.26.0",
+      "os": "darwin",
+      "schema": 37,
+      "source": "vcs",
+      "version": "0.3.5"
+    },
+    "post_migration_situation": {
+      "agencies": [],
+      "dispatches": {
+        "active": 0,
+        "agents": [],
+        "total": 0
+      },
+      "queue": {
+        "pending": 0,
+        "retrying": 0,
+        "running": 0
+      },
+      "recent_events": [],
+      "runs": [
+        {
+          "created_at": 1787081753,
+          "goal": "Synchronize the Pi-native Skaffen harness with current Clavain and Intercore contracts while preserving Intercore authority, safe migrations, exact pins, and reversible evidence-backed adoption decisions.",
+          "id": "l39wvala",
+          "oodarc_role": "observe",
+          "phase": "brainstorm",
+          "producer": {
+            "kind": "agent_host",
+            "name": "pi",
+            "version": "0.84.1"
+          },
+          "project_dir": "",
+          "status": "active"
+        },
+        {
+          "created_at": 1787081753,
+          "goal": "Synchronize the Pi-native Skaffen harness with current Clavain and Intercore contracts while preserving Intercore authority, safe migrations, exact pins, and reversible evidence-backed adoption decisions.",
+          "id": "niya78he",
+          "oodarc_role": "observe",
+          "phase": "brainstorm",
+          "producer": {
+            "kind": "agent_host",
+            "name": "pi",
+            "version": "0.84.1"
+          },
+          "project_dir": "/Users/arouth/projects/Clavain",
+          "status": "active"
+        },
+        {
+          "created_at": 1787081753,
+          "goal": "Synchronize the Pi-native Skaffen harness with current Clavain and Intercore contracts while preserving Intercore authority, safe migrations, exact pins, and reversible evidence-backed adoption decisions.",
+          "id": "vh82qo8n",
+          "oodarc_role": "observe",
+          "phase": "brainstorm",
+          "producer": {
+            "kind": "agent_host",
+            "name": "pi",
+            "version": "0.84.1"
+          },
+          "project_dir": "/Users/arouth/projects/intercore",
+          "status": "active"
+        },
+        {
+          "created_at": 1787081753,
+          "goal": "Synchronize the Pi-native Skaffen harness with current Clavain and Intercore contracts while preserving Intercore authority, safe migrations, exact pins, and reversible evidence-backed adoption decisions.",
+          "id": "1odse4u8",
+          "oodarc_role": "observe",
+          "phase": "brainstorm",
+          "producer": {
+            "kind": "agent_host",
+            "name": "pi",
+            "version": "0.84.1"
+          },
+          "project_dir": "/Users/arouth/projects/Skaffen",
+          "status": "active"
+        },
+        {
+          "created_at": 1774014405,
+          "goal": "codec-tdb",
+          "id": "uehw21te",
+          "oodarc_role": "observe",
+          "phase": "brainstorm",
+          "project_dir": "/Users/arouth/projects/codec",
+          "status": "active"
+        }
+      ],
+      "timestamp": "2026-08-18T19:46:11.103704Z"
+    },
+    "pre_migration_situation": {
+      "dispatches": {
+        "active": 0,
+        "agents": [],
+        "total": 0
+      },
+      "queue": {
+        "pending": 0,
+        "retrying": 0,
+        "running": 0
+      },
+      "recent_events": [],
+      "runs": [
+        {
+          "created_at": 1787081753,
+          "goal": "Synchronize the Pi-native Skaffen harness with current Clavain and Intercore contracts while preserving Intercore authority, safe migrations, exact pins, and reversible evidence-backed adoption decisions.",
+          "id": "l39wvala",
+          "oodarc_role": "observe",
+          "phase": "brainstorm",
+          "project_dir": "",
+          "status": "active"
+        },
+        {
+          "created_at": 1787081753,
+          "goal": "Synchronize the Pi-native Skaffen harness with current Clavain and Intercore contracts while preserving Intercore authority, safe migrations, exact pins, and reversible evidence-backed adoption decisions.",
+          "id": "niya78he",
+          "oodarc_role": "observe",
+          "phase": "brainstorm",
+          "project_dir": "/Users/arouth/projects/Clavain",
+          "status": "active"
+        },
+        {
+          "created_at": 1787081753,
+          "goal": "Synchronize the Pi-native Skaffen harness with current Clavain and Intercore contracts while preserving Intercore authority, safe migrations, exact pins, and reversible evidence-backed adoption decisions.",
+          "id": "vh82qo8n",
+          "oodarc_role": "observe",
+          "phase": "brainstorm",
+          "project_dir": "/Users/arouth/projects/intercore",
+          "status": "active"
+        },
+        {
+          "created_at": 1787081753,
+          "goal": "Synchronize the Pi-native Skaffen harness with current Clavain and Intercore contracts while preserving Intercore authority, safe migrations, exact pins, and reversible evidence-backed adoption decisions.",
+          "id": "1odse4u8",
+          "oodarc_role": "observe",
+          "phase": "brainstorm",
+          "project_dir": "/Users/arouth/projects/Skaffen",
+          "status": "active"
+        },
+        {
+          "created_at": 1774014405,
+          "goal": "codec-tdb",
+          "id": "uehw21te",
+          "oodarc_role": "observe",
+          "phase": "brainstorm",
+          "project_dir": "/Users/arouth/projects/codec",
+          "status": "active"
+        }
+      ],
+      "timestamp": "2026-08-18T19:46:09.828237Z"
+    }
+  },
+  "data_preservation": {
+    "common_column_data_equal": true,
+    "confirmed_at": "2026-08-18T19:59:14.542253+00:00",
+    "existing_tables_compared": 37,
+    "new_table_counts": {
+      "agency_events": 0,
+      "goals": 0
+    },
+    "schema37_backup": "/Users/arouth/projects/.clavain/intercore.db.backup-20260818-124609-schema37-pre-v39",
+    "schema39_live": "/Users/arouth/projects/.clavain/intercore.db",
+    "tables": {
+      "_migrate_lock": {
+        "common_columns": [
+          "x"
+        ],
+        "rows": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "action_receipts": {
+        "common_columns": [
+          "receipt_id",
+          "timestamp",
+          "agent_id",
+          "model",
+          "tool_calls_json",
+          "parent_run_id",
+          "content_hash",
+          "schema_version",
+          "signature",
+          "signature_alg",
+          "key_id",
+          "signed_at",
+          "payload_canonical",
+          "inserted_at"
+        ],
+        "rows": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "audit_log": {
+        "common_columns": [
+          "id",
+          "session_id",
+          "event_type",
+          "actor",
+          "target",
+          "payload",
+          "metadata",
+          "prev_hash",
+          "checksum",
+          "sequence_num",
+          "trace_id",
+          "created_at"
+        ],
+        "rows": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "authorizations": {
+        "common_columns": [
+          "id",
+          "op_type",
+          "target",
+          "agent_id",
+          "bead_id",
+          "mode",
+          "policy_match",
+          "policy_hash",
+          "vetted_sha",
+          "vetting",
+          "cross_project_id",
+          "created_at",
+          "sig_version",
+          "signature",
+          "signed_at"
+        ],
+        "rows": 3,
+        "sha256": "3ac8a2a27a4cd375718977227be6f399eadfec3558dcf987edc091bc5185822c"
+      },
+      "authz_tokens": {
+        "common_columns": [
+          "id",
+          "op_type",
+          "target",
+          "agent_id",
+          "bead_id",
+          "delegate_to",
+          "expires_at",
+          "consumed_at",
+          "revoked_at",
+          "issued_by",
+          "parent_token",
+          "root_token",
+          "depth",
+          "sig_version",
+          "signature",
+          "created_at"
+        ],
+        "rows": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "coordination_events": {
+        "common_columns": [
+          "id",
+          "lock_id",
+          "run_id",
+          "event_type",
+          "owner",
+          "pattern",
+          "scope",
+          "reason",
+          "envelope_json",
+          "created_at"
+        ],
+        "rows": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "coordination_locks": {
+        "common_columns": [
+          "id",
+          "type",
+          "owner",
+          "scope",
+          "pattern",
+          "exclusive",
+          "reason",
+          "ttl_seconds",
+          "created_at",
+          "expires_at",
+          "released_at",
+          "dispatch_id",
+          "run_id"
+        ],
+        "rows": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "cost_reconciliations": {
+        "common_columns": [
+          "id",
+          "run_id",
+          "dispatch_id",
+          "reported_in",
+          "reported_out",
+          "billed_in",
+          "billed_out",
+          "delta_in",
+          "delta_out",
+          "source",
+          "created_at"
+        ],
+        "rows": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "discoveries": {
+        "common_columns": [
+          "id",
+          "source",
+          "source_id",
+          "title",
+          "summary",
+          "url",
+          "raw_metadata",
+          "embedding",
+          "relevance_score",
+          "confidence_tier",
+          "status",
+          "run_id",
+          "bead_id",
+          "discovered_at",
+          "promoted_at",
+          "reviewed_at"
+        ],
+        "rows": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "discovery_events": {
+        "common_columns": [
+          "id",
+          "discovery_id",
+          "event_type",
+          "from_status",
+          "to_status",
+          "payload",
+          "created_at"
+        ],
+        "rows": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "dispatch_events": {
+        "common_columns": [
+          "id",
+          "dispatch_id",
+          "run_id",
+          "from_status",
+          "to_status",
+          "event_type",
+          "reason",
+          "envelope_json",
+          "created_at"
+        ],
+        "rows": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "dispatches": {
+        "common_columns": [
+          "id",
+          "agent_type",
+          "status",
+          "project_dir",
+          "prompt_file",
+          "prompt_hash",
+          "output_file",
+          "verdict_file",
+          "pid",
+          "exit_code",
+          "name",
+          "model",
+          "sandbox",
+          "sandbox_spec",
+          "sandbox_effective",
+          "timeout_sec",
+          "turns",
+          "commands",
+          "messages",
+          "input_tokens",
+          "output_tokens",
+          "cache_hits",
+          "created_at",
+          "started_at",
+          "completed_at",
+          "verdict_status",
+          "verdict_summary",
+          "error_message",
+          "scope_id",
+          "parent_id",
+          "base_repo_commit",
+          "retry_count",
+          "conflict_type",
+          "quarantine_reason",
+          "spawn_depth",
+          "parent_dispatch_id"
+        ],
+        "rows": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "feedback_idempotency": {
+        "common_columns": [
+          "idempotency_key",
+          "discovery_id",
+          "signal_type",
+          "signal_data",
+          "actor",
+          "signal_id",
+          "created_at"
+        ],
+        "rows": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "feedback_signals": {
+        "common_columns": [
+          "id",
+          "discovery_id",
+          "signal_type",
+          "signal_data",
+          "actor",
+          "created_at"
+        ],
+        "rows": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "intent_events": {
+        "common_columns": [
+          "id",
+          "intent_type",
+          "bead_id",
+          "idempotency_key",
+          "session_id",
+          "run_id",
+          "success",
+          "error_detail",
+          "created_at"
+        ],
+        "rows": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "interest_profile": {
+        "common_columns": [
+          "id",
+          "topic_vector",
+          "keyword_weights",
+          "source_weights",
+          "updated_at"
+        ],
+        "rows": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "interspect_events": {
+        "common_columns": [
+          "id",
+          "run_id",
+          "agent_name",
+          "event_type",
+          "override_reason",
+          "context_json",
+          "session_id",
+          "project_dir",
+          "created_at"
+        ],
+        "rows": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "landed_changes": {
+        "common_columns": [
+          "id",
+          "commit_sha",
+          "project_dir",
+          "branch",
+          "dispatch_id",
+          "run_id",
+          "bead_id",
+          "session_id",
+          "merge_intent_id",
+          "landed_at",
+          "reverted_at",
+          "reverted_by",
+          "files_changed",
+          "insertions",
+          "deletions"
+        ],
+        "rows": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "lane_events": {
+        "common_columns": [
+          "id",
+          "lane_id",
+          "event_type",
+          "payload",
+          "created_at"
+        ],
+        "rows": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "lane_members": {
+        "common_columns": [
+          "lane_id",
+          "bead_id",
+          "added_at"
+        ],
+        "rows": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "lanes": {
+        "common_columns": [
+          "id",
+          "name",
+          "lane_type",
+          "status",
+          "description",
+          "metadata",
+          "created_at",
+          "updated_at",
+          "closed_at",
+          "intent"
+        ],
+        "rows": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "merge_intents": {
+        "common_columns": [
+          "id",
+          "dispatch_id",
+          "run_id",
+          "base_commit",
+          "patch_hash",
+          "status",
+          "result_commit",
+          "conflict_files",
+          "error_message",
+          "created_at",
+          "completed_at"
+        ],
+        "rows": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "phase_actions": {
+        "common_columns": [
+          "id",
+          "run_id",
+          "phase",
+          "action_type",
+          "command",
+          "args",
+          "mode",
+          "priority",
+          "created_at",
+          "updated_at"
+        ],
+        "rows": 6,
+        "sha256": "1cbd59fcf05bbd8e2926ec1bdd8ab98afe6ac0e9fee6e49b27007a227b85d8bd"
+      },
+      "phase_events": {
+        "common_columns": [
+          "id",
+          "run_id",
+          "from_phase",
+          "to_phase",
+          "event_type",
+          "gate_result",
+          "gate_tier",
+          "reason",
+          "envelope_json",
+          "created_at"
+        ],
+        "rows": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "project_deps": {
+        "common_columns": [
+          "id",
+          "portfolio_run_id",
+          "upstream_project",
+          "downstream_project",
+          "created_at"
+        ],
+        "rows": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "publish_state": {
+        "common_columns": [
+          "id",
+          "plugin",
+          "from_ver",
+          "to_ver",
+          "phase",
+          "root",
+          "market",
+          "started_at",
+          "updated_at",
+          "error"
+        ],
+        "rows": 6,
+        "sha256": "1a2fe10a026502a2129c87ce9a2126270969fa92a8a790ed91fca54554271837"
+      },
+      "review_events": {
+        "common_columns": [
+          "id",
+          "run_id",
+          "finding_id",
+          "agents_json",
+          "resolution",
+          "dismissal_reason",
+          "chosen_severity",
+          "impact",
+          "session_id",
+          "project_dir",
+          "created_at",
+          "event_type"
+        ],
+        "rows": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "routing_decisions": {
+        "common_columns": [
+          "id",
+          "dispatch_id",
+          "run_id",
+          "session_id",
+          "bead_id",
+          "project_dir",
+          "phase",
+          "agent",
+          "category",
+          "selected_model",
+          "rule_matched",
+          "floor_applied",
+          "floor_from",
+          "floor_to",
+          "candidates",
+          "excluded",
+          "policy_hash",
+          "override_id",
+          "complexity",
+          "context_json",
+          "decided_at"
+        ],
+        "rows": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "run_agents": {
+        "common_columns": [
+          "id",
+          "run_id",
+          "agent_type",
+          "name",
+          "status",
+          "dispatch_id",
+          "created_at",
+          "updated_at"
+        ],
+        "rows": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "run_artifacts": {
+        "common_columns": [
+          "id",
+          "run_id",
+          "phase",
+          "path",
+          "type",
+          "content_hash",
+          "dispatch_id",
+          "status",
+          "created_at"
+        ],
+        "rows": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "run_replay_inputs": {
+        "common_columns": [
+          "id",
+          "run_id",
+          "kind",
+          "input_key",
+          "payload",
+          "artifact_ref",
+          "event_source",
+          "event_id",
+          "created_at"
+        ],
+        "rows": 1,
+        "sha256": "38cc71d773b027a9d04f34eb93ed96ab74af723a6e9b771a9dda37a9070c92b8"
+      },
+      "runs": {
+        "common_columns": [
+          "id",
+          "project_dir",
+          "goal",
+          "status",
+          "phase",
+          "complexity",
+          "force_full",
+          "auto_advance",
+          "created_at",
+          "updated_at",
+          "completed_at",
+          "scope_id",
+          "metadata",
+          "phases",
+          "token_budget",
+          "budget_warn_pct",
+          "parent_run_id",
+          "max_dispatches",
+          "budget_enforce",
+          "max_agents",
+          "gate_rules"
+        ],
+        "rows": 5,
+        "sha256": "4f1ffc65f4021497b5889704e9d5b4b1358da22f82c27c2c8bb1dd6457e0fb50"
+      },
+      "scheduler_jobs": {
+        "common_columns": [
+          "id",
+          "status",
+          "priority",
+          "agent_type",
+          "session_name",
+          "batch_id",
+          "dispatch_id",
+          "spawn_opts",
+          "max_retries",
+          "retry_count",
+          "error_msg",
+          "created_at",
+          "started_at",
+          "completed_at"
+        ],
+        "rows": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "sentinels": {
+        "common_columns": [
+          "name",
+          "scope_id",
+          "last_fired"
+        ],
+        "rows": 10,
+        "sha256": "300ea8c1f030e3740b9e171b988e80fa4e2099993fcd9dd33e108a2acefacd32"
+      },
+      "session_attributions": {
+        "common_columns": [
+          "id",
+          "session_id",
+          "project_dir",
+          "bead_id",
+          "run_id",
+          "phase",
+          "created_at"
+        ],
+        "rows": 65,
+        "sha256": "93f715fda2974b0f9e2a208eecf64ee172fe887e737983b383d7fa9dd9926012"
+      },
+      "sessions": {
+        "common_columns": [
+          "id",
+          "session_id",
+          "project_dir",
+          "agent_type",
+          "model",
+          "started_at",
+          "ended_at",
+          "metadata"
+        ],
+        "rows": 401,
+        "sha256": "92857b0d73f94047692a0e6a733c764701b3edcc29e6fb563c45488d3b925e86"
+      },
+      "state": {
+        "common_columns": [
+          "key",
+          "scope_id",
+          "payload",
+          "updated_at",
+          "expires_at"
+        ],
+        "rows": 2,
+        "sha256": "8a830661efba91aae037ca8a498f992b506c95444d1bbe8f07cd244f5968faae"
+      }
+    }
+  },
+  "database": {
+    "backup_open_check": {
+      "foreign_key_violations": 0,
+      "integrity": "ok",
+      "schema": 37
+    },
+    "live_path": "/Users/arouth/projects/.clavain/intercore.db",
+    "post_check": {
+      "agency_events_rows": 0,
+      "foreign_key_violations": 0,
+      "goals_rows": 0,
+      "integrity": "ok",
+      "lanes_intent_present": true,
+      "runs_goal_id_present": true,
+      "schema": 39
+    },
+    "schema37_backup_path": "/Users/arouth/projects/.clavain/intercore.db.backup-20260818-124609-schema37-pre-v39",
+    "schema37_backup_sha256": "66376c26a103ddcec7785465641f93be14fd558103011c516e2561d8d1c0ab8a"
+  },
+  "maintenance_fence": {
+    "active_dispatches": 0,
+    "active_ic_processes": 0,
+    "open_db_wal_shm_handles": 0,
+    "queue_pending": 0,
+    "queue_retrying": 0,
+    "queue_running": 0
+  },
+  "operation": "intercore-live-schema-migration",
+  "rollback_boundary": {
+    "active_dispatches": 0,
+    "confirmed_at": "2026-08-18T19:59:14.542253+00:00",
+    "installed_sha256": "c28525dc3d4b18c2c1ad817b85bb43d9bee6468785859b6996a4b3184abf868e",
+    "old_binary_sha256": "c765aef6d7d20a190be891782f36e8bfa1f85681aaa4ebc27fbb243041f9e2c7",
+    "open_handles": 0,
+    "queue_running": 0,
+    "reason": "no schema-39 application-data write; all pre-existing common-column row multisets equal the schema-37 backup; goals and agency_events remain empty",
+    "rollback_eligible": true,
+    "schema37_backup_sha256": "66376c26a103ddcec7785465641f93be14fd558103011c516e2561d8d1c0ab8a",
+    "staged_sha256": "c28525dc3d4b18c2c1ad817b85bb43d9bee6468785859b6996a4b3184abf868e"
+  },
+  "rollback_procedure": {
+    "after_first_v39_application_write": "rollback ineligible; roll forward only",
+    "eligible_when": "before any schema-39 application-data write",
+    "steps": [
+      "fence all Intercore writers and verify no DB/WAL/SHM handles",
+      "remove transient live WAL/SHM sidecars",
+      "restore schema-37 database backup to the live path with mode 0600",
+      "restore schema-37 binary backup to ~/.local/bin/ic with mode 0755",
+      "verify schema 37, integrity ok, zero foreign-key violations, and ic health ok"
+    ]
+  },
+  "schema_version": 1,
+  "timeline": {
+    "backup_and_install": "2026-08-18T12:46:10-07:00",
+    "final_pre_snapshot": "2026-08-18T12:46:09-07:00",
+    "last_no_application_write_confirmation": "2026-08-18T19:59:14.542253+00:00",
+    "post_migration_verification": "2026-08-18T12:46:11-07:00"
+  }
+}

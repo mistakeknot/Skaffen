@@ -6,7 +6,7 @@ Current development targets a Pi-hosted package: Pi owns the universal provider/
 
 ## Pi-hosted harness (in development)
 
-The first vertical slice lives in `pi-package/`. It observes Intercore without writing to it and adds `/harness`, `/situation`, `observe_situation`, and compact run/OODARC status to Pi.
+The vertical slice lives in `pi-package/`. It observes Intercore without writing to it and adds `/harness`, `/situation`, `observe_situation`, and compact run/OODARC status to Pi. It independently validates operational health, provenance-stamped `ic version --json` output, and schema-39 agency/producer ownership annotations while remaining compatible with schema-37 snapshots.
 
 ```bash
 cd pi-package
@@ -20,7 +20,7 @@ pi --no-extensions -e .
 pi install /absolute/path/to/Skaffen/pi-package
 ```
 
-A missing `ic` binary, timeout, malformed snapshot, or schema mismatch is displayed as degraded state; startup never runs `ic init` or another migration/write command.
+A missing `ic` binary, timeout, malformed snapshot, or schema mismatch is displayed as degraded state; missing or dirty build provenance is surfaced separately from database health. Situation rendering bounds run and agency collections. Startup never runs `ic init` or another migration/write command.
 
 ## Existing Go runtime
 

@@ -1,0 +1,61 @@
+{
+  "timestamp": "2026-08-18T19:46:09.828237Z",
+  "runs": [
+    {
+      "id": "l39wvala",
+      "phase": "brainstorm",
+      "oodarc_role": "observe",
+      "status": "active",
+      "project_dir": "",
+      "goal": "Synchronize the Pi-native Skaffen harness with current Clavain and Intercore contracts while preserving Intercore authority, safe migrations, exact pins, and reversible evidence-backed adoption decisions.",
+      "created_at": 1787081753
+    },
+    {
+      "id": "niya78he",
+      "phase": "brainstorm",
+      "oodarc_role": "observe",
+      "status": "active",
+      "project_dir": "/Users/arouth/projects/Clavain",
+      "goal": "Synchronize the Pi-native Skaffen harness with current Clavain and Intercore contracts while preserving Intercore authority, safe migrations, exact pins, and reversible evidence-backed adoption decisions.",
+      "created_at": 1787081753
+    },
+    {
+      "id": "vh82qo8n",
+      "phase": "brainstorm",
+      "oodarc_role": "observe",
+      "status": "active",
+      "project_dir": "/Users/arouth/projects/intercore",
+      "goal": "Synchronize the Pi-native Skaffen harness with current Clavain and Intercore contracts while preserving Intercore authority, safe migrations, exact pins, and reversible evidence-backed adoption decisions.",
+      "created_at": 1787081753
+    },
+    {
+      "id": "1odse4u8",
+      "phase": "brainstorm",
+      "oodarc_role": "observe",
+      "status": "active",
+      "project_dir": "/Users/arouth/projects/Skaffen",
+      "goal": "Synchronize the Pi-native Skaffen harness with current Clavain and Intercore contracts while preserving Intercore authority, safe migrations, exact pins, and reversible evidence-backed adoption decisions.",
+      "created_at": 1787081753
+    },
+    {
+      "id": "uehw21te",
+      "phase": "brainstorm",
+      "oodarc_role": "observe",
+      "status": "active",
+      "project_dir": "/Users/arouth/projects/codec",
+      "goal": "codec-tdb",
+      "created_at": 1774014405
+    }
+  ],
+  "dispatches": {
+    "active": 0,
+    "total": 0,
+    "agents": []
+  },
+  "recent_events": [],
+  "queue": {
+    "pending": 0,
+    "running": 0,
+    "retrying": 0
+  }
+}

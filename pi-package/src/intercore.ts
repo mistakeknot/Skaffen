@@ -1,5 +1,14 @@
 import { isAbsolute, relative, resolve } from "node:path";
-import type { ExecResult, HarnessState, RunSummary, SituationSnapshot } from "./types.ts";
+import type {
+	AgencySummary,
+	ExecResult,
+	HarnessState,
+	IntercoreProvenance,
+	IntercoreVersion,
+	ProducerSummary,
+	RunSummary,
+	SituationSnapshot,
+} from "./types.ts";
 
 export type IcRunner = (
 	args: readonly string[],
@@ -15,8 +24,32 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 	return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function isFiniteNumber(value: unknown): value is number {
-	return typeof value === "number" && Number.isFinite(value);
+function isNonnegativeSafeInteger(value: unknown): value is number {
+	return typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
+}
+
+function isProducerSummary(value: unknown): value is ProducerSummary {
+	if (!isRecord(value)) return false;
+	return (
+		typeof value.kind === "string" &&
+		typeof value.name === "string" &&
+		(value.class === undefined || typeof value.class === "string") &&
+		(value.version === undefined || typeof value.version === "string")
+	);
+}
+
+function isAgencySummary(value: unknown): value is AgencySummary {
+	if (!isRecord(value)) return false;
+	return (
+		typeof value.name === "string" &&
+		typeof value.cycle_id === "string" &&
+		typeof value.stage === "string" &&
+		typeof value.event_type === "string" &&
+		(value.run_id === undefined || typeof value.run_id === "string") &&
+		(value.project_dir === undefined || typeof value.project_dir === "string") &&
+		isNonnegativeSafeInteger(value.last_event_id) &&
+		typeof value.updated_at === "string"
+	);
 }
 
 function isRunSummary(value: unknown): value is RunSummary {
@@ -28,7 +61,8 @@ function isRunSummary(value: unknown): value is RunSummary {
 		typeof value.status === "string" &&
 		typeof value.project_dir === "string" &&
 		typeof value.goal === "string" &&
-		isFiniteNumber(value.created_at)
+		isNonnegativeSafeInteger(value.created_at) &&
+		(value.producer === undefined || isProducerSummary(value.producer))
 	);
 }
 
@@ -39,17 +73,20 @@ function isSituationSnapshot(value: unknown): value is SituationSnapshot {
 	}
 	if (!isRecord(value.dispatches)) return false;
 	if (
-		!isFiniteNumber(value.dispatches.active) ||
-		!isFiniteNumber(value.dispatches.total) ||
+		!isNonnegativeSafeInteger(value.dispatches.active) ||
+		!isNonnegativeSafeInteger(value.dispatches.total) ||
 		!Array.isArray(value.dispatches.agents)
 	) {
 		return false;
 	}
 	if (!Array.isArray(value.recent_events) || !isRecord(value.queue)) return false;
+	if (value.agencies !== undefined) {
+		if (!Array.isArray(value.agencies) || !value.agencies.every(isAgencySummary)) return false;
+	}
 	if (
-		!isFiniteNumber(value.queue.pending) ||
-		!isFiniteNumber(value.queue.running) ||
-		!isFiniteNumber(value.queue.retrying)
+		!isNonnegativeSafeInteger(value.queue.pending) ||
+		!isNonnegativeSafeInteger(value.queue.running) ||
+		!isNonnegativeSafeInteger(value.queue.retrying)
 	) {
 		return false;
 	}
@@ -57,14 +94,39 @@ function isSituationSnapshot(value: unknown): value is SituationSnapshot {
 		if (!isRecord(value.budget)) return false;
 		if (
 			typeof value.budget.run_id !== "string" ||
-			!isFiniteNumber(value.budget.budget) ||
-			!isFiniteNumber(value.budget.used) ||
-			!isFiniteNumber(value.budget.remaining)
+			!isNonnegativeSafeInteger(value.budget.budget) ||
+			!isNonnegativeSafeInteger(value.budget.used) ||
+			!isNonnegativeSafeInteger(value.budget.remaining)
 		) {
 			return false;
 		}
 	}
 	return true;
+}
+
+function isIntercoreVersion(value: unknown): value is IntercoreVersion {
+	if (!isRecord(value)) return false;
+	return (
+		typeof value.version === "string" &&
+		(value.commit === undefined || typeof value.commit === "string") &&
+		(value.commit_time === undefined || typeof value.commit_time === "string") &&
+		typeof value.dirty === "boolean" &&
+		typeof value.go === "string" &&
+		typeof value.os === "string" &&
+		typeof value.arch === "string" &&
+		typeof value.source === "string" &&
+		(value.schema === undefined || isNonnegativeSafeInteger(value.schema))
+	);
+}
+
+export function parseIntercoreVersion(stdout: string): IntercoreVersion | undefined {
+	if (!stdout.trim()) return undefined;
+	try {
+		const value: unknown = JSON.parse(stdout);
+		return isIntercoreVersion(value) ? value : undefined;
+	} catch {
+		return undefined;
+	}
 }
 
 export function parseSituation(stdout: string): SituationSnapshot | undefined {
@@ -99,7 +161,9 @@ async function runCommand(
 	try {
 		return { result: await runner(args, options) };
 	} catch (error) {
-		return { error: error instanceof Error ? error : new Error(String(error)) };
+		const normalized = error instanceof Error ? error : new Error(String(error));
+		if (normalized.name === "AbortError") throw normalized;
+		return { error: normalized };
 	}
 }
 
@@ -132,10 +196,31 @@ function commandFailure(label: string, outcome: CommandOutcome): string | undefi
 	return undefined;
 }
 
+function inspectProvenance(outcome: CommandOutcome): {
+	provenance: IntercoreProvenance;
+	version?: IntercoreVersion;
+	provenanceReason?: string;
+} {
+	const failure = commandFailure("ic version", outcome);
+	if (failure) return { provenance: "unavailable", provenanceReason: failure };
+
+	const version = outcome.result ? parseIntercoreVersion(outcome.result.stdout) : undefined;
+	if (!version) return { provenance: "unavailable", provenanceReason: "invalid ic version response" };
+	if (version.dirty) return { provenance: "unverified", version, provenanceReason: "Intercore build is dirty" };
+	if (!version.commit?.trim()) {
+		return { provenance: "unverified", version, provenanceReason: "Intercore build commit is unavailable" };
+	}
+	if (!version.source.trim() || version.source === "unknown") {
+		return { provenance: "unverified", version, provenanceReason: "Intercore build source is unknown" };
+	}
+	return { provenance: "verified", version };
+}
+
 function bothCommandsUnavailable(health: CommandOutcome, situation: CommandOutcome): boolean {
 	const noUsableSignal = (outcome: CommandOutcome): boolean => {
 		if (outcome.error) return true;
 		if (!outcome.result) return true;
+		if (outcome.result.code === 127) return true;
 		return (
 			outcome.result.code !== 0 &&
 			!outcome.result.killed &&
@@ -153,8 +238,9 @@ export async function inspectIntercore(
 ): Promise<HarnessState> {
 	const started = performance.now();
 	const options = { cwd, timeout };
-	const [healthOutcome, situationOutcome] = await Promise.all([
+	const [healthOutcome, versionOutcome, situationOutcome] = await Promise.all([
 		runCommand(runner, ["health", "--json"], options),
+		runCommand(runner, ["version", "--json"], options),
 		runCommand(runner, ["situation", "snapshot", "--json"], options),
 	]);
 
@@ -189,9 +275,11 @@ export async function inspectIntercore(
 		}
 	}
 
+	const provenance = inspectProvenance(versionOutcome);
 	return {
 		health,
 		...(reason ? { reason } : {}),
+		...provenance,
 		checkedAt: new Date().toISOString(),
 		latencyMs: Math.max(0, Math.round(performance.now() - started)),
 		...(snapshot ? { snapshot, currentRun: findCurrentRun(snapshot, cwd) } : {}),
