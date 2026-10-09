@@ -60,8 +60,10 @@ type fakeAS struct {
 	expiresIn   int
 	noRotate    bool
 	tokenFail   *oauthFailure // every token call fails this way
-	refreshMode string        // refresh grants only: "500", "drop", "malformed", "oversize"
-	denyConsent bool
+	refreshMode string        // refresh grants only: "500", "drop", "malformed", "oversize", "stall"
+	// refreshEntered receives a value when a stalled refresh request arrives.
+	refreshEntered chan struct{}
+	denyConsent    bool
 
 	// State.
 	clients   map[string]string // client_id -> redirect URI
@@ -341,6 +343,17 @@ func (f *fakeAS) handleToken(w http.ResponseWriter, r *http.Request) {
 					_ = conn.Close()
 				}
 			}
+		case "stall":
+			f.mu.Lock()
+			entered := f.refreshEntered
+			f.mu.Unlock()
+			if entered != nil {
+				select {
+				case entered <- struct{}{}:
+				default:
+				}
+			}
+			<-r.Context().Done()
 		case "malformed":
 			w.Header().Set("Content-Type", "application/json")
 			_, _ = w.Write([]byte("{not json"))

@@ -61,6 +61,35 @@ type remoteFailure struct {
 // deleteBodyCap bounds how much of a session-termination response is read.
 const deleteBodyCap = 4096
 
+// ctxMutex is a mutex whose waiters can give up when a context ends, so work
+// queued behind a stalled holder (a refresh in flight) cannot outlive a
+// shutdown. The zero value is ready to use.
+type ctxMutex struct {
+	once sync.Once
+	ch   chan struct{}
+}
+
+func (m *ctxMutex) init() { m.once.Do(func() { m.ch = make(chan struct{}, 1) }) }
+
+// Lock waits without bound; use it only where the holder is known to be bounded.
+func (m *ctxMutex) Lock() { m.init(); m.ch <- struct{}{} }
+
+// LockCtx waits for the lock or for ctx to end, whichever comes first.
+func (m *ctxMutex) LockCtx(ctx context.Context) error {
+	m.init()
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	select {
+	case m.ch <- struct{}{}:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
+func (m *ctxMutex) Unlock() { <-m.ch }
+
 // remote is one connected remote MCP server: its OAuth client, its credentials
 // and its HTTP transport. It owns the lifecycle of all three.
 type remote struct {
@@ -83,7 +112,7 @@ type remote struct {
 	closeReturned atomic.Bool
 	failure       atomic.Pointer[remoteFailure]
 
-	tokMu   sync.Mutex
+	tokMu   ctxMutex // guards tok and retired; waiters can be cancelled
 	tok     *tokenSet
 	retired []*tokenSet
 
@@ -248,31 +277,31 @@ func (r *remote) doShutdown(c *Client) {
 	r.setupMu.Unlock()
 	r.setupCancel() // pending consent and registration end now
 	grace := r.opts.closeGrace
+	var closeDone chan struct{}
 	if c != nil {
-		done := make(chan struct{})
+		closeDone = make(chan struct{})
 		go func() {
 			_ = c.Close()
 			r.closeReturned.Store(true)
-			close(done)
+			close(closeDone)
 		}()
 		t := time.NewTimer(grace)
 		select {
-		case <-done:
+		case <-closeDone:
 		case <-t.C:
-			r.transportCancel()
-			t2 := time.NewTimer(grace)
-			select {
-			case <-done:
-			case <-t2.C:
-			}
-			t2.Stop()
 		}
 		t.Stop()
 	} else {
 		r.closeReturned.Store(true)
 	}
+	// The grace is over: abort transport and authentication work together, so
+	// a refresh holding the credential lock cannot keep the session DELETE
+	// queued behind it. Nothing below waits on anything uncancellable.
 	r.transportCancel()
 	r.authCancel()
+	if closeDone != nil {
+		<-closeDone // Close must have returned before any credential is wiped
+	}
 	r.setup.Wait() // no credential may arrive after the wipe below
 	r.bg.Wait()
 	if r.testBeforeZero != nil {
@@ -293,8 +322,10 @@ func (r *remote) doShutdown(c *Client) {
 
 // accessToken returns the bearer token to send, refreshing it first when it
 // is about to expire. Refreshes are single-flight under tokMu.
-func (r *remote) accessToken() (string, error) {
-	r.tokMu.Lock()
+func (r *remote) accessToken(ctx context.Context) (string, error) {
+	if err := r.tokMu.LockCtx(ctx); err != nil {
+		return "", err
+	}
 	defer r.tokMu.Unlock()
 	if r.zeroed.Load() || r.tok == nil || r.tok.access.isZero() {
 		return "", ErrRemoteClosed
@@ -310,8 +341,10 @@ func (r *remote) accessToken() (string, error) {
 // refreshAfter401 returns the token to retry with after the server rejected
 // used. If another caller already replaced the token, no second refresh is
 // made.
-func (r *remote) refreshAfter401(used string) (string, error) {
-	r.tokMu.Lock()
+func (r *remote) refreshAfter401(ctx context.Context, used string) (string, error) {
+	if err := r.tokMu.LockCtx(ctx); err != nil {
+		return "", err
+	}
 	defer r.tokMu.Unlock()
 	if r.zeroed.Load() || r.tok == nil {
 		return "", ErrRemoteClosed
@@ -458,7 +491,7 @@ func (t *remoteTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	var once sync.Once
 	release := func() { once.Do(func() { stop(); timeoutCancel(); cancel() }) }
 
-	tok, err := r.accessToken()
+	tok, err := r.accessToken(ctx)
 	if err != nil {
 		closeRequestBody(req)
 		release()
@@ -479,7 +512,7 @@ func (t *remoteTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 		body, ok := replayBody(req)
 		next, rerr := "", error(nil)
 		if ok {
-			next, rerr = r.refreshAfter401(tok)
+			next, rerr = r.refreshAfter401(ctx, tok)
 		} else {
 			rerr = r.setFailure(kindTerminalAuth, fmt.Errorf("%w: the server rejected the token and the request cannot be replayed", ErrRemoteAuth))
 		}

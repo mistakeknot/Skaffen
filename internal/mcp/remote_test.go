@@ -1143,3 +1143,54 @@ func TestRemoteShutdown_RejectsAndWipesTokensArrivingDuringShutdown(t *testing.T
 		t.Errorf("%d MCP requests were made with tokens that arrived during shutdown", n)
 	}
 }
+
+// TestRemoteShutdown_StalledRefreshWithQueuedDeleteIsBounded stalls a token
+// refresh that holds the credential lock, queues the session DELETE behind it
+// and shuts down. At the grace deadline both the transport and the
+// authentication work must be cancelled, so shutdown ends near one grace
+// period (not two) and only after Close has returned.
+func TestRemoteShutdown_StalledRefreshWithQueuedDeleteIsBounded(t *testing.T) {
+	f := newFakeAS(t)
+	f.attachMCP()
+	r := newRemoteForTest(t, f)
+	c := connectT(t, r, f)
+
+	entered := make(chan struct{}, 1)
+	f.tune(func(f *fakeAS) { f.refreshMode, f.refreshEntered = "stall", entered })
+	r.tokMu.Lock()
+	r.tok.expiry = time.Now().Add(time.Second) // inside the refresh leeway
+	r.tokMu.Unlock()
+
+	callDone := make(chan error, 1)
+	go func() {
+		_, err := c.CallTool(ctxT(t), "list_accounts", nil)
+		callDone <- err
+	}()
+	select {
+	case <-entered:
+	case <-time.After(10 * time.Second):
+		t.Fatal("the refresh never started")
+	}
+
+	var closeReturnedAtZero bool
+	r.testBeforeZero = func() { closeReturnedAtZero = r.closeReturned.Load() }
+	start := time.Now()
+	r.shutdown(c)
+	elapsed := time.Since(start)
+
+	grace := r.opts.closeGrace
+	if elapsed > grace+grace/2 {
+		t.Errorf("shutdown took %v with a %v grace: authentication work was not cancelled at the deadline", elapsed, grace)
+	}
+	if !closeReturnedAtZero {
+		t.Error("credentials were zeroed before Close returned")
+	}
+	select {
+	case err := <-callDone:
+		if err == nil {
+			t.Error("the call behind the stalled refresh should have failed")
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("the stalled call never ended")
+	}
+}
