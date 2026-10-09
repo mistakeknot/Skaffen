@@ -312,6 +312,42 @@ func TestManagerRemotePolicy(t *testing.T) {
 			wantState: kindTerminalAuth, wantRefresh: 1,
 		},
 		{
+			name: "refresh 5xx is terminal and never reconnects",
+			setup: func(f *fakeAS, m *fakeMCP) {
+				f.expireAccess(m.lastToken())
+				f.tune(func(f *fakeAS) { f.refreshMode = "500" })
+			},
+			wantInit:  1,
+			wantState: kindTerminalAuth, wantRefresh: 1,
+		},
+		{
+			name: "refresh network error is terminal and never reconnects",
+			setup: func(f *fakeAS, m *fakeMCP) {
+				f.expireAccess(m.lastToken())
+				f.tune(func(f *fakeAS) { f.refreshMode = "drop" })
+			},
+			wantInit:  1,
+			wantState: kindTerminalAuth, wantRefresh: 1,
+		},
+		{
+			name: "refresh malformed success is terminal and never reconnects",
+			setup: func(f *fakeAS, m *fakeMCP) {
+				f.expireAccess(m.lastToken())
+				f.tune(func(f *fakeAS) { f.refreshMode = "malformed" })
+			},
+			wantInit:  1,
+			wantState: kindTerminalAuth, wantRefresh: 1,
+		},
+		{
+			name: "refresh oversized response is terminal and never reconnects",
+			setup: func(f *fakeAS, m *fakeMCP) {
+				f.expireAccess(m.lastToken())
+				f.tune(func(f *fakeAS) { f.refreshMode = "oversize" })
+			},
+			wantInit:  1,
+			wantState: kindTerminalAuth, wantRefresh: 1,
+		},
+		{
 			name:      "event stream never reconnects",
 			setup:     func(_ *fakeAS, m *fakeMCP) { m.set(func(k *fakeKnobs) { k.sse = true }) },
 			wantInit:  1,

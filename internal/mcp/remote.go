@@ -282,8 +282,11 @@ func (r *remote) refreshAfter401(used string) (string, error) {
 }
 
 // refreshLocked trades the refresh token for a new set. The caller holds
-// tokMu. A refusal or an out-of-scope grant is terminal; a network error or a
-// server error is returned without changing state, so a later call may retry.
+// tokMu. Every failed refresh is terminal: a refusal, an out-of-scope grant, a
+// server error, a network error, a malformed or oversized reply. After a lost
+// or unreadable reply the server may already have rotated the refresh token,
+// so retrying could replay a spent credential. The recorded reason is the
+// boundary-built OAuth error, which never carries a response body.
 func (r *remote) refreshLocked() error {
 	if f := r.failure.Load(); f != nil {
 		return f.err
@@ -294,16 +297,10 @@ func (r *remote) refreshLocked() error {
 	}
 	ts, err := r.oc.refresh(r.authCtx, old.refresh)
 	if err != nil {
-		var oe *oauthError
-		switch {
-		case errors.Is(err, ErrScopeMismatch):
+		if errors.Is(err, ErrScopeMismatch) {
 			old.zero()
-			return r.setFailure(kindTerminalAuth, fmt.Errorf("%w: %w", ErrRemoteAuth, err))
-		case errors.As(err, &oe) && oe.Status >= 400 && oe.Status <= 499:
-			return r.setFailure(kindTerminalAuth, fmt.Errorf("%w: %v", ErrRemoteAuth, err))
-		default:
-			return err
 		}
+		return r.setFailure(kindTerminalAuth, fmt.Errorf("%w: %w", ErrRemoteAuth, err))
 	}
 	retired := &tokenSet{access: old.access}
 	if ts.refresh.isZero() {

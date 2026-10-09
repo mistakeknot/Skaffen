@@ -60,6 +60,7 @@ type fakeAS struct {
 	expiresIn   int
 	noRotate    bool
 	tokenFail   *oauthFailure // every token call fails this way
+	refreshMode string        // refresh grants only: "500", "drop", "malformed", "oversize"
 	denyConsent bool
 
 	// State.
@@ -327,6 +328,28 @@ func (f *fakeAS) handleToken(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	form := r.PostForm
+	f.mu.Lock()
+	mode := f.refreshMode
+	f.mu.Unlock()
+	if mode != "" && form.Get("grant_type") == "refresh_token" {
+		switch mode {
+		case "500":
+			tokenErr(w, http.StatusInternalServerError, "server_error", "")
+		case "drop":
+			if hj, ok := w.(http.Hijacker); ok {
+				if conn, _, err := hj.Hijack(); err == nil {
+					_ = conn.Close()
+				}
+			}
+		case "malformed":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte("{not json"))
+		case "oversize":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"pad":"` + strings.Repeat("A", 200<<10) + `"}`))
+		}
+		return
+	}
 	if form.Get("resource") == "" {
 		f.mu.Lock()
 		f.MissingResource++
