@@ -58,6 +58,10 @@ func (c *oauthClient) runConsent(ctx context.Context, consent Consent) (*tokenSe
 	if err := c.register(ctx, redirect); err != nil {
 		return nil, err
 	}
+	c.hook("registered")
+	if err := ctx.Err(); err != nil {
+		return nil, err // shutdown began; do not show a prompt
+	}
 	state, err := newState()
 	if err != nil {
 		return nil, errors.New("cannot generate authorization state")

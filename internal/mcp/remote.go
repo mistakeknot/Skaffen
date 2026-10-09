@@ -71,7 +71,9 @@ type remote struct {
 	rt   *remoteTransport
 	hc   *http.Client
 
-	authCtx         context.Context // cancelled at shutdown; bounds refreshes
+	setupCtx        context.Context // cancelled when shutdown begins; bounds consent and registration
+	setupCancel     context.CancelFunc
+	authCtx         context.Context // cancelled at the shutdown deadline; bounds refreshes
 	authCancel      context.CancelFunc
 	transportCtx    context.Context // cancelled to abort in-flight requests
 	transportCancel context.CancelFunc
@@ -86,16 +88,20 @@ type remote struct {
 	retired []*tokenSet
 
 	bg       sync.WaitGroup // background work that touches credentials
+	setupMu  sync.Mutex     // orders beginSetup against the start of shutdown
+	setup    sync.WaitGroup // connect calls in flight; shutdown joins them
 	shutOnce sync.Once
 
-	testBeforeZero func() // test hook: runs after all work stops, before zeroing
-	testScrubGap   func() // test hook: runs inside scrub, just before the redactor is consulted
+	testBeforeZero    func()             // test hook: runs after all work stops, before zeroing
+	testScrubGap      func()             // test hook: runs inside scrub, just before the redactor is consulted
+	testBeforeInstall func(ts *tokenSet) // test hook: connect holds fresh tokens, not yet installed
 }
 
 func newRemote(cfg RemoteConfig, opts remoteOptions) *remote {
 	opts = opts.withDefaults()
 	red := newRedactor()
 	r := &remote{cfg: cfg, opts: opts, red: red, oc: newOAuthClient(cfg, opts, red)}
+	r.setupCtx, r.setupCancel = context.WithCancel(context.Background())
 	r.authCtx, r.authCancel = context.WithCancel(context.Background())
 	r.transportCtx, r.transportCancel = context.WithCancel(context.Background())
 	r.rt = &remoteTransport{r: r, base: opts.baseTransport()}
@@ -144,29 +150,63 @@ func (r *remote) failureKind() failureKind {
 	return kindNone
 }
 
-// connect runs the consent flow, stores the credentials and opens the MCP
-// session. ctx bounds only this startup; the session outlives it.
-func (r *remote) connect(ctx context.Context, consent Consent) (*Client, error) {
+// beginSetup registers a connect in flight. It refuses once shutdown has
+// begun; shutdown sets the closing flag under the same lock, so no setup can
+// start after the join below has been decided.
+func (r *remote) beginSetup() bool {
+	r.setupMu.Lock()
+	defer r.setupMu.Unlock()
 	if r.closing.Load() {
+		return false
+	}
+	r.setup.Add(1)
+	return true
+}
+
+// connect runs the consent flow, stores the credentials and opens the MCP
+// session. ctx bounds only this startup; the session outlives it. Shutdown
+// cancels the flow and waits for it, and credentials that arrive once shutdown
+// has begun are wiped instead of installed.
+func (r *remote) connect(ctx context.Context, consent Consent) (*Client, error) {
+	if !r.beginSetup() {
 		return nil, ErrRemoteClosed
 	}
+	defer r.setup.Done()
 	cctx, cancel := context.WithTimeout(ctx, consent.timeout()+30*time.Second)
 	defer cancel()
-	stop := context.AfterFunc(r.authCtx, cancel)
+	stop := context.AfterFunc(r.setupCtx, cancel)
 	defer stop()
 
 	ts, err := r.oc.runConsent(cctx, consent)
 	if err != nil {
 		return nil, err
 	}
+	if r.testBeforeInstall != nil {
+		r.testBeforeInstall(ts)
+	}
 	r.tokMu.Lock()
+	if r.closing.Load() {
+		r.tokMu.Unlock()
+		ts.zero()
+		return nil, ErrRemoteClosed
+	}
 	old := r.tok
 	r.tok = ts
 	if old != nil {
 		r.retired = append(r.retired, old)
 	}
 	r.tokMu.Unlock()
-	return r.dial(cctx)
+	c, err := r.dial(cctx)
+	if err != nil {
+		return nil, err
+	}
+	if r.closing.Load() {
+		// Shutdown began while the session was opening; nobody else holds
+		// this client, so end it here while the credentials are still live.
+		_ = c.Close()
+		return nil, ErrRemoteClosed
+	}
+	return c, nil
 }
 
 // dial opens an MCP session with the credentials already held. It performs no
@@ -174,6 +214,9 @@ func (r *remote) connect(ctx context.Context, consent Consent) (*Client, error) 
 func (r *remote) dial(ctx context.Context) (*Client, error) {
 	if err := r.failureErr(); err != nil {
 		return nil, err
+	}
+	if r.closing.Load() {
+		return nil, ErrRemoteClosed
 	}
 	tr := &gomcp.StreamableClientTransport{
 		Endpoint:             r.cfg.URL,
@@ -200,7 +243,10 @@ func (r *remote) shutdown(c *Client) {
 }
 
 func (r *remote) doShutdown(c *Client) {
+	r.setupMu.Lock()
 	r.closing.Store(true)
+	r.setupMu.Unlock()
+	r.setupCancel() // pending consent and registration end now
 	grace := r.opts.closeGrace
 	if c != nil {
 		done := make(chan struct{})
@@ -227,6 +273,7 @@ func (r *remote) doShutdown(c *Client) {
 	}
 	r.transportCancel()
 	r.authCancel()
+	r.setup.Wait() // no credential may arrive after the wipe below
 	r.bg.Wait()
 	if r.testBeforeZero != nil {
 		r.testBeforeZero()

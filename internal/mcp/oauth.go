@@ -170,6 +170,15 @@ type oauthClient struct {
 	clientID     string
 	clientSecret secret
 	authMethod   string // none, client_secret_post or client_secret_basic
+
+	testHook func(stage string) // test hook: called at named points of the consent flow
+}
+
+// hook calls the test hook, if any.
+func (c *oauthClient) hook(stage string) {
+	if c.testHook != nil {
+		c.testHook(stage)
+	}
 }
 
 func newOAuthClient(cfg RemoteConfig, opts remoteOptions, red *redactor) *oauthClient {

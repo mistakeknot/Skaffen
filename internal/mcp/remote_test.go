@@ -1027,3 +1027,119 @@ func TestRemoteScrub_AuthCodeAndVerifierEchoedAtEveryBoundary(t *testing.T) {
 		})
 	}
 }
+
+// pausedConnect starts r.connect, returns once the barrier hook has been
+// reached and a function that releases it. The hook is installed by arm.
+type pausedConnect struct {
+	reached chan struct{}
+	resume  chan struct{}
+	done    chan error
+	prompts atomic.Int32
+}
+
+func startPausedConnect(t *testing.T, r *remote, f *fakeAS, arm func(pc *pausedConnect)) *pausedConnect {
+	t.Helper()
+	pc := &pausedConnect{reached: make(chan struct{}), resume: make(chan struct{}), done: make(chan error, 1)}
+	arm(pc)
+	approve := autoApprove(f)
+	go func() {
+		_, err := r.connect(ctxT(t), Consent{Timeout: 10 * time.Second, Prompt: func(name, u string) {
+			pc.prompts.Add(1)
+			approve(name, u)
+		}})
+		pc.done <- err
+	}()
+	select {
+	case <-pc.reached:
+	case <-time.After(10 * time.Second):
+		t.Fatal("setup never reached the barrier")
+	}
+	return pc
+}
+
+// shutdownDuringSetup runs a shutdown while setup is paused, asserts it waits
+// for the setup, then releases the barrier and returns the setup's error.
+func shutdownDuringSetup(t *testing.T, r *remote, pc *pausedConnect) error {
+	t.Helper()
+	shutDone := make(chan struct{})
+	go func() { r.shutdown(nil); close(shutDone) }()
+	select {
+	case <-shutDone:
+		t.Fatal("shutdown finished while credential setup was still pending")
+	case <-time.After(200 * time.Millisecond):
+	}
+	if r.zeroed.Load() {
+		t.Error("credentials were zeroed under a pending setup")
+	}
+	close(pc.resume)
+	select {
+	case <-shutDone:
+	case <-time.After(10 * time.Second):
+		t.Fatal("shutdown never finished after setup was released")
+	}
+	select {
+	case err := <-pc.done:
+		return err
+	case <-time.After(10 * time.Second):
+		t.Fatal("setup never returned")
+		return nil
+	}
+}
+
+func TestRemoteShutdown_JoinsSetupPausedAfterRegistration(t *testing.T) {
+	f := newFakeAS(t)
+	f.dcrClientSecret, f.dcrAuthMethod = "SENTINEL-CLIENTSECRET-"+f.tag, "client_secret_post"
+	f.attachMCP()
+	r := newRemoteForTest(t, f)
+	pc := startPausedConnect(t, r, f, func(pc *pausedConnect) {
+		r.oc.testHook = func(stage string) {
+			if stage == "registered" {
+				close(pc.reached)
+				<-pc.resume
+			}
+		}
+	})
+	err := shutdownDuringSetup(t, r, pc)
+	if err == nil {
+		t.Error("setup should fail once shutdown has begun")
+	}
+	if n := pc.prompts.Load(); n != 0 {
+		t.Errorf("the user was prompted %d times after shutdown began", n)
+	}
+	if !r.oc.clientSecret.isZero() {
+		t.Error("the client secret issued during registration survived shutdown")
+	}
+	if got := len(f.hits("/token")); got != 0 {
+		t.Errorf("%d token requests after shutdown began", got)
+	}
+}
+
+func TestRemoteShutdown_RejectsAndWipesTokensArrivingDuringShutdown(t *testing.T) {
+	f := newFakeAS(t)
+	m := f.attachMCP()
+	r := newRemoteForTest(t, f)
+	var access string
+	pc := startPausedConnect(t, r, f, func(pc *pausedConnect) {
+		r.testBeforeInstall = func(ts *tokenSet) {
+			access = ts.access.reveal()
+			close(pc.reached)
+			<-pc.resume
+		}
+	})
+	err := shutdownDuringSetup(t, r, pc)
+	if !errors.Is(err, ErrRemoteClosed) {
+		t.Errorf("setup error = %v, want ErrRemoteClosed", err)
+	}
+	if access == "" {
+		t.Fatal("the barrier never saw the token")
+	}
+	if got := r.currentAccess(); got != "" {
+		t.Errorf("tokens that arrived during shutdown were installed (%d bytes)", len(got))
+	}
+	if out := r.scrub("x " + access); strings.Contains(out, access) {
+		t.Errorf("late token escaped scrubbing: %q", out)
+	}
+	if n := m.requests(); n != 0 {
+		t.Errorf("%d MCP requests were made with tokens that arrived during shutdown", n)
+	}
+}
