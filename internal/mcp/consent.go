@@ -64,6 +64,10 @@ func (c *oauthClient) runConsent(ctx context.Context, consent Consent) (*tokenSe
 	}
 	verifier, challenge := newPKCE()
 	defer verifier.zero()
+	// The redactor keeps its own copy until shutdown: wiping the working
+	// wrapper must not stop a combined authorization and MCP server's echo of
+	// the verifier from being scrubbed.
+	c.red.add(newSecret(verifier.reveal()))
 	l.arm(state)
 	consent.show(c.cfg.Name, c.authURL(redirect, state, challenge))
 
@@ -77,5 +81,6 @@ func (c *oauthClient) runConsent(ctx context.Context, consent Consent) (*tokenSe
 		}
 		return nil, err
 	}
+	c.red.add(newSecret(code.reveal())) // registered before it leaves the process
 	return c.exchange(ctx, code, verifier, redirect)
 }

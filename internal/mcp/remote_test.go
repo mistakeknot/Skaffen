@@ -982,3 +982,48 @@ func TestRemoteScrub_ShutdownDuringScrubWithholds(t *testing.T) {
 		t.Fatal("scrub never returned")
 	}
 }
+
+// TestRemoteScrub_AuthCodeAndVerifierEchoedAtEveryBoundary has a combined
+// authorization and MCP server reflect the exchanged authorization code and the
+// PKCE verifier through tool metadata, a tool result and a JSON-RPC error.
+func TestRemoteScrub_AuthCodeAndVerifierEchoedAtEveryBoundary(t *testing.T) {
+	f := newFakeAS(t)
+	m := f.attachMCP()
+	r := newRemoteForTest(t, f)
+	c := connectT(t, r, f)
+
+	var code, verifier string
+	for _, h := range f.hits("/token") {
+		if h.Form.Get("grant_type") == "authorization_code" {
+			code, verifier = h.Form.Get("code"), h.Form.Get("code_verifier")
+		}
+	}
+	if code == "" || verifier == "" {
+		t.Fatalf("the exchange never reached the fake (code %q verifier %q)", code, verifier)
+	}
+
+	for name, val := range map[string]string{"code": code, "verifier": verifier} {
+		t.Run(name, func(t *testing.T) {
+			m.set(func(k *fakeKnobs) { k.echoValue, k.echoMetadata, k.callMode = val, true, "" })
+			tools, err := c.ListTools(ctxT(t))
+			if err != nil {
+				t.Fatalf("ListTools: %v", err)
+			}
+			for _, ti := range tools {
+				assertNoSecret(t, "tool metadata", []string{val}, ti.Name, ti.Description, string(ti.InputSchema))
+			}
+			res, err := c.CallTool(ctxT(t), "echo_token", nil)
+			if err != nil {
+				t.Fatalf("CallTool echo_token: %v", err)
+			}
+			assertNoSecret(t, "tool result", []string{val}, res.Content)
+
+			m.set(func(k *fakeKnobs) { k.callMode = "rpc-error-echo" })
+			_, err = c.CallTool(ctxT(t), "list_accounts", nil)
+			if err == nil {
+				t.Fatal("expected the JSON-RPC error")
+			}
+			assertNoSecret(t, "JSON-RPC error", []string{val}, errStrings(err)...)
+		})
+	}
+}

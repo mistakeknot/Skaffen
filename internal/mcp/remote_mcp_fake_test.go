@@ -27,6 +27,7 @@ type fakeKnobs struct {
 	callMode     string        // "", "oversize", "oversize-length", "stall", "text-chunked", "text-length", "rpc-error-echo"
 	echoMetadata bool          // tools/list descriptions, defaults and enums echo the bearer token
 	echoGate     chan struct{} // echo_token waits for this channel to close before answering
+	echoValue    string        // when set, echo this instead of the bearer token (metadata, echo_token, rpc-error-echo)
 }
 
 // rpcInfo describes one request as the fake saw it.
@@ -93,6 +94,11 @@ func (f *fakeAS) attachMCP() *fakeMCP {
 						}
 					}
 					text = "token=" + strings.TrimPrefix(req.Extra.Header.Get("Authorization"), "Bearer ")
+					m.mu.Lock()
+					if v := m.knobs.echoValue; v != "" {
+						text = "token=" + v
+					}
+					m.mu.Unlock()
 				}
 				return &gomcp.CallToolResult{Content: []gomcp.Content{&gomcp.TextContent{Text: text}}}, nil
 			})
@@ -268,7 +274,7 @@ func (m *fakeMCP) serveKnobs(w http.ResponseWriter, r *http.Request) {
 	m.sdk.ServeHTTP(rec, r)
 	body := rec.Body.Bytes()
 	if k.echoMetadata && info.RPC == "tools/list" {
-		body = echoIntoToolList(body, info.Token)
+		body = echoIntoToolList(body, echoOr(k.echoValue, info.Token))
 	}
 	for hk, hv := range rec.Header() {
 		w.Header()[hk] = hv
@@ -286,6 +292,14 @@ func (m *fakeMCP) serveKnobs(w http.ResponseWriter, r *http.Request) {
 	}
 	w.WriteHeader(rec.Code)
 	_, _ = w.Write(body)
+}
+
+// echoOr returns override when set, else def.
+func echoOr(override, def string) string {
+	if override != "" {
+		return override
+	}
+	return def
 }
 
 // echoIntoToolList writes tok into a description, a default and an enum of the
@@ -371,7 +385,10 @@ func (m *fakeMCP) serveCallMode(w http.ResponseWriter, r *http.Request, info rpc
 		_, _ = w.Write([]byte("not json at all"))
 	case "rpc-error-echo":
 		w.Header().Set("Content-Type", "application/json")
-		msg, _ := json.Marshal("denied for " + info.Token)
+		m.mu.Lock()
+		echo := echoOr(m.knobs.echoValue, info.Token)
+		m.mu.Unlock()
+		msg, _ := json.Marshal("denied for " + echo)
 		_, _ = w.Write([]byte(`{"jsonrpc":"2.0","id":` + id + `,"error":{"code":-32000,"message":` + string(msg) + `}}`))
 	}
 }
