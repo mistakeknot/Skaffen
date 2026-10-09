@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/mistakeknot/Skaffen/internal/sandbox"
+	"github.com/modelcontextprotocol/go-sdk/jsonrpc"
 	gomcp "github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -45,6 +46,9 @@ type Client struct {
 type remoteCallError struct {
 	msg    string
 	ctxErr error
+	// answered is true when the server replied with a JSON-RPC error: the
+	// session worked and the server declined, so reconnecting cannot help.
+	answered bool
 }
 
 func (e *remoteCallError) Error() string { return e.msg }
@@ -52,6 +56,8 @@ func (e *remoteCallError) Unwrap() error { return e.ctxErr }
 
 func (c *Client) remoteErr(err error, format string, args ...any) error {
 	re := &remoteCallError{msg: c.scrub(fmt.Sprintf(format, args...) + ": " + err.Error())}
+	var rpcErr *jsonrpc.Error
+	re.answered = errors.As(err, &rpcErr)
 	switch {
 	case errors.Is(err, context.DeadlineExceeded):
 		re.ctxErr = context.DeadlineExceeded

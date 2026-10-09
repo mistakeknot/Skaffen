@@ -32,6 +32,12 @@ type Manager struct {
 	mu       sync.RWMutex
 	shutdown bool
 	sandbox  *sandbox.Sandbox
+
+	// Remote (streamable-HTTP) servers; see manager_remote.go.
+	remotes    map[string]*remoteHandle // key: remote name
+	pending    map[*remote]struct{}     // remotes still waiting for consent
+	connectMu  sync.Mutex               // serialises ConnectRemote
+	remoteOpts remoteOptions
 }
 
 // NewManager creates a Manager from resolved plugin configs.
@@ -42,6 +48,8 @@ func NewManager(config map[string]PluginConfig, registry *tool.Registry, sb *san
 		registry: registry,
 		handles:  make(map[string]*serverHandle),
 		sandbox:  sb,
+		remotes:  make(map[string]*remoteHandle),
+		pending:  make(map[*remote]struct{}),
 	}
 }
 
@@ -342,6 +350,7 @@ func (m *Manager) Shutdown() {
 		}
 		h.mu.Unlock()
 	}
+	m.shutdownRemotes()
 }
 
 // PluginCount returns the number of successfully connected plugins.
@@ -350,6 +359,13 @@ func (m *Manager) PluginCount() int {
 	defer m.mu.RUnlock()
 	count := 0
 	for _, h := range m.handles {
+		h.mu.RLock()
+		if h.client != nil {
+			count++
+		}
+		h.mu.RUnlock()
+	}
+	for _, h := range m.remotes {
 		h.mu.RLock()
 		if h.client != nil {
 			count++
@@ -365,6 +381,9 @@ func (m *Manager) ToolCount() int {
 	defer m.mu.RUnlock()
 	count := 0
 	for _, h := range m.handles {
+		count += len(h.tools)
+	}
+	for _, h := range m.remotes {
 		count += len(h.tools)
 	}
 	return count
@@ -389,6 +408,21 @@ func (m *Manager) CallTool(ctx context.Context, toolName string, arguments map[s
 				m.mu.RUnlock() // release before call to avoid deadlock with respawn
 				result, err := caller.CallTool(ctx, toolName, arguments)
 				m.mu.RLock() // re-acquire for deferred unlock
+				return result, err
+			}
+		}
+	}
+
+	// Remote servers expose only their allowlisted tools, so a tool the
+	// allowlist hides is "not found" here exactly as if no server had it.
+	for _, name := range sortedRemoteNames(m.remotes) {
+		h := m.remotes[name]
+		for _, ti := range h.tools {
+			if ti.Name == toolName {
+				caller := &remoteCaller{m: m, h: h}
+				m.mu.RUnlock()
+				result, err := caller.CallTool(ctx, toolName, arguments)
+				m.mu.RLock()
 				return result, err
 			}
 		}
