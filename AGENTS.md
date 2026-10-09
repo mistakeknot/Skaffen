@@ -22,7 +22,7 @@ The separation means `agentloop` has zero dependencies on `agent` or `tool` (for
 | `router` | Model selection | `Router`, `Config`, `ICClient`, complexity classifier |
 | `session` | Persistence | `Session`, JSONL format, truncation, priompt rendering |
 | `tool` | Tool system | `Tool`, `Registry`, `Phase`, 7 built-in tools |
-| `mcp` | MCP client | `Manager`, `Client`, `MCPTool`, `PluginConfig` |
+| `mcp` | MCP client (stdio plugins and remote HTTP servers) | `Manager`, `Client`, `MCPTool`, `PluginConfig`, `RemoteConfig` |
 | `evidence` | Event emission | JSONL writer + `ic events record` bridge |
 | `git` | Git operations | Auto-commit, revert, squash |
 | `trust` | Tool approval | `Evaluator`, safety classification |
@@ -73,7 +73,7 @@ go run ./cmd/skaffen --plugins ~/.skaffen/plugins.toml
 ```
 ~/.skaffen/
   routing.json      Model routing config (phase defaults, budget, complexity)
-  plugins.toml      MCP plugin declarations
+  plugins.toml      MCP plugin declarations and [remote.*] servers
   sessions/         Session JSONL files
   evidence/         Evidence JSONL files
 ```
@@ -88,10 +88,58 @@ go run ./cmd/skaffen --plugins ~/.skaffen/plugins.toml
 | `--phase` | `build` | Starting OODARC phase |
 | `--max-turns` | `100` | Safety limit for loop iterations |
 | `--budget` | `0` (unlimited) | Per-session token budget |
-| `--plugins` | `~/.skaffen/plugins.toml` | MCP plugin config path |
+| `--plugins` | `~/.skaffen/plugins.toml` | MCP plugin config path (also the trusted source of `[remote.*]`) |
 | `-p` | stdin | Prompt text |
 | `-c` | — | Resume last session |
 | `-r` | — | Resume specific session by ID |
+
+### Remote MCP servers (`[remote.NAME]`)
+
+Skaffen can connect to a remote MCP server over streamable HTTP, using its own
+OAuth client (discovery, dynamic client registration, PKCE with a loopback
+redirect, token refresh and revoke). This is a read-only integration: the only
+scope it ever requests is `finance:read`, and a server that grants anything
+else is refused.
+
+```toml
+# ~/.skaffen/plugins.toml  (user-global file, or the file passed to --plugins)
+[remote.finance]
+url    = "https://mcp.example.com/mcp"   # https only, no userinfo or fragment
+issuer = "https://mcp.example.com"       # authorization server; all OAuth endpoints must share this origin
+phases = ["orient"]                      # phases the tools are registered for
+tools  = ["list_accounts", "list_transactions"]   # allowlist of server-side tool names
+# redirect_port = 53682                  # optional fixed loopback callback port; default is ephemeral
+```
+
+- **Trusted file only.** `[remote.*]` is read from `~/.skaffen/plugins.toml` or
+  from `--plugins`. A project's `.skaffen/plugins.toml` and discovered plugin
+  manifests can never add, replace or redirect a remote; a project file that
+  declares one gets a warning and the table is ignored. A stdio plugin with the
+  same name as a remote wins and the remote is skipped. An invalid entry is
+  reported and skipped without dropping the valid ones.
+- **Allowlist.** Only tools named in `tools` are registered (as
+  `<name>_remote_<tool>`), and the allowlist is checked again on every call.
+  Other tools the server offers stay hidden; they are counted in a startup
+  warning but never named. There is no `scope` key. Fail closed: if the server
+  offers none of the allowlisted tools, the connection fails, nothing is
+  registered and the session is closed, rather than connecting with no tools.
+- **Approval.** The first connection prints an authorization URL on stderr and
+  waits (five minutes by default) for the browser redirect to a loopback port.
+  Ctrl-C at that prompt abandons the approval and startup continues without that
+  remote. Tokens are kept in memory only and wiped at shutdown; nothing is
+  written to disk, and token values are never printed or logged.
+- **TUI only.** Remotes connect when the TUI starts. Print mode is
+  non-interactive, so it prints one warning and does not connect them.
+- **Failure handling.** An authorization failure or a protocol violation by the
+  server puts that remote in a terminal state: calls then return a short error to
+  the model and nothing more is sent. A dropped connection gets up to three
+  reconnects over the life of the session, reusing the held credentials without
+  asking again. Text from the server is scrubbed before the model sees it.
+
+Residual risk: the allowlist limits what Skaffen will call, not what the server
+does with a call it accepts, and a retried call after a reconnect may run twice
+on the server. List only read-oriented tools, and register them for the
+read-oriented phases (`orient`, `decide`) rather than `act`.
 
 ## Module Relationships
 
