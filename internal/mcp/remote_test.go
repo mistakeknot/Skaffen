@@ -1277,3 +1277,68 @@ func TestTransportClass(t *testing.T) {
 		})
 	}
 }
+
+// A token minted by a refresh that no request has yet been accepted with is
+// unproven. If the server rejects it, that is the terminal "rejected a freshly
+// refreshed token" case: a second caller holding that same token must not
+// start another refresh while the first caller's own retry is still in flight.
+func TestRemoteRefresh_RejectedFreshTokenIsTerminalForEveryHolder(t *testing.T) {
+	f := newFakeAS(t)
+	f.attachMCP()
+	r := newRemoteForTest(t, f)
+	connectT(t, r, f)
+
+	r.tokMu.Lock()
+	t0 := r.tok.access.reveal()
+	r.tokMu.Unlock()
+
+	t1, err := r.refreshAfter401(ctxT(t), t0)
+	if err != nil || t1 == t0 {
+		t.Fatalf("first refresh: token changed=%v err=%v", t1 != t0, err)
+	}
+	// Another caller was sent t1 and the server rejected it too, before the
+	// first caller's retry has been judged.
+	if _, err := r.refreshAfter401(ctxT(t), t1); !errors.Is(err, ErrRemoteAuth) {
+		t.Fatalf("a rejected fresh token must be terminal, got %v", err)
+	}
+	if n := refreshCalls(f); n != 1 {
+		t.Errorf("refresh calls = %d, want 1", n)
+	}
+	if r.failureErr() == nil {
+		t.Error("the terminal state was not recorded")
+	}
+}
+
+// Once the remote is terminal, a caller that was only waiting for the
+// credential lock gets the failure, not a token to send.
+func TestRemoteRefresh_WaiterAfterTerminalGetsFailure(t *testing.T) {
+	f := newFakeAS(t)
+	f.attachMCP()
+	r := newRemoteForTest(t, f)
+	connectT(t, r, f)
+
+	r.tokMu.Lock()
+	t0 := r.tok.access.reveal()
+	r.tokMu.Unlock()
+
+	r.tokMu.Lock() // the waiter queues behind this holder
+	got := make(chan error, 1)
+	go func() {
+		_, err := r.refreshAfter401(ctxT(t), t0+"-stale")
+		got <- err
+	}()
+	time.Sleep(50 * time.Millisecond)
+	r.setFailure(kindTerminalAuth, fmt.Errorf("%w: test", ErrRemoteAuth))
+	r.tokMu.Unlock()
+	select {
+	case err := <-got:
+		if !errors.Is(err, ErrRemoteAuth) {
+			t.Fatalf("waiter got %v, want the terminal failure", err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("waiter never returned")
+	}
+	if n := refreshCalls(f); n != 0 {
+		t.Errorf("refresh calls = %d, want 0", n)
+	}
+}

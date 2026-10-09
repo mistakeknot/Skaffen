@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"errors"
 	"fmt"
 	"io"
@@ -99,6 +100,12 @@ type remote struct {
 	oc   *oauthClient
 	rt   *remoteTransport
 	hc   *http.Client
+
+	// freshTok holds the hash of the access token a refresh last minted until
+	// a request is accepted with it (not answered 401). A 401 for a token that
+	// is still unproven means the server rejects what it just issued, which is
+	// terminal. A hash, not the token, so no extra credential copy is kept.
+	freshTok atomic.Pointer[[sha256.Size]byte]
 
 	setupCtx        context.Context // cancelled when shutdown begins; bounds consent and registration
 	setupCancel     context.CancelFunc
@@ -341,6 +348,9 @@ func (r *remote) accessToken(ctx context.Context) (string, error) {
 	if r.zeroed.Load() || r.tok == nil || r.tok.access.isZero() {
 		return "", ErrRemoteClosed
 	}
+	if f := r.failure.Load(); f != nil { // a waiter learns of a failure set while it queued
+		return "", f.err
+	}
 	if !r.tok.expiry.IsZero() && time.Until(r.tok.expiry) < refreshLeeway && !r.closing.Load() {
 		if err := r.refreshLocked(ctx); err != nil {
 			return "", err
@@ -360,16 +370,41 @@ func (r *remote) refreshAfter401(ctx context.Context, used string) (string, erro
 	if r.zeroed.Load() || r.tok == nil {
 		return "", ErrRemoteClosed
 	}
+	if f := r.failure.Load(); f != nil { // a waiter learns of a failure set while it queued
+		return "", f.err
+	}
 	if cur := r.tok.access.reveal(); cur != used {
 		return cur, nil
 	}
 	if r.closing.Load() {
 		return "", ErrRemoteClosed
 	}
+	if r.isFresh(used) {
+		// The server rejected a token it issued moments ago and no request
+		// has been accepted with it. Set under tokMu, so no later waiter can
+		// start another refresh.
+		return "", r.setFailure(kindTerminalAuth, fmt.Errorf("%w: the server rejected a freshly refreshed token", ErrRemoteAuth))
+	}
 	if err := r.refreshLocked(ctx); err != nil {
 		return "", err
 	}
 	return r.tok.access.reveal(), nil
+}
+
+func tokenHash(tok string) [sha256.Size]byte { return sha256.Sum256([]byte(tok)) }
+
+// isFresh reports whether tok is the token the last refresh minted and no
+// request has been accepted with it yet.
+func (r *remote) isFresh(tok string) bool {
+	p := r.freshTok.Load()
+	return p != nil && *p == tokenHash(tok)
+}
+
+// markAccepted records that the server did not answer 401 to tok.
+func (r *remote) markAccepted(tok string) {
+	if p := r.freshTok.Load(); p != nil && *p == tokenHash(tok) {
+		r.freshTok.CompareAndSwap(p, nil)
+	}
 }
 
 // refreshLocked trades the refresh token for a new set. The caller holds
@@ -416,6 +451,8 @@ func (r *remote) refreshLocked(ctx context.Context) error {
 	}
 	r.retired = append(r.retired, retired)
 	r.tok = ts
+	h := tokenHash(ts.access.reveal())
+	r.freshTok.Store(&h)
 	return nil
 }
 
@@ -533,7 +570,9 @@ func (t *remoteTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 		return t.finishDelete(resp, release)
 	}
 
-	if resp.StatusCode == http.StatusUnauthorized {
+	if resp.StatusCode != http.StatusUnauthorized {
+		r.markAccepted(tok)
+	} else {
 		_ = resp.Body.Close()
 		body, ok := replayBody(req)
 		next, rerr := "", error(nil)
@@ -556,6 +595,7 @@ func (t *remoteTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 			release()
 			return nil, r.setFailure(kindTerminalAuth, fmt.Errorf("%w: the server rejected a freshly refreshed token", ErrRemoteAuth))
 		}
+		r.markAccepted(next)
 	}
 	if resp.StatusCode == http.StatusForbidden {
 		_ = resp.Body.Close()
