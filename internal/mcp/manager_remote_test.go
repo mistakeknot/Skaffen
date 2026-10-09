@@ -161,6 +161,26 @@ func TestManagerConnectRemote_AllowlistWarnings(t *testing.T) {
 	}
 }
 
+// A server that offers none of the allowlisted tools is refused outright
+// rather than connected with nothing to call.
+func TestManagerConnectRemote_NoAllowlistedToolFailsClosed(t *testing.T) {
+	f := newFakeAS(t)
+	f.attachMCP()
+	mgr, reg := newTestManager(t, f)
+	cfg := f.config()
+	cfg.Tools = []string{"no_such_tool", "also_missing"}
+	err := mgr.ConnectRemote(ctxT(t), cfg, (&consentLog{}).consent(f))
+	if err == nil {
+		t.Fatal("connecting with no allowlisted tool offered must fail")
+	}
+	if !strings.Contains(err.Error(), "none of the allowlisted tools") {
+		t.Errorf("error does not say why: %v", err)
+	}
+	if got := toolNames(reg, tool.PhaseOrient); len(got) != 0 {
+		t.Errorf("tools registered after a refused connection: %v", got)
+	}
+}
+
 func TestManagerConnectRemote_Rejections(t *testing.T) {
 	t.Run("name collision", func(t *testing.T) {
 		f := newFakeAS(t)

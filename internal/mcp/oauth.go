@@ -40,14 +40,13 @@ const (
 // remoteOptions tunes the remote transport. Production uses the defaults;
 // tests shorten the timeouts and inject a root CA for httptest servers.
 type remoteOptions struct {
-	rootCAs        *x509.CertPool
-	httpTimeout    time.Duration // MCP http.Client timeout
-	oauthTimeout   time.Duration // credential-free OAuth http.Client timeout
-	opTimeout      time.Duration // total CallTool/ListTools deadline
-	closeGrace     time.Duration // Shutdown grace before transport cancellation
-	consentTimeout time.Duration // time allowed for the user to approve
-	oauthBodyCap   int64
-	mcpBodyCap     int64
+	rootCAs      *x509.CertPool
+	httpTimeout  time.Duration // MCP http.Client timeout
+	oauthTimeout time.Duration // credential-free OAuth http.Client timeout
+	opTimeout    time.Duration // total CallTool/ListTools deadline
+	closeGrace   time.Duration // Shutdown grace before transport cancellation
+	oauthBodyCap int64
+	mcpBodyCap   int64
 }
 
 func (o remoteOptions) withDefaults() remoteOptions {
@@ -62,9 +61,6 @@ func (o remoteOptions) withDefaults() remoteOptions {
 	}
 	if o.closeGrace <= 0 {
 		o.closeGrace = 5 * time.Second
-	}
-	if o.consentTimeout <= 0 {
-		o.consentTimeout = 5 * time.Minute
 	}
 	if o.oauthBodyCap <= 0 {
 		o.oauthBodyCap = oauthBodyCapDefault

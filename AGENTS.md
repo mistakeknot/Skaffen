@@ -120,7 +120,9 @@ tools  = ["list_accounts", "list_transactions"]   # allowlist of server-side too
 - **Allowlist.** Only tools named in `tools` are registered (as
   `<name>_remote_<tool>`), and the allowlist is checked again on every call.
   Other tools the server offers stay hidden; they are counted in a startup
-  warning but never named. There is no `scope` key.
+  warning but never named. There is no `scope` key. Fail closed: if the server
+  offers none of the allowlisted tools, the connection fails, nothing is
+  registered and the session is closed, rather than connecting with no tools.
 - **Approval.** The first connection prints an authorization URL on stderr and
   waits (five minutes by default) for the browser redirect to a loopback port.
   Ctrl-C at that prompt abandons the approval and startup continues without that
