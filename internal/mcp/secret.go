@@ -61,30 +61,46 @@ func (s secret) MarshalText() ([]byte, error) { return []byte(redactedText), nil
 
 // redactor holds every credential issued during one remote session, including
 // superseded ones, so a delayed response that echoes an old token is still
-// scrubbed. It lives until Shutdown.
+// scrubbed. It lives until Shutdown. Whether it is closed and the credential
+// snapshot a scrub works from are read under one lock, so a scrub can never
+// observe "open" and then find the credentials already wiped.
 type redactor struct {
-	mu    sync.RWMutex
-	items []secret
+	mu     sync.RWMutex
+	items  []secret
+	closed bool
 }
 
 func newRedactor() *redactor { return &redactor{} }
 
+// add registers s. A closed redactor wipes s instead, so nothing is retained
+// after shutdown.
 func (r *redactor) add(s secret) {
 	if s.isZero() {
 		return
 	}
 	r.mu.Lock()
+	if r.closed {
+		r.mu.Unlock()
+		s.zero()
+		return
+	}
 	r.items = append(r.items, s)
 	r.mu.Unlock()
 }
 
 // scrub replaces every known credential in s with redactedText, longest first
-// so that overlapping values do not leave a tail behind.
+// so that overlapping values do not leave a tail behind. Once the redactor is
+// closed the credentials are gone and it cannot tell what to remove, so it
+// withholds non-empty text entirely.
 func (r *redactor) scrub(s string) string {
 	if s == "" {
 		return s
 	}
 	r.mu.RLock()
+	if r.closed {
+		r.mu.RUnlock()
+		return redactedText
+	}
 	vals := make([]string, 0, len(r.items))
 	for _, it := range r.items {
 		if v := it.reveal(); v != "" {
@@ -104,9 +120,10 @@ func (r *redactor) scrub(s string) string {
 	return s
 }
 
-// zero wipes every held credential and forgets them.
+// zero closes the redactor, wipes every held credential and forgets them.
 func (r *redactor) zero() {
 	r.mu.Lock()
+	r.closed = true
 	for _, it := range r.items {
 		it.zero()
 	}

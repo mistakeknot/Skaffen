@@ -89,6 +89,7 @@ type remote struct {
 	shutOnce sync.Once
 
 	testBeforeZero func() // test hook: runs after all work stops, before zeroing
+	testScrubGap   func() // test hook: runs inside scrub, just before the redactor is consulted
 }
 
 func newRemote(cfg RemoteConfig, opts remoteOptions) *remote {
@@ -110,14 +111,15 @@ func (r *remote) String() string   { return "remote{" + r.cfg.Name + "}" }
 func (r *remote) GoString() string { return r.String() }
 
 // scrub removes every credential the remote ever held from server-supplied
-// text. Once the credentials are wiped it can no longer tell what to remove,
-// so it withholds the text entirely.
+// text. The redactor decides, under its own lock, whether it is still open, so
+// a scrub that overlaps shutdown either sees every credential or withholds the
+// text; it can never return text unscrubbed.
 func (r *remote) scrub(s string) string {
 	if s == "" {
 		return s
 	}
-	if r.zeroed.Load() {
-		return redactedText
+	if r.testScrubGap != nil {
+		r.testScrubGap()
 	}
 	return r.red.scrub(s)
 }

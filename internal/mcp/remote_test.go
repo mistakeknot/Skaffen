@@ -941,3 +941,44 @@ func TestRemoteConnect_CancelledContextStopsConsent(t *testing.T) {
 		t.Fatalf("err = %v, want context.Canceled", err)
 	}
 }
+
+// TestRemoteScrub_ShutdownDuringScrubWithholds pauses a scrub inside the gap
+// where the old code had already decided the remote was live, completes a
+// shutdown, then resumes: the text, which carries a live token, must be
+// withheld rather than returned raw.
+func TestRemoteScrub_ShutdownDuringScrubWithholds(t *testing.T) {
+	f := newFakeAS(t)
+	f.attachMCP()
+	r := newRemoteForTest(t, f)
+	c := connectT(t, r, f)
+	tok := r.currentAccess()
+
+	reached := make(chan struct{})
+	resume := make(chan struct{})
+	r.testScrubGap = func() {
+		close(reached)
+		<-resume
+	}
+	got := make(chan string, 1)
+	go func() { got <- r.scrub("server says " + tok) }()
+	select {
+	case <-reached:
+	case <-time.After(10 * time.Second):
+		t.Fatal("scrub never reached the gap")
+	}
+	r.testScrubGap = nil
+	r.shutdown(c)
+	close(resume)
+
+	select {
+	case out := <-got:
+		if strings.Contains(out, tok) {
+			t.Fatalf("scrub returned the live token after shutdown: %q", out)
+		}
+		if out != redactedText {
+			t.Errorf("a scrub that finished after shutdown must withhold the text, got %q", out)
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("scrub never returned")
+	}
+}

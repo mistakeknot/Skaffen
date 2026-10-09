@@ -96,9 +96,10 @@ func TestRedactor_ScrubsEveryGeneration(t *testing.T) {
 	}
 
 	r.zero()
-	if got := r.scrub(in); got != in {
-		// After zero the set is empty; scrubbing is a no-op by design.
-		t.Errorf("scrub after zero = %q", got)
+	if got := r.scrub(in); got != redactedText {
+		// After zero the redactor cannot tell what to remove, so it
+		// withholds the text instead of returning it unscrubbed.
+		t.Errorf("scrub after zero = %q, want the text withheld", got)
 	}
 }
 
@@ -121,5 +122,25 @@ func TestScrubJSONStrings(t *testing.T) {
 	}
 	if !strings.Contains(string(out), `"minimum":3`) {
 		t.Errorf("numbers must survive unchanged: %s", out)
+	}
+}
+
+func TestRedactor_ClosedWithholdsAndRetainsNothing(t *testing.T) {
+	r := newRedactor()
+	r.add(newSecret(sentinelSecret))
+	if got := r.scrub("a " + sentinelSecret); strings.Contains(got, sentinelSecret) {
+		t.Fatalf("open redactor leaked: %q", got)
+	}
+	r.zero()
+	if got := r.scrub("harmless"); got != redactedText {
+		t.Errorf("closed redactor must withhold non-empty text, got %q", got)
+	}
+	if got := r.scrub(""); got != "" {
+		t.Errorf("empty text stays empty, got %q", got)
+	}
+	late := newSecret("LATE-" + sentinelSecret)
+	r.add(late)
+	if !late.isZero() {
+		t.Error("a credential added after close must be wiped, not retained")
 	}
 }
