@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -68,6 +69,7 @@ type fakeAS struct {
 	access    map[string]bool // access tokens issued and not revoked
 	seq       int
 	dcrBodies []map[string]any
+	dcrProbe  []bool // redirect listener reachable at registration time
 
 	// Observations.
 	MissingResource int // token calls rejected for lacking resource
@@ -238,6 +240,16 @@ func (f *fakeAS) handleRegister(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	redirect, _ := uris[0].(string)
+	if ru, err := url.Parse(redirect); err == nil {
+		// Probe: is something already listening on the registered redirect?
+		conn, derr := net.DialTimeout("tcp", ru.Host, time.Second)
+		if derr == nil {
+			conn.Close()
+		}
+		f.mu.Lock()
+		f.dcrProbe = append(f.dcrProbe, derr == nil)
+		f.mu.Unlock()
+	}
 	f.mu.Lock()
 	id := fmt.Sprintf("client-%d", len(f.clients)+1)
 	f.clients[id] = redirect
@@ -420,8 +432,6 @@ func (fs *foreignServer) count() int {
 func testOpts(pool *x509.CertPool) remoteOptions {
 	return remoteOptions{rootCAs: pool}.withDefaults()
 }
-
-var _ = time.Second
 
 // lastDCR returns the most recent registration request body.
 func (f *fakeAS) lastDCR() map[string]any {
