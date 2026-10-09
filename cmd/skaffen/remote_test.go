@@ -448,8 +448,16 @@ func TestPrintModeSkipsRemote(t *testing.T) {
 		"finance": stubRemoteConfig(s, "finance"),
 		"ledger":  stubRemoteConfig(s, "ledger"),
 	}
+
+	// startMCPForPrint is the function runPrint calls, so a regression that
+	// makes print mode connect remotes shows up here.
 	var buf bytes.Buffer
-	skipRemotesInPrintMode(remotes, &buf)
+	reg := tool.NewRegistry()
+	mgr := startMCPForPrint(context.Background(), reg, nil, remotes, nil, &buf)
+	if mgr != nil {
+		mgr.Shutdown()
+		t.Error("print mode created a manager for remotes alone")
+	}
 	out := buf.String()
 	if strings.Count(out, "\n") != 1 {
 		t.Errorf("want exactly one warning line, got %q", out)
@@ -460,21 +468,17 @@ func TestPrintModeSkipsRemote(t *testing.T) {
 	if strings.Contains(out, s.base()) {
 		t.Errorf("warning leaks the URL: %q", out)
 	}
-
-	buf.Reset()
-	skipRemotesInPrintMode(nil, &buf)
-	if buf.Len() != 0 {
-		t.Errorf("warned with no remotes configured: %q", buf.String())
-	}
-
-	// Print mode passes no remotes on: without stdio plugins there is no
-	// manager at all, and nothing reached the server.
-	reg := tool.NewRegistry()
-	if mgr := loadMCPPluginsFromConfig(context.Background(), reg, nil, nil, nil); mgr != nil {
-		mgr.Shutdown()
-		t.Error("print mode created a manager for remotes alone")
-	}
 	if n := s.totalHits(); n != 0 {
 		t.Errorf("print mode contacted the remote %d time(s)", n)
+	}
+	for _, name := range []string{"finance_remote_list_accounts", "ledger_remote_list_accounts"} {
+		if _, ok := reg.Get(name); ok {
+			t.Errorf("print mode registered a remote tool: %s", name)
+		}
+	}
+
+	buf.Reset()
+	if mgr := startMCPForPrint(context.Background(), reg, nil, nil, nil, &buf); mgr != nil || buf.Len() != 0 {
+		t.Errorf("no remotes configured: manager %v, output %q", mgr, buf.String())
 	}
 }

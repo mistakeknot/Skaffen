@@ -296,8 +296,7 @@ func runPrint() error {
 
 	// Load MCP plugins. Remote servers need an interactive approval, so print
 	// mode does not connect them.
-	skipRemotesInPrintMode(remotesCfg, os.Stderr)
-	mcpMgr := loadMCPPluginsFromConfig(ctx, reg, pluginsCfg, nil, sb)
+	mcpMgr := startMCPForPrint(ctx, reg, pluginsCfg, remotesCfg, sb, os.Stderr)
 	if mcpMgr != nil {
 		defer mcpMgr.Shutdown()
 	}
@@ -852,6 +851,16 @@ func connectRemotes(ctx context.Context, mgr *mcp.Manager, remotes map[string]mc
 		}
 		fmt.Fprintf(os.Stderr, "skaffen: connected remote %q\n", name)
 	}
+}
+
+// startMCPForPrint loads the stdio plugins for print mode and deliberately
+// connects no remote server: approving one needs a person at a terminal, and
+// print mode must stay non-interactive. Remotes are neither passed on nor
+// contacted; one warning line on w says they were left out. runPrint calls
+// this, so tests of it cover the real startup path.
+func startMCPForPrint(ctx context.Context, reg *tool.Registry, pluginsCfg map[string]mcp.PluginConfig, remotes map[string]mcp.RemoteConfig, sb *sandbox.Sandbox, w io.Writer) *mcp.Manager {
+	skipRemotesInPrintMode(remotes, w)
+	return loadMCPPluginsFromConfig(ctx, reg, pluginsCfg, nil, sb)
 }
 
 // skipRemotesInPrintMode explains that print mode does not connect remote
