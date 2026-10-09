@@ -5,8 +5,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"os/exec"
+	"regexp"
 	"strings"
 	"time"
 
@@ -54,8 +56,28 @@ type remoteCallError struct {
 func (e *remoteCallError) Error() string { return e.msg }
 func (e *remoteCallError) Unwrap() error { return e.ctxErr }
 
+// urlInText matches an absolute http(s) URL embedded in error text.
+var urlInText = regexp.MustCompile(`https?://[^\s"'<>\\]+`)
+
+// hostOnlyURLs rewrites every absolute URL in s to scheme://host. The SDK and
+// net/http wrap transport failures in *url.Error, which carries the full
+// request URL; a configured URL may hold a path or query that identifies the
+// account or carries a key, and none of that belongs in text the model or the
+// startup log sees. A URL that does not parse is replaced outright.
+func hostOnlyURLs(s string) string {
+	return urlInText.ReplaceAllStringFunc(s, func(m string) string {
+		trimmed := strings.TrimRight(m, ":.,;)]")
+		tail := m[len(trimmed):]
+		u, err := url.Parse(trimmed)
+		if err != nil || u.Host == "" {
+			return "<url>" + tail
+		}
+		return u.Scheme + "://" + u.Host + tail
+	})
+}
+
 func (c *Client) remoteErr(err error, format string, args ...any) error {
-	re := &remoteCallError{msg: c.scrub(fmt.Sprintf(format, args...) + ": " + err.Error())}
+	re := &remoteCallError{msg: c.scrub(hostOnlyURLs(fmt.Sprintf(format, args...) + ": " + err.Error()))}
 	var rpcErr *jsonrpc.Error
 	re.answered = errors.As(err, &rpcErr)
 	switch {
