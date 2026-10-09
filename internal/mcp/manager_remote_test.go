@@ -694,3 +694,93 @@ func TestManagerRemote_NoCredentialInResultsOrLogs(t *testing.T) {
 	mgr.Shutdown()
 	assertNoSecret(t, "stderr", m.tokensSeen(), stderr())
 }
+
+func TestManagerRemotePolicy_CancelWhileAnotherCallerHoldsReconnectLock(t *testing.T) {
+	f := newFakeAS(t)
+	m := f.attachMCP()
+	mgr, reg, _ := connectedManager(t, f)
+	h := mgr.remotes[f.config().Name]
+	if h == nil {
+		t.Fatal("remote handle not found")
+	}
+	m.set(func(k *fakeKnobs) { k.dropSessions = 1 })
+
+	// Another caller owns the reconnect lock.
+	h.rmu.Lock()
+	held := true
+	release := func() {
+		if held {
+			held = false
+			h.rmu.Unlock()
+		}
+	}
+	defer release()
+
+	before := m.requests()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	done := make(chan tool.ToolResult, 1)
+	go func() {
+		done <- reg.Execute(ctx, remoteOrient, "finance_remote_list_accounts", json.RawMessage(`{}`))
+	}()
+	deadline := time.Now().Add(10 * time.Second)
+	for m.requests() == before { // the call reached the server and was told the session is gone
+		if time.Now().After(deadline) {
+			t.Fatal("the call never reached the server")
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	time.Sleep(100 * time.Millisecond) // let the caller queue behind the lock
+	cancel()
+
+	select {
+	case res := <-done:
+		if !res.IsError {
+			t.Error("a cancelled call should fail")
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("a cancelled caller kept waiting for the reconnect lock")
+	}
+	release()
+	time.Sleep(200 * time.Millisecond)
+	if n := m.count("initialize"); n != 1 {
+		t.Errorf("initialize requests = %d: a caller that gave up must not dial", n)
+	}
+	h.mu.RLock()
+	used := h.reconnects
+	h.mu.RUnlock()
+	if used != 0 {
+		t.Errorf("reconnects used = %d, want 0", used)
+	}
+}
+
+func TestManagerRemotePolicy_OneDeadlineAcrossReconnectAndRetry(t *testing.T) {
+	f := newFakeAS(t)
+	m := f.attachMCP()
+	const op = 900 * time.Millisecond
+	_, reg, _ := connectedManager(t, f, func(o *remoteOptions) { o.opTimeout = op })
+	// The session is lost, the reconnect takes a while, and the retried call
+	// then stalls: all of it is one operation with one deadline.
+	m.set(func(k *fakeKnobs) { k.dropSessions = 1; k.initDelay = 500 * time.Millisecond })
+	var armed atomic.Bool
+	go func() { // stall only the retry, once the reconnect has started
+		for !armed.Load() {
+			if m.count("initialize") >= 2 {
+				m.set(func(k *fakeKnobs) { k.callMode = "stall" })
+				armed.Store(true)
+			}
+			time.Sleep(5 * time.Millisecond)
+		}
+	}()
+	defer armed.Store(true)
+
+	start := time.Now()
+	res := execRemote(t, reg, "finance_remote_list_accounts")
+	elapsed := time.Since(start)
+	if !res.IsError {
+		t.Fatal("the stalled retry should fail")
+	}
+	if elapsed > op+op/4 {
+		t.Errorf("operation took %v; the call, reconnect and retry must share one %v deadline", elapsed, op)
+	}
+}

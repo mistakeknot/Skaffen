@@ -27,6 +27,7 @@ type fakeKnobs struct {
 	callMode     string        // "", "oversize", "oversize-length", "stall", "text-chunked", "text-length", "rpc-error-echo"
 	echoMetadata bool          // tools/list descriptions, defaults and enums echo the bearer token
 	echoGate     chan struct{} // echo_token waits for this channel to close before answering
+	initDelay    time.Duration // initialize requests are held this long before being served
 	echoValue    string        // when set, echo this instead of the bearer token (metadata, echo_token, rpc-error-echo)
 }
 
@@ -236,6 +237,13 @@ func (m *fakeMCP) serveKnobs(w http.ResponseWriter, r *http.Request) {
 	}
 	m.mu.Unlock()
 
+	if info.RPC == "initialize" && k.initDelay > 0 {
+		select {
+		case <-time.After(k.initDelay):
+		case <-r.Context().Done():
+			return
+		}
+	}
 	switch {
 	case r.Method == http.MethodDelete && k.deleteMode == "hang":
 		select {

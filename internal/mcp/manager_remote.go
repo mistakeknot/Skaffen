@@ -25,7 +25,7 @@ type remoteHandle struct {
 	allowed map[string]bool // server-side tool names the config permits
 	tools   []ToolInfo      // allowed tools the server offered, already scrubbed
 
-	rmu        sync.Mutex   // serialises reconnects
+	rmu        ctxMutex     // serialises reconnects; waiters give up with their caller
 	mu         sync.RWMutex // protects client, gen, reconnects, closed
 	client     *Client
 	gen        uint64
@@ -208,6 +208,9 @@ func (rc *remoteCaller) CallTool(ctx context.Context, name string, arguments map
 	if !h.allowed[name] {
 		return rc.refusal("mcp tool %q is not enabled for remote %q", name, h.name), nil
 	}
+	// One deadline covers the call, any reconnect and the retry.
+	ctx, cancel := context.WithTimeout(ctx, h.r.opts.opTimeout)
+	defer cancel()
 	if res, refused := rc.unavailable(); refused {
 		return res, nil
 	}
@@ -222,7 +225,7 @@ func (rc *remoteCaller) CallTool(ctx context.Context, name string, arguments map
 	if !rc.reconnectable(ctx, err) {
 		return rc.failed(name, err), nil
 	}
-	client, ok := rc.reconnect(gen)
+	client, ok := rc.reconnect(ctx, gen)
 	if !ok {
 		return rc.failed(name, err), nil
 	}
@@ -263,11 +266,18 @@ func (rc *remoteCaller) reconnectable(ctx context.Context, err error) bool {
 // reconnect replaces the session that failed at generation gen. When another
 // caller already replaced it, that caller's session is used. It reuses the
 // held credentials, never prompts, and is limited to maxRespawns over the
-// life of the remote.
-func (rc *remoteCaller) reconnect(gen uint64) (*Client, bool) {
+// life of the remote. ctx is the caller's operation context: waiting for the
+// reconnect lock and dialing both end with it, and a caller that has given up
+// never dials.
+func (rc *remoteCaller) reconnect(ctx context.Context, gen uint64) (*Client, bool) {
 	h := rc.h
-	h.rmu.Lock()
+	if err := h.rmu.LockCtx(ctx); err != nil {
+		return nil, false
+	}
 	defer h.rmu.Unlock()
+	if ctx.Err() != nil {
+		return nil, false
+	}
 
 	h.mu.RLock()
 	cur, curGen, used, closed := h.client, h.gen, h.reconnects, h.closed
@@ -287,7 +297,7 @@ func (rc *remoteCaller) reconnect(gen uint64) (*Client, bool) {
 	}
 
 	r := h.r
-	dctx, cancel := context.WithTimeout(context.Background(), r.opts.opTimeout)
+	dctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	stop := context.AfterFunc(r.authCtx, cancel)
 	defer stop()
