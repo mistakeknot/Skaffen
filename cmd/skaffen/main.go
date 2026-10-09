@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"runtime/debug"
+	"sort"
 	"strings"
 	"syscall"
 	"time"
@@ -109,15 +110,20 @@ func main() {
 
 // initConfig loads and merges configuration from user-global and per-project
 // directories, applies CLI flag overrides, and returns the resolved config,
-// routing config, and plugin configs.
-func initConfig() (*config.Config, *router.Config, map[string]mcp.PluginConfig, error) {
+// routing config, stdio plugin configs, and remote server configs.
+//
+// Remote servers ([remote.NAME] tables) are read only from the user-global
+// plugins.toml, or from the file given with --plugins. A project's plugins
+// file is untrusted: it can start local processes only through the existing
+// stdio path, and it can never add, replace or redirect a remote server.
+func initConfig() (*config.Config, *router.Config, map[string]mcp.PluginConfig, map[string]mcp.RemoteConfig, error) {
 	workDir, err := os.Getwd()
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("getwd: %w", err)
+		return nil, nil, nil, nil, fmt.Errorf("getwd: %w", err)
 	}
 	cfg, err := config.Load(workDir)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 
 	// Load and merge routing configs (user-global base, per-project overlay)
@@ -164,6 +170,7 @@ func initConfig() (*config.Config, *router.Config, map[string]mcp.PluginConfig, 
 
 	// Load and merge plugin configs
 	var pluginsCfg map[string]mcp.PluginConfig
+	var remotes map[string]mcp.RemoteConfig
 	if *flagPlugins != "" {
 		// CLI flag overrides entire config hierarchy
 		pluginsCfg, err = mcp.LoadConfig(*flagPlugins)
@@ -171,9 +178,14 @@ func initConfig() (*config.Config, *router.Config, map[string]mcp.PluginConfig, 
 			fmt.Fprintf(os.Stderr, "skaffen: warning: plugins config: %v\n", err)
 			pluginsCfg = make(map[string]mcp.PluginConfig)
 		}
+		remotes = loadTrustedRemotes(*flagPlugins)
 	} else {
+		trusted := filepath.Join(cfg.UserDir(), "plugins.toml")
 		pluginPaths := cfg.PluginPaths()
 		for _, p := range pluginPaths {
+			if p != trusted && mcp.DeclaresRemote(p) {
+				fmt.Fprintf(os.Stderr, "skaffen: warning: %s declares [remote.*] servers; remotes are read only from the user-global plugins.toml or --plugins, so they are ignored\n", p)
+			}
 			pcfg, err := mcp.LoadConfig(p)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "skaffen: warning: plugins config %s: %v\n", p, err)
@@ -188,6 +200,7 @@ func initConfig() (*config.Config, *router.Config, map[string]mcp.PluginConfig, 
 		if pluginsCfg == nil {
 			pluginsCfg = make(map[string]mcp.PluginConfig)
 		}
+		remotes = loadTrustedRemotes(trusted)
 	}
 
 	// Auto-discover Interverse plugins (MCP servers merged here;
@@ -202,7 +215,27 @@ func initConfig() (*config.Config, *router.Config, map[string]mcp.PluginConfig, 
 		}
 	}
 
-	return cfg, routerCfg, pluginsCfg, nil
+	// A stdio plugin (including a discovered one) never shadows a remote: on a
+	// name collision the remote is skipped, not the other way around.
+	if len(remotes) > 0 {
+		var cerr error
+		remotes, cerr = mcp.DropCollidingRemotes(remotes, pluginsCfg)
+		if cerr != nil {
+			fmt.Fprintf(os.Stderr, "skaffen: warning: %v\n", cerr)
+		}
+	}
+
+	return cfg, routerCfg, pluginsCfg, remotes, nil
+}
+
+// loadTrustedRemotes reads the [remote.*] tables of a trusted plugins file.
+// Invalid entries are reported and skipped; valid ones are kept.
+func loadTrustedRemotes(path string) map[string]mcp.RemoteConfig {
+	remotes, err := mcp.LoadRemoteConfig(path)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "skaffen: warning: remote config: %v\n", err)
+	}
+	return remotes
 }
 
 func runPrint() error {
@@ -245,7 +278,7 @@ func runPrint() error {
 	tool.RegisterBuiltins(reg)
 
 	// Load config (user-global + per-project + CLI overrides)
-	cfg, routerCfg, pluginsCfg, err := initConfig()
+	cfg, routerCfg, pluginsCfg, remotesCfg, err := initConfig()
 	if err != nil {
 		return fmt.Errorf("config: %w", err)
 	}
@@ -261,8 +294,10 @@ func runPrint() error {
 		}
 	}
 
-	// Load MCP plugins
-	mcpMgr := loadMCPPluginsFromConfig(ctx, reg, pluginsCfg, sb)
+	// Load MCP plugins. Remote servers need an interactive approval, so print
+	// mode does not connect them.
+	skipRemotesInPrintMode(remotesCfg, os.Stderr)
+	mcpMgr := loadMCPPluginsFromConfig(ctx, reg, pluginsCfg, nil, sb)
 	if mcpMgr != nil {
 		defer mcpMgr.Shutdown()
 	}
@@ -480,7 +515,7 @@ func runTUI() error {
 	tool.RegisterBuiltins(reg)
 
 	// Load config (user-global + per-project + CLI overrides)
-	cfg, routerCfg, pluginsCfg, err := initConfig()
+	cfg, routerCfg, pluginsCfg, remotesCfg, err := initConfig()
 	if err != nil {
 		return fmt.Errorf("config: %w", err)
 	}
@@ -494,10 +529,8 @@ func runTUI() error {
 		}
 	}
 
-	// Load MCP plugins (use timeout context since TUI manages its own context)
-	mcpCtx, mcpCancel := context.WithTimeout(context.Background(), 30*time.Second)
-	mcpMgr := loadMCPPluginsFromConfig(mcpCtx, reg, pluginsCfg, sb)
-	mcpCancel()
+	// Load MCP plugins, then connect remote servers (see startMCPForTUI)
+	mcpMgr := startMCPForTUI(reg, pluginsCfg, remotesCfg, sb, mcp.Consent{})
 	if mcpMgr != nil {
 		defer mcpMgr.Shutdown()
 	}
@@ -736,19 +769,99 @@ func checkIntercore() *router.ICClient {
 	return ic
 }
 
-// loadMCPPluginsFromConfig loads pre-resolved plugin configs into the registry.
-// Returns the manager (may be nil if no plugins configured) — caller must defer Shutdown().
-func loadMCPPluginsFromConfig(ctx context.Context, reg *tool.Registry, pluginsCfg map[string]mcp.PluginConfig, sb *sandbox.Sandbox) *mcp.Manager {
-	if len(pluginsCfg) == 0 {
+// loadMCPPluginsFromConfig loads pre-resolved stdio plugin configs into the
+// registry and returns the manager. The manager is created when there are
+// stdio plugins or remote servers; it is nil when there are neither. Remote
+// servers are only recorded as a reason to create the manager: they are
+// connected separately by connectRemotes. The caller must defer Shutdown().
+func loadMCPPluginsFromConfig(ctx context.Context, reg *tool.Registry, pluginsCfg map[string]mcp.PluginConfig, remotes map[string]mcp.RemoteConfig, sb *sandbox.Sandbox) *mcp.Manager {
+	if len(pluginsCfg) == 0 && len(remotes) == 0 {
 		return nil
 	}
 	mgr := mcp.NewManager(pluginsCfg, reg, sb)
+	if len(pluginsCfg) == 0 {
+		return mgr
+	}
 	if err := mgr.LoadAll(ctx); err != nil {
 		fmt.Fprintf(os.Stderr, "skaffen: warning: MCP plugins: %v\n", err)
 	}
 	fmt.Fprintf(os.Stderr, "skaffen: loaded %d MCP plugin(s), %d tool(s)\n",
 		mgr.PluginCount(), mgr.ToolCount())
 	return mgr
+}
+
+// startMCPForTUI starts stdio plugins under a 30 second startup deadline, then
+// connects remote servers under their own, separate contexts. The deadline
+// that bounds a plugin spawn must not also bound an interactive approval, so
+// the remotes get a fresh live context rather than the expired one. Optional
+// prep functions run on the manager before any remote connects.
+func startMCPForTUI(reg *tool.Registry, pluginsCfg map[string]mcp.PluginConfig, remotes map[string]mcp.RemoteConfig, sb *sandbox.Sandbox, consent mcp.Consent, prep ...func(*mcp.Manager)) *mcp.Manager {
+	mcpCtx, mcpCancel := context.WithTimeout(context.Background(), 30*time.Second)
+	mgr := loadMCPPluginsFromConfig(mcpCtx, reg, pluginsCfg, remotes, sb)
+	mcpCancel()
+	if mgr == nil {
+		return nil
+	}
+	for _, p := range prep {
+		p(mgr)
+	}
+	if len(remotes) > 0 {
+		connectRemotes(context.Background(), mgr, remotes, consent)
+	}
+	return mgr
+}
+
+// remoteConnectMargin is added to the approval timeout to bound everything
+// else one remote does at startup (discovery, token exchange, tool listing).
+const remoteConnectMargin = time.Minute
+
+// connectRemotes connects each configured remote server in name order. It
+// installs its own interrupt handler: pressing Ctrl-C while an approval is
+// pending abandons that approval and the remaining ones, and startup carries
+// on without them. A remote that fails is reported and skipped; it never
+// stops the others or the session. ctx is the parent for every remote; each
+// remote gets its own deadline of the approval timeout plus a margin.
+func connectRemotes(ctx context.Context, mgr *mcp.Manager, remotes map[string]mcp.RemoteConfig, consent mcp.Consent) {
+	if len(remotes) == 0 {
+		return
+	}
+	ictx, stop := signal.NotifyContext(ctx, os.Interrupt)
+	defer stop()
+
+	names := make([]string, 0, len(remotes))
+	for n := range remotes {
+		names = append(names, n)
+	}
+	sort.Strings(names)
+
+	wait := consent.Timeout
+	if wait <= 0 {
+		wait = 5 * time.Minute
+	}
+	for i, name := range names {
+		if ictx.Err() != nil {
+			fmt.Fprintf(os.Stderr, "skaffen: startup interrupted; skipping remote(s): %s\n", strings.Join(names[i:], ", "))
+			return
+		}
+		rctx, cancel := context.WithTimeout(ictx, wait+remoteConnectMargin)
+		err := mgr.ConnectRemote(rctx, remotes[name], consent)
+		cancel()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "skaffen: warning: %v\n", err)
+			continue
+		}
+		fmt.Fprintf(os.Stderr, "skaffen: connected remote %q\n", name)
+	}
+}
+
+// skipRemotesInPrintMode explains that print mode does not connect remote
+// servers: approving one needs a person at a terminal, and print mode must
+// stay non-interactive.
+func skipRemotesInPrintMode(remotes map[string]mcp.RemoteConfig, w io.Writer) {
+	if len(remotes) == 0 {
+		return
+	}
+	fmt.Fprintf(w, "skaffen: warning: %d remote server(s) configured but not connected: print mode is non-interactive; use the TUI to approve them\n", len(remotes))
 }
 
 // loadHooks loads and merges hook configs (user-global + per-project),
