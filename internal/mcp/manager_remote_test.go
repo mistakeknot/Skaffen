@@ -804,3 +804,84 @@ func TestManagerRemotePolicy_OneDeadlineAcrossReconnectAndRetry(t *testing.T) {
 		t.Errorf("operation took %v; the call, reconnect and retry must share one %v deadline", elapsed, op)
 	}
 }
+
+// A refresh that stalls while a call is reconnecting must not hold the call
+// past its caller's cancellation. The cancelled refresh is ambiguous (the
+// server may have rotated the refresh token), so the remote is then terminal.
+func TestManagerRemotePolicy_CancelDuringStalledRefreshInReconnect(t *testing.T) {
+	f := newFakeAS(t)
+	m := f.attachMCP()
+	mgr, reg, _ := connectedManager(t, f)
+	h := mgr.remotes[f.config().Name]
+	if h == nil {
+		t.Fatal("remote handle not found")
+	}
+	m.set(func(k *fakeKnobs) { k.dropSessions = 1 })
+
+	// Hold the reconnect lock so the token can be aged between the failed
+	// call and its reconnect.
+	h.rmu.Lock()
+	held := true
+	release := func() {
+		if held {
+			held = false
+			h.rmu.Unlock()
+		}
+	}
+	defer release()
+
+	before := m.requests()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	done := make(chan tool.ToolResult, 1)
+	go func() {
+		done <- reg.Execute(ctx, remoteOrient, "finance_remote_list_accounts", json.RawMessage(`{}`))
+	}()
+	deadline := time.Now().Add(10 * time.Second)
+	for m.requests() == before {
+		if time.Now().After(deadline) {
+			t.Fatal("the call never reached the server")
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	time.Sleep(100 * time.Millisecond) // the caller is queued for the reconnect
+
+	entered := make(chan struct{}, 1)
+	f.tune(func(f *fakeAS) { f.refreshMode, f.refreshEntered = "stall", entered })
+	h.r.tokMu.Lock()
+	h.r.tok.expiry = time.Now().Add(time.Second) // inside the refresh leeway
+	h.r.tokMu.Unlock()
+	release()
+
+	select {
+	case <-entered:
+	case <-time.After(10 * time.Second):
+		t.Fatal("the reconnect never reached the refresh")
+	}
+	start := time.Now()
+	cancel()
+	select {
+	case res := <-done:
+		if !res.IsError {
+			t.Error("a cancelled call should fail")
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatalf("a cancelled caller kept waiting on the stalled refresh (%v)", time.Since(start))
+	}
+
+	// The aborted refresh may have rotated the token: nothing refreshes again.
+	f.tune(func(f *fakeAS) { f.refreshMode = "" })
+	res := execRemote(t, reg, "finance_remote_list_accounts")
+	if !res.IsError {
+		t.Error("a remote whose refresh was aborted mid-flight must stay failed")
+	}
+	refreshes := 0
+	for _, rec := range f.hits("/token") {
+		if rec.Form.Get("grant_type") == "refresh_token" {
+			refreshes++
+		}
+	}
+	if refreshes != 1 {
+		t.Errorf("refresh requests = %d, want exactly the one that was aborted", refreshes)
+	}
+}

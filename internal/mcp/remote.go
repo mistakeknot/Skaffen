@@ -331,7 +331,7 @@ func (r *remote) accessToken(ctx context.Context) (string, error) {
 		return "", ErrRemoteClosed
 	}
 	if !r.tok.expiry.IsZero() && time.Until(r.tok.expiry) < refreshLeeway && !r.closing.Load() {
-		if err := r.refreshLocked(); err != nil {
+		if err := r.refreshLocked(ctx); err != nil {
 			return "", err
 		}
 	}
@@ -355,7 +355,7 @@ func (r *remote) refreshAfter401(ctx context.Context, used string) (string, erro
 	if r.closing.Load() {
 		return "", ErrRemoteClosed
 	}
-	if err := r.refreshLocked(); err != nil {
+	if err := r.refreshLocked(ctx); err != nil {
 		return "", err
 	}
 	return r.tok.access.reveal(), nil
@@ -367,15 +367,30 @@ func (r *remote) refreshAfter401(ctx context.Context, used string) (string, erro
 // or unreadable reply the server may already have rotated the refresh token,
 // so retrying could replay a spent credential. The recorded reason is the
 // boundary-built OAuth error, which never carries a response body.
-func (r *remote) refreshLocked() error {
+//
+// The request is bound to both the shared authentication context and the
+// caller's ctx, so a caller that is cancelled or out of budget is not held for
+// the OAuth timeout behind a stalled refresh. Aborting the request mid-flight
+// is as ambiguous as a lost reply (the server may have rotated the refresh
+// token already), so it is terminal too; the safer alternative of letting the
+// refresh run on for other callers would keep a rotated credential in doubt.
+// A ctx that is already done fails before anything is sent and is not terminal.
+func (r *remote) refreshLocked(ctx context.Context) error {
 	if f := r.failure.Load(); f != nil {
 		return f.err
+	}
+	if err := ctx.Err(); err != nil {
+		return err
 	}
 	old := r.tok
 	if old.refresh.isZero() {
 		return r.setFailure(kindTerminalAuth, fmt.Errorf("%w: the access token expired and no refresh token is held", ErrRemoteAuth))
 	}
-	ts, err := r.oc.refresh(r.authCtx, old.refresh)
+	rctx, rcancel := context.WithCancel(r.authCtx)
+	stop := context.AfterFunc(ctx, rcancel)
+	ts, err := r.oc.refresh(rctx, old.refresh)
+	stop()
+	rcancel()
 	if err != nil {
 		if errors.Is(err, ErrScopeMismatch) {
 			old.zero()
