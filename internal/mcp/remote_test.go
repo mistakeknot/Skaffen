@@ -1198,60 +1198,80 @@ func TestRemoteShutdown_StalledRefreshWithQueuedDeleteIsBounded(t *testing.T) {
 // TestRemoteErrors_ConfiguredURLQueryNeverSurfaces connects to a server whose
 // configured URL carries a sensitive query parameter, takes the server away,
 // and checks that no network failure surfaced to the caller or to a
-// reconnect names anything but the host.
+// reconnect repeats any of the URL beyond its scheme and host. The queries
+// include the characters a pattern-based rewrite would stop at.
 func TestRemoteErrors_ConfiguredURLQueryNeverSurfaces(t *testing.T) {
-	f := newFakeAS(t)
-	f.attachMCP()
-	query := "SENTINEL-QUERY-" + f.tag
-	cfg := f.config()
-	cfg.URL += "?apikey=" + query
-	f.prmResource = cfg.URL
-
-	opts := testOpts(f.pool())
-	opts.closeGrace = 400 * time.Millisecond
-	opts.httpTimeout = 10 * time.Second
-	r := newRemote(cfg, opts)
-	t.Cleanup(func() { r.shutdown(nil) })
-	c, err := r.connect(ctxT(t), Consent{Timeout: 10 * time.Second, Prompt: autoApprove(f)})
-	if err != nil {
-		t.Fatalf("connect: %v", err)
-	}
-	t.Cleanup(func() { r.shutdown(c) })
-
-	f.srv.Close() // every further request is a network failure
-
-	_, callErr := c.CallTool(ctxT(t), "list_accounts", nil)
-	if callErr == nil {
-		t.Fatal("the call should fail with the server gone")
-	}
-	_, listErr := c.ListTools(ctxT(t))
-	if listErr == nil {
-		t.Fatal("ListTools should fail with the server gone")
-	}
-	_, dialErr := r.dial(ctxT(t))
-	if dialErr == nil {
-		t.Fatal("dial should fail with the server gone")
-	}
-	for what, err := range map[string]error{"CallTool": callErr, "ListTools": listErr, "dial": dialErr} {
-		assertNoSecret(t, what+" error", []string{query, "apikey"}, errStrings(err)...)
-		if !strings.Contains(err.Error(), "127.0.0.1") {
-			t.Errorf("%s error should still name the host: %q", what, err)
-		}
-	}
-}
-
-func TestHostOnlyURLs(t *testing.T) {
-	tests := []struct{ name, in, want string }{
-		{"query", `Post "https://h.example:8443/mcp?k=S": refused`, `Post "https://h.example:8443": refused`},
-		{"userinfo", `get https://user:pw@h.example/p failed`, `get https://h.example failed`},
-		{"trailing colon", `dial https://h.example/a/b: refused`, `dial https://h.example: refused`},
-		{"escaped quote", `Post \"https://h.example/mcp?k=S\": x`, `Post \"https://h.example\": x`},
-		{"no url", `plain text`, `plain text`},
-		{"two", `a http://x.test/p?q=1 b https://y.test/z c`, `a http://x.test b https://y.test c`},
+	tests := []struct{ name, query string }{
+		{"plain", "apikey=%s"},
+		{"apostrophe", "label='&apikey=%s"},
+		{"escaped delimiter", "label=a%%26apikey%%3D%s"},
+		{"double quote", `label="x&apikey=%s`},
+		{"angle and backslash", `label=<\>&apikey=%s`},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := hostOnlyURLs(tt.in); got != tt.want {
+			f := newFakeAS(t)
+			f.attachMCP()
+			sentinel := "SENTINEL-QUERY-" + f.tag
+			cfg := f.config()
+			cfg.URL += "?" + fmt.Sprintf(tt.query, sentinel)
+			f.prmResource = cfg.URL
+
+			opts := testOpts(f.pool())
+			opts.closeGrace = 400 * time.Millisecond
+			opts.httpTimeout = 10 * time.Second
+			r := newRemote(cfg, opts)
+			t.Cleanup(func() { r.shutdown(nil) })
+			c, err := r.connect(ctxT(t), Consent{Timeout: 10 * time.Second, Prompt: autoApprove(f)})
+			if err != nil {
+				t.Fatalf("connect: %v", err)
+			}
+			t.Cleanup(func() { r.shutdown(c) })
+
+			f.srv.Close() // every further request is a network failure
+
+			_, callErr := c.CallTool(ctxT(t), "list_accounts", nil)
+			_, listErr := c.ListTools(ctxT(t))
+			_, dialErr := r.dial(ctxT(t))
+			for what, err := range map[string]error{"CallTool": callErr, "ListTools": listErr, "dial": dialErr} {
+				if err == nil {
+					t.Fatalf("%s should fail with the server gone", what)
+				}
+				assertNoSecret(t, what+" error", []string{sentinel, "apikey", "label", "SENTINEL"}, errStrings(err)...)
+				if !strings.Contains(err.Error(), f.base()) {
+					t.Errorf("%s error should name the configured scheme and host %s: %q", what, f.base(), err)
+				}
+				if !strings.Contains(err.Error(), "connection refused") {
+					t.Errorf("%s error should classify the failure: %q", what, err)
+				}
+			}
+		})
+	}
+}
+
+func TestTransportClass(t *testing.T) {
+	tests := []struct {
+		name string
+		err  error
+		want string
+	}{
+		{"refused", errors.New(`Post "https://h/p?k=S": dial tcp 1.2.3.4:443: connect: connection refused`), "connection refused"},
+		{"dns", errors.New(`dial tcp: lookup h.invalid: no such host`), "DNS lookup failed"},
+		{"tls", errors.New(`tls: failed to verify certificate: x509: certificate signed by unknown authority`), "TLS or certificate error"},
+		{"timeout text", errors.New(`net/http: request canceled (Client.Timeout exceeded while awaiting headers)`), "timed out"},
+		{"deadline", context.DeadlineExceeded, "timed out"},
+		{"canceled", context.Canceled, "canceled"},
+		{"eof", errors.New(`Post "https://h/p?k=S": EOF`), "connection reset"},
+		{"reset", errors.New(`read tcp: connection reset by peer`), "connection reset"},
+		{"status", errors.New(`unexpected status code 502 from server`), "HTTP status 502"},
+		{"auth sentinel", fmt.Errorf("x: %v", ErrRemoteAuth), "authentication failed"},
+		{"protocol sentinel", fmt.Errorf("x: %v", ErrRemoteProtocol), "protocol violation"},
+		{"closed sentinel", fmt.Errorf("x: %v", ErrRemoteClosed), "connection closed"},
+		{"unknown", errors.New(`something about https://h/p?k='S`), "transport error"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := transportClass(tt.err); got != tt.want {
 				t.Fatalf("got %q, want %q", got, tt.want)
 			}
 		})

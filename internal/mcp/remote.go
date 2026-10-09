@@ -240,6 +240,17 @@ func (r *remote) connect(ctx context.Context, consent Consent) (*Client, error) 
 
 // dial opens an MCP session with the credentials already held. It performs no
 // consent, so a reconnect never prompts the user.
+// displayOrigin is the configured scheme and host, parsed from the
+// configuration rather than from any error text. It is empty only if the
+// configured URL cannot be parsed, which validation rules out.
+func (r *remote) displayOrigin() string {
+	u, err := url.Parse(r.cfg.URL)
+	if err != nil || u.Host == "" {
+		return "unknown host"
+	}
+	return u.Scheme + "://" + u.Host
+}
+
 func (r *remote) dial(ctx context.Context) (*Client, error) {
 	if err := r.failureErr(); err != nil {
 		return nil, err
@@ -253,7 +264,7 @@ func (r *remote) dial(ctx context.Context) (*Client, error) {
 		MaxRetries:           -1,
 		DisableStandaloneSSE: true,
 	}
-	c, err := newTransportClient(ctx, tr, r.scrub, r.opts.opTimeout)
+	c, err := newTransportClient(ctx, tr, r.scrub, r.opts.opTimeout, r.displayOrigin())
 	if err != nil {
 		if fe := r.failureErr(); fe != nil {
 			return nil, fe
