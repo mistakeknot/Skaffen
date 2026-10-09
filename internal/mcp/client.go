@@ -3,10 +3,12 @@ package mcp
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
 	"strings"
+	"time"
 
 	"github.com/mistakeknot/Skaffen/internal/sandbox"
 	gomcp "github.com/modelcontextprotocol/go-sdk/mcp"
@@ -26,9 +28,62 @@ type CallResult struct {
 	IsError bool
 }
 
-// Client wraps an MCP stdio connection to a single server.
+// Client wraps an MCP connection to a single server.
 type Client struct {
 	session *gomcp.ClientSession
+
+	// scrub and opTimeout are set only for remote connections: every string
+	// that came from the server passes through scrub before the caller sees
+	// it, and each operation is bounded by opTimeout in total.
+	scrub     func(string) string
+	opTimeout time.Duration
+}
+
+// remoteCallError is the only error a remote Client returns. Its text has been
+// scrubbed; only context cancellation or deadline identity survives, so no
+// wrapped SDK or transport error can carry server text to the caller.
+type remoteCallError struct {
+	msg    string
+	ctxErr error
+}
+
+func (e *remoteCallError) Error() string { return e.msg }
+func (e *remoteCallError) Unwrap() error { return e.ctxErr }
+
+func (c *Client) remoteErr(err error, format string, args ...any) error {
+	re := &remoteCallError{msg: c.scrub(fmt.Sprintf(format, args...) + ": " + err.Error())}
+	switch {
+	case errors.Is(err, context.DeadlineExceeded):
+		re.ctxErr = context.DeadlineExceeded
+	case errors.Is(err, context.Canceled):
+		re.ctxErr = context.Canceled
+	}
+	return re
+}
+
+func newImplementation() *gomcp.Implementation {
+	return &gomcp.Implementation{Name: "skaffen", Version: "0.2.0"}
+}
+
+// newTransportClient connects over an arbitrary transport (the remote HTTP
+// transport) and returns a Client that scrubs everything the server sends.
+func newTransportClient(ctx context.Context, transport gomcp.Transport, scrub func(string) string, opTimeout time.Duration) (*Client, error) {
+	client := gomcp.NewClient(newImplementation(), nil)
+	c := &Client{scrub: scrub, opTimeout: opTimeout}
+	session, err := client.Connect(ctx, transport, nil)
+	if err != nil {
+		return nil, c.remoteErr(err, "mcp connect")
+	}
+	c.session = session
+	return c, nil
+}
+
+// bound applies the per-operation deadline to remote calls.
+func (c *Client) bound(ctx context.Context) (context.Context, context.CancelFunc) {
+	if c.scrub != nil && c.opTimeout > 0 {
+		return context.WithTimeout(ctx, c.opTimeout)
+	}
+	return ctx, func() {}
 }
 
 // NewClient spawns an MCP server subprocess and performs the initialize handshake.
@@ -53,10 +108,7 @@ func NewClient(ctx context.Context, command string, args []string, env map[strin
 
 	transport := &gomcp.CommandTransport{Command: cmd}
 
-	client := gomcp.NewClient(&gomcp.Implementation{
-		Name:    "skaffen",
-		Version: "0.2.0",
-	}, nil)
+	client := gomcp.NewClient(newImplementation(), nil)
 
 	session, err := client.Connect(ctx, transport, nil)
 	if err != nil {
@@ -68,30 +120,51 @@ func NewClient(ctx context.Context, command string, args []string, env map[strin
 
 // ListTools calls tools/list and returns tool metadata.
 func (c *Client) ListTools(ctx context.Context) ([]ToolInfo, error) {
+	ctx, cancel := c.bound(ctx)
+	defer cancel()
 	result, err := c.session.ListTools(ctx, nil)
 	if err != nil {
+		if c.scrub != nil {
+			return nil, c.remoteErr(err, "mcp tools/list")
+		}
 		return nil, fmt.Errorf("mcp tools/list: %w", err)
 	}
 
 	tools := make([]ToolInfo, len(result.Tools))
 	for i, t := range result.Tools {
 		schema, _ := json.Marshal(t.InputSchema)
-		tools[i] = ToolInfo{
+		info := ToolInfo{
 			Name:        t.Name,
 			Description: t.Description,
 			InputSchema: schema,
 		}
+		if c.scrub != nil {
+			info.Name = c.scrub(info.Name)
+			info.Description = c.scrub(info.Description)
+			clean, serr := scrubJSONStrings(schema, c.scrub)
+			if serr != nil {
+				// Withhold a schema that cannot be scrubbed rather than pass it on.
+				clean = json.RawMessage(`{"type":"object"}`)
+			}
+			info.InputSchema = clean
+		}
+		tools[i] = info
 	}
 	return tools, nil
 }
 
 // CallTool calls tools/call and returns the result.
 func (c *Client) CallTool(ctx context.Context, name string, arguments map[string]any) (CallResult, error) {
+	ctx, cancel := c.bound(ctx)
+	defer cancel()
 	result, err := c.session.CallTool(ctx, &gomcp.CallToolParams{
 		Name:      name,
 		Arguments: arguments,
 	})
 	if err != nil {
+		if c.scrub != nil {
+			return CallResult{}, c.remoteErr(err, "mcp tools/call %q", name)
+		}
 		return CallResult{}, fmt.Errorf("mcp tools/call %q: %w", name, err)
 	}
 
@@ -106,8 +179,12 @@ func (c *Client) CallTool(ctx context.Context, name string, arguments map[string
 		}
 	}
 
+	content := sb.String()
+	if c.scrub != nil {
+		content = c.scrub(content)
+	}
 	return CallResult{
-		Content: sb.String(),
+		Content: content,
 		IsError: result.IsError,
 	}, nil
 }

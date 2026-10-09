@@ -74,6 +74,8 @@ type fakeAS struct {
 	// Observations.
 	MissingResource int // token calls rejected for lacking resource
 	Revoked         []string
+
+	mcp http.Handler // MCP endpoint served at /mcp on the same origin
 }
 
 type oauthFailure struct {
@@ -109,6 +111,7 @@ func newFakeAS(t *testing.T) *fakeAS {
 	mux.HandleFunc("/authorize", f.handleAuthorize)
 	mux.HandleFunc("/token", f.handleToken)
 	mux.HandleFunc("/revoke", f.handleRevoke)
+	mux.HandleFunc("/mcp", f.serveMCP)
 	f.srv = httptest.NewTLSServer(f.record(mux))
 	t.Cleanup(f.srv.Close)
 	return f
@@ -308,9 +311,19 @@ func tokenErr(w http.ResponseWriter, status int, code, desc string) {
 	writeJSON(w, status, body)
 }
 
+// tune changes fake knobs while handlers may be running.
+func (f *fakeAS) tune(fn func(*fakeAS)) {
+	f.mu.Lock()
+	fn(f)
+	f.mu.Unlock()
+}
+
 func (f *fakeAS) handleToken(w http.ResponseWriter, r *http.Request) {
-	if f.tokenFail != nil {
-		tokenErr(w, f.tokenFail.Status, f.tokenFail.Code, f.tokenFail.Description)
+	f.mu.Lock()
+	fail := f.tokenFail
+	f.mu.Unlock()
+	if fail != nil {
+		tokenErr(w, fail.Status, fail.Code, fail.Description)
 		return
 	}
 	form := r.PostForm
@@ -359,14 +372,15 @@ func (f *fakeAS) handleToken(w http.ResponseWriter, r *http.Request) {
 	if f.noRotate && grant == "refresh_token" {
 		rt = ""
 	}
+	scope, set := f.scopeRaw[grant]
+	expires := f.expiresIn
 	f.mu.Unlock()
 
 	var sb strings.Builder
-	fmt.Fprintf(&sb, `{"access_token":%q,"token_type":"Bearer","expires_in":%d`, at, f.expiresIn)
+	fmt.Fprintf(&sb, `{"access_token":%q,"token_type":"Bearer","expires_in":%d`, at, expires)
 	if rt != "" {
 		fmt.Fprintf(&sb, `,"refresh_token":%q`, rt)
 	}
-	scope, set := f.scopeRaw[grant]
 	if !set {
 		scope = `"finance:read"`
 	}
@@ -392,6 +406,25 @@ func (f *fakeAS) revoked() []string {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	return append([]string(nil), f.Revoked...)
+}
+
+func (f *fakeAS) serveMCP(w http.ResponseWriter, r *http.Request) {
+	f.mu.Lock()
+	h := f.mcp
+	f.mu.Unlock()
+	if h == nil {
+		http.NotFound(w, r)
+		return
+	}
+	h.ServeHTTP(w, r)
+}
+
+// expireAccess invalidates an access token without revoking its refresh token,
+// as if it had expired on the resource server.
+func (f *fakeAS) expireAccess(tok string) {
+	f.mu.Lock()
+	delete(f.access, tok)
+	f.mu.Unlock()
 }
 
 // acceptsAccess reports whether the access token is currently valid.
